@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # Attention : à l'intérieur de docker-compose, l'hôte de la base
+      # est le nom du service ("db"), jamais "localhost". Voir .env.example.
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - '${DR_PORT:-51213}:5432'
+    networks:
+      - agce_network
+    volumes:
+      # Volume nommé = persistance des données. Sans lui, un `docker
+      # compose down` efface toute la base. Ne jamais le supprimer par erreur.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
+networks:
+  agce_network:
+    driver: bridge

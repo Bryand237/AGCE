@@ -1,0 +1,62 @@
+@import 'tailwindcss';
+
+/*
+ * Design system inspiré TeamHub — vert émeraude, surfaces claires,
+ * cartes arrondies avec ombre légère.
+ */
+@theme {
+  /* Couleurs sémantiques (shadcn-like) */
+  --color-background: oklch(98.5% 0.004 155);
+  --color-foreground: oklch(22% 0.02 155);
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(22% 0.02 155);
+  --color-muted: oklch(96% 0.008 155);
+  --color-muted-foreground: oklch(52% 0.02 155);
+  --color-border: oklch(91% 0.012 155);
+  --color-input: oklch(91% 0.012 155);
+  --color-destructive: oklch(58% 0.22 25);
+  --color-destructive-foreground: oklch(98% 0 0);
+
+  /* Primaire émeraude */
+  --color-primary: oklch(52% 0.14 155);
+  --color-primary-foreground: oklch(99% 0 0);
+
+  --color-success: oklch(55% 0.14 155);
+  --color-warning: oklch(75% 0.16 80);
+  --color-danger: oklch(58% 0.22 25);
+
+  /* Grades — graphiques et badges */
+  --color-grade-pr: oklch(48% 0.13 155);
+  --color-grade-mc: oklch(55% 0.12 175);
+  --color-grade-cc: oklch(62% 0.11 145);
+  --color-grade-ass: oklch(72% 0.1 130);
+
+  --color-sexe-m: oklch(55% 0.14 230);
+  --color-sexe-f: oklch(62% 0.18 340);
+
+  --radius-card: 1rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+
+  /* Alias legacy — compatibilité modules existants */
+  --surface-1: oklch(100% 0 0);
+  --surface-2: oklch(98.5% 0.004 155);
+  --border: oklch(91% 0.012 155);
+  --text-secondary: oklch(52% 0.02 155);
+  --text-accent: oklch(48% 0.13 155);
+  --bg-accent: oklch(95% 0.04 155);
+  --bg-danger: oklch(97% 0.02 25);
+  --text-danger: oklch(58% 0.22 25);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

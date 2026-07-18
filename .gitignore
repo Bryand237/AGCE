@@ -1,0 +1,31 @@
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Dependances
+/node_modules
+
+# Variables d'environnement - ne jamais committer de vraies valeurs
+.env
+.env*.local
+!.env.example
+
+# Build / cache
+/coverage
+.turbo
+*.tsbuildinfo
+
+# Prisma - client genere, jamais versionne
+/src/generated/prisma
+
+# Tests
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Divers
+.DS_Store
+*.pem
+npm-debug.log*

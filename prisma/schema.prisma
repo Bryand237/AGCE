@@ -1,0 +1,341 @@
+// Schéma consolidé — reflète les décisions prises module par module.
+// Absence et HistoriqueAvancement restent provisoires : à affiner quand
+// ces modules seront traités en détail.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// L'URL de connexion ne se déclare plus ici depuis Prisma ORM v7 :
+// voir prisma.config.ts (datasource.url), lu par la CLI Prisma.
+datasource db {
+  provider = "postgresql"
+}
+
+model Utilisateur {
+  id             String    @id @default(uuid())
+  nomUtilisateur String    @unique
+  motDePasseHash String
+  sessions       Session[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Session {
+  id            String      @id @default(uuid())
+  token         String      @unique
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@index([token])
+}
+
+// L'ordre de déclaration compte : PostgreSQL trie un enum nativement selon
+// cet ordre. `orderBy: { grade: 'asc' }` reproduira donc directement le
+// classement Professeurs → MC → CC → Assistants utilisé dans la liste des
+// enseignants et le rapport d'avancement, sans tri manuel côté code.
+enum Grade {
+  PROFESSEUR
+  MAITRE_DE_CONFERENCES
+  CHARGE_DE_COURS
+  ASSISTANT
+}
+
+enum Sexe {
+  M
+  F
+}
+
+enum StatutEnseignant {
+  ACTIF
+  TRANSFERE
+  RETRAITE
+}
+
+enum TypeAvancement {
+  ANCIENNETE
+  CHOIX
+  GRAND_CHOIX
+}
+
+enum TypeAbsence {
+  MISSION
+  CONGE_MATERNITE
+  CONGE_MALADIE
+  CONGE_ADMINISTRATIF
+  AUTRE
+}
+
+enum TypeEtablissement {
+  ECOLE
+  FACULTE
+}
+
+enum StatutRapport {
+  BROUILLON
+  VALIDE
+}
+
+enum StatutDecision {
+  EN_ATTENTE
+  VALIDEE
+}
+
+enum StatutAbsence {
+  EN_ATTENTE
+  EN_PERIODE
+  DEPASSE
+  TERMINE
+}
+
+enum StatutAttestation {
+  EN_ATTENTE
+  VALIDEE
+}
+
+// --- Référentiels ---
+
+model Etablissement {
+  id           String            @id @default(uuid())
+  nom          String
+  abreviation  String            @unique // FALSH, FSJP...
+  type         TypeEtablissement
+  departements Departement[]
+  // Pas de relation directe "enseignants" ici : un enseignant est lié à un
+  // Departement, jamais directement à un Etablissement (voir plus bas).
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Departement {
+  id              String        @id @default(uuid())
+  nom             String // "Département d'Histoire" — académique, distinct de l'origine géographique
+  abreviation     String
+  etablissementId String
+  etablissement   Etablissement @relation(fields: [etablissementId], references: [id])
+  enseignants     Enseignant[]
+
+  @@unique([etablissementId, nom])
+  @@unique([etablissementId, abreviation])
+}
+
+model Region {
+  id                  String               @id @default(uuid())
+  nom                 String               @unique // Adamaoua, Centre, Est... (10 régions, géographie administrative fixe)
+  departementsOrigine DepartementOrigine[]
+}
+
+// Géographie administrative camerounaise (58 départements) — SANS RAPPORT
+// avec `Departement` (académique, ci-dessus). Les deux partagent le mot
+// "département" en français mais sont deux notions totalement différentes ;
+// on les garde strictement séparées dans le code, jamais un seul modèle.
+model DepartementOrigine {
+  id          String       @id @default(uuid())
+  nom         String       @unique // Djérem, Mfoundi, Wouri... (58 au total)
+  regionId    String
+  region      Region       @relation(fields: [regionId], references: [id])
+  enseignants Enseignant[]
+}
+
+// Grille indiciaire — table de référence, jamais de logique conditionnelle en dur.
+// Voir prisma/seed.ts pour le chargement à partir du document officiel.
+//
+// ATTENTION à ne pas confondre deux notions qui se ressemblent :
+// - `voie` : embranchement parallèle et EXCLUSIF. Seul le grade Assistant
+//   en a un (SANS_THESE / AVEC_THESE) — on ne "passe" jamais de l'un à
+//   l'autre par un simple avancement d'échelon. `null` pour tous les
+//   autres grades.
+// - `sousCategorie` : simple libellé d'affichage pour un palier qui ne
+//   se décrit pas en classe/échelon numérotés (Délégué, Stagiaire,
+//   Classe Exceptionnelle, Hors Échelle). N'intervient JAMAIS dans le
+//   calcul du palier suivant — uniquement dans son libellé.
+model EchelonIndiciaire {
+  id            String  @id @default(uuid())
+  grade         Grade
+  voie          String? // SANS_THESE | AVEC_THESE — uniquement pour ASSISTANT
+  sousCategorie String? // DELEGUE | STAGIAIRE | CLASSE_EXCEPTIONNELLE | HORS_ECHELLE (affichage seul)
+  classe        Int? // 1 ou 2 ; null si palier hors numérotation
+  echelon       Int? // null pour les paliers uniques
+  indice        Int
+  ordre         Int // séquence stricte : sert à trouver "le palier suivant"
+
+  enseignantsActuels    Enseignant[]           @relation("PositionActuelle")
+  avancementsDepuis     HistoriqueAvancement[] @relation("PositionAncienne")
+  avancementsVers       HistoriqueAvancement[] @relation("PositionNouvelle")
+  selectionsProposees   SelectionAvancement[]  @relation("PositionProposee")
+
+  @@unique([grade, voie, ordre])
+}
+
+// --- Cœur métier ---
+
+model Enseignant {
+  id            String           @id @default(uuid())
+  matricule     String           @unique
+  nom           String
+  prenom        String
+  sexe          Sexe
+  dateNaissance DateTime
+  lieuNaissance String
+  statut        StatutEnseignant @default(ACTIF)
+  // Renseignée quand statut passe à TRANSFERE (date effective du transfert
+  // hors UN) ou RETRAITE (date effective de départ). Null tant que ACTIF.
+  dateFinService DateTime?
+
+  grade Grade // dénormalisé volontairement (recherche/tri fréquents) — voir note plus bas
+  diplomePlusEleve     String?
+  domaineRecherche     String?
+  datePriseService     DateTime
+  estResident          Boolean  @default(true)
+  contratCollaboration Boolean  @default(false)
+  posteResponsabilite  String?
+  telephone            String?
+  email                String?
+
+  // Un enseignant est lié à un Departement, qui est lié à un Etablissement —
+  // jamais les deux directement : stocker etablissementId ET departementId
+  // sur la même ligne permettrait aux deux de désigner des établissements
+  // différents, une incohérence impossible à empêcher au niveau du schéma.
+  // "Quel établissement ?" se répond toujours par enseignant.departement.etablissement.
+  departementId String
+  departement   Departement @relation(fields: [departementId], references: [id])
+
+  // Même principe : departementOrigine porte la région (via son propre lien
+  // vers Region). Pas de regionOrigineId séparé sur Enseignant.
+  departementOrigineId String?
+  departementOrigine   DepartementOrigine? @relation(fields: [departementOrigineId], references: [id])
+
+  // Position actuelle sur la grille — une vraie référence, pas 3 entiers
+  // recopiés à la main. Impossible d'avoir une combinaison classe/échelon/
+  // indice qui ne corresponde à aucune ligne réelle de la grille : c'est
+  // la base de données elle-même qui l'empêche, pas une validation
+  // applicative qu'on pourrait oublier d'appeler quelque part.
+  //
+  // `grade` ci-dessus est TECHNIQUEMENT dérivable de positionActuelle.grade,
+  // mais reste dupliqué ici volontairement car il sert des recherches/tris
+  // fréquents (voir module Enseignants) — contrairement à `voie`, qui a été
+  // retiré du modèle car jamais interrogé directement. Le risque de
+  // désynchronisation est neutralisé au niveau du code, pas du schéma : la
+  // Server Action qui fixe positionActuelleId DOIT toujours fixer `grade`
+  // dans la même écriture, à partir de positionActuelle.grade — jamais les
+  // deux indépendamment (voir actions.ts du module Enseignants).
+  positionActuelleId String
+  positionActuelle   EchelonIndiciaire @relation("PositionActuelle", fields: [positionActuelleId], references: [id])
+  dateEffetEchelon   DateTime
+
+  historique HistoriqueAvancement[]
+  absences   Absence[]
+  selections SelectionAvancement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departementId])
+  @@index([statut])
+  @@index([grade])
+  @@index([nom, prenom])
+}
+
+model SessionConseil {
+  id                     String   @id @default(uuid())
+  numero                 String   // "l'édition" : 54ème, 55ème...
+  periodeDebut           DateTime
+  periodeFin             DateTime
+  statut                 StatutRapport @default(BROUILLON)
+  motifRejet             String?
+  dateSessionCU          DateTime?
+  dateSessionCA          DateTime?
+  referenceLoiFinances   String?   // loi de finances de l'exercice — change chaque année
+  referenceCirculaire    String?   // circulaire d'exécution budgétaire — idem
+  dateSignatureDecisions DateTime?
+  dateValidation   DateTime?
+  auteurValidation String?
+
+  selections  SelectionAvancement[]
+  avancements HistoriqueAvancement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([statut])
+}
+
+model SelectionAvancement {
+  id                 String            @id @default(uuid())
+  rapportId          String
+  rapport            SessionConseil    @relation(fields: [rapportId], references: [id], onDelete: Cascade)
+  enseignantId       String
+  enseignant         Enseignant        @relation(fields: [enseignantId], references: [id])
+  positionProposeeId String
+  positionProposee   EchelonIndiciaire @relation("PositionProposee", fields: [positionProposeeId], references: [id])
+
+  @@unique([rapportId, enseignantId])
+}
+
+model HistoriqueAvancement {
+  id           String          @id @default(uuid())
+  enseignantId String
+  enseignant   Enseignant      @relation(fields: [enseignantId], references: [id])
+  sessionId    String?
+  session      SessionConseil? @relation(fields: [sessionId], references: [id])
+
+  anciennePositionId String
+  anciennePosition   EchelonIndiciaire @relation("PositionAncienne", fields: [anciennePositionId], references: [id])
+  dateAncienEffet    DateTime
+
+  nouvellePositionId String
+  nouvellePosition   EchelonIndiciaire @relation("PositionNouvelle", fields: [nouvellePositionId], references: [id])
+  dateNouvelEffet    DateTime
+  auteurValidationDecision String?
+
+  typeAvancement TypeAvancement?
+  numeroDecision String?
+  avisCU         Boolean         @default(false)
+  avisCA         Boolean         @default(false)
+  observations   String?
+  decisionGeneree        Bytes?
+  statutDecision         StatutDecision?
+  dateValidationDecision DateTime?
+
+  creeLe DateTime @default(now())
+
+  @@index([enseignantId, dateNouvelEffet])
+}
+
+model Absence {
+  id           String        @id @default(uuid())
+  enseignantId String
+  enseignant   Enseignant    @relation(fields: [enseignantId], references: [id])
+  type         TypeAbsence
+  statut       StatutAbsence @default(EN_ATTENTE)
+
+  dateDebut  DateTime
+  dateFin    DateTime
+  dateRetour DateTime?
+
+  dateValidation   DateTime?
+  auteurValidation String?
+
+  // Spécifique congé maternité — nuls pour les autres types
+  referenceCorrespondance String?
+  dateCorrespondance      DateTime?
+  dateDemandeInteressee   DateTime?
+
+  motif String?
+
+  numeroDecision              String?
+  decisionGeneree             Bytes?
+  statutAttestation           StatutAttestation?
+  dateValidationAttestation   DateTime?
+  auteurValidationAttestation String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enseignantId, dateDebut])
+  @@index([enseignantId, statut])
+}
