@@ -49,6 +49,13 @@
   --text-danger: oklch(58% 0.22 25);
 }
 
+html,
+body,
+#__next {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

@@ -44,14 +44,14 @@ export function BarreLaterale() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-6">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-md">
+    <aside className="border-border bg-card sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r">
+      <div className="border-border flex items-center gap-3 border-b px-5 py-6">
+        <div className="bg-primary text-primary-foreground flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold shadow-md">
           AGCE
         </div>
         <div>
-          <p className="text-sm font-bold tracking-tight text-foreground">AGCE</p>
-          <p className="text-xs text-muted-foreground">Carrière enseignants</p>
+          <p className="text-foreground text-sm font-bold tracking-tight">AGCE</p>
+          <p className="text-muted-foreground text-xs">Carrière enseignants</p>
         </div>
       </div>
 
@@ -76,8 +76,8 @@ export function BarreLaterale() {
         })}
       </nav>
 
-      <div className="m-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-xs leading-relaxed text-muted-foreground">
-        <p className="font-medium text-primary">Rappel</p>
+      <div className="border-primary/20 bg-primary/5 text-muted-foreground m-4 rounded-2xl border p-4 text-xs leading-relaxed">
+        <p className="text-primary font-medium">Rappel</p>
         <p className="mt-1">Sauvegardez régulièrement la base de données — voir le README.</p>
       </div>
     </aside>
@@ -103,10 +103,10 @@ export function EnTeteDashboard({
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex h-[4.25rem] items-center gap-4 border-b border-border bg-card/95 px-6 backdrop-blur-md">
-        <nav className="hidden shrink-0 items-center gap-1.5 text-sm text-muted-foreground lg:flex">
-          <Link href="/dashboard" className="transition-colors hover:text-foreground">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="border-border bg-card/95 sticky top-0 z-10 flex h-[4.25rem] items-center gap-4 border-b px-6 backdrop-blur-md">
+        <nav className="text-muted-foreground hidden shrink-0 items-center gap-1.5 text-sm lg:flex">
+          <Link href="/dashboard" className="hover:text-foreground transition-colors">
             Accueil
           </Link>
           {segments.map((seg, i) => (
@@ -114,7 +114,9 @@ export function EnTeteDashboard({
               <span className="text-border">/</span>
               <span
                 className={
-                  i === segments.length - 1 ? 'font-medium text-foreground' : 'hover:text-foreground'
+                  i === segments.length - 1
+                    ? 'text-foreground font-medium'
+                    : 'hover:text-foreground'
                 }
               >
                 {libelleSegment(seg)}
@@ -127,13 +129,13 @@ export function EnTeteDashboard({
           <div className="relative">
             <Search
               size={16}
-              className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground"
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2"
             />
             <input
               name="recherche"
               type="search"
               placeholder="Rechercher un enseignant..."
-              className="w-full rounded-2xl border border-border bg-muted/60 py-2.5 pr-4 pl-10 text-sm placeholder:text-muted-foreground transition-colors focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/15 focus:outline-none"
+              className="border-border bg-muted/60 placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:ring-primary/15 w-full rounded-2xl border py-2.5 pr-4 pl-10 text-sm transition-colors focus:ring-2 focus:outline-none"
             />
           </div>
         </form>
@@ -142,26 +144,26 @@ export function EnTeteDashboard({
           <button
             type="button"
             title="Notifications"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
           >
             <Bell size={18} />
           </button>
           <button
             type="button"
             title="Paramètres"
-            className="hidden h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-9 w-9 items-center justify-center rounded-xl transition-colors sm:flex"
           >
             <Settings size={18} />
           </button>
 
-          <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
+          <div className="bg-border mx-1 hidden h-6 w-px sm:block" />
 
           <div className="hidden items-center gap-2.5 sm:flex">
             <div className="text-right">
-              <p className="text-sm font-semibold text-foreground">{nomUtilisateur}</p>
-              <p className="text-xs text-muted-foreground">Administrateur</p>
+              <p className="text-foreground text-sm font-semibold">{nomUtilisateur}</p>
+              <p className="text-muted-foreground text-xs">Administrateur</p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/20">
+            <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ring-2">
               {nomUtilisateur.charAt(0).toUpperCase()}
             </div>
           </div>
@@ -170,7 +172,7 @@ export function EnTeteDashboard({
             <button
               type="submit"
               title="Déconnexion"
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
             >
               <LogOut size={18} />
             </button>
@@ -178,18 +180,21 @@ export function EnTeteDashboard({
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto bg-background">
-        <form onSubmit={handleRecherche} className="border-b border-border bg-card px-4 py-3 md:hidden">
+      <main className="bg-background min-h-0 flex-1 overflow-auto">
+        <form
+          onSubmit={handleRecherche}
+          className="border-border bg-card border-b px-4 py-3 md:hidden"
+        >
           <div className="relative">
             <Search
               size={16}
-              className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground"
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2"
             />
             <input
               name="recherche"
               type="search"
               placeholder="Rechercher un enseignant..."
-              className="w-full rounded-2xl border border-border bg-muted/60 py-2.5 pr-4 pl-10 text-sm placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/15 focus:outline-none"
+              className="border-border bg-muted/60 placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:ring-primary/15 w-full rounded-2xl border py-2.5 pr-4 pl-10 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
         </form>

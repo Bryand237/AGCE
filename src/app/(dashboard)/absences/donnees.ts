@@ -50,14 +50,26 @@ export async function recupererEffectifsAbsenceParGradeSexe() {
 // Le composant radar existant attend une clé "grade" pour son libellé —
 // ajuste le nom si le tien diffère, la forme des données compte plus que le nom.
 export async function recupererEffectifsParType() {
-  const comptes = await prisma.absence.groupBy({ by: ['type'], where: { statut: { not: 'TERMINE' } }, _count: true })
+  const comptes = await prisma.absence.groupBy({
+    by: ['type'],
+    where: { statut: { not: 'TERMINE' } },
+    _count: true,
+  })
   return Object.entries(LIBELLES_TYPE).map(([type, nom]) => ({
     grade: nom,
     effectif: comptes.find((c) => c.type === type)?._count ?? 0,
   }))
 }
 
-export async function recupererAbsences({ page = 1, recherche, tri }: { page?: number; recherche?: string; tri?: 'grade' | 'statut' }) {
+export async function recupererAbsences({
+  page = 1,
+  recherche,
+  tri,
+}: {
+  page?: number
+  recherche?: string
+  tri?: 'grade' | 'statut'
+}) {
   const where = recherche
     ? {
         OR: [
@@ -67,10 +79,20 @@ export async function recupererAbsences({ page = 1, recherche, tri }: { page?: n
       }
     : {}
   const orderBy =
-    tri === 'grade' ? { enseignant: { grade: 'asc' as const } } : tri === 'statut' ? { statut: 'asc' as const } : { dateDebut: 'desc' as const }
+    tri === 'grade'
+      ? { enseignant: { grade: 'asc' as const } }
+      : tri === 'statut'
+        ? { statut: 'asc' as const }
+        : { dateDebut: 'desc' as const }
 
   const [absences, total] = await Promise.all([
-    prisma.absence.findMany({ where, orderBy, skip: (page - 1) * TAILLE_PAGE, take: TAILLE_PAGE, include: { enseignant: true } }),
+    prisma.absence.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * TAILLE_PAGE,
+      take: TAILLE_PAGE,
+      include: { enseignant: true },
+    }),
     prisma.absence.count({ where }),
   ])
   return { absences, page, totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)) }
@@ -80,5 +102,13 @@ export async function recupererAbsenceDetail(id: string) {
   return prisma.absence.findUnique({
     where: { id },
     include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
+  })
+}
+
+export async function recupererEnseignantsActifsPourAbsence() {
+  return prisma.enseignant.findMany({
+    where: { statut: 'ACTIF' },
+    orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
+    select: { id: true, nom: true, prenom: true, matricule: true },
   })
 }

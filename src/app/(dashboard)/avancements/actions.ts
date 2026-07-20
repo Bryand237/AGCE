@@ -6,8 +6,44 @@ import { prisma } from '@/lib/prisma'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
+import {
+  MetadonneesSessionSchema,
+  ValidationDecisionSchema,
+} from '@/lib/validations/avancement'
+import { metadonneesSessionCompletes } from '@/domain/avancement/metadonneesSessionCompletes'
 
 export type EtatFormulaire = { errors?: Record<string, string[]>; message?: string }
+
+async function chargerAvancementPourDecision(avancementId: string) {
+  return prisma.historiqueAvancement.findUnique({
+    where: { id: avancementId },
+    include: { enseignant: true, anciennePosition: true, nouvellePosition: true, session: true },
+  })
+}
+
+export async function mettreAJourMetadonneesSession(
+  rapportId: string,
+  _prevState: EtatFormulaire,
+  formData: FormData
+): Promise<EtatFormulaire> {
+  const parsed = MetadonneesSessionSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors }
+  }
+
+  const rapport = await prisma.sessionConseil.findUnique({ where: { id: rapportId } })
+  if (!rapport) return { message: 'Rapport introuvable.' }
+  if (rapport.statut === 'VALIDE') {
+    return { message: 'Impossible de modifier les métadonnées d\'un rapport déjà validé.' }
+  }
+
+  await prisma.sessionConseil.update({
+    where: { id: rapportId },
+    data: parsed.data,
+  })
+  revalidatePath(`/avancements/${rapportId}`)
+  return { message: 'Métadonnées enregistrées.' }
+}
 
 export async function creerRapport(
   _prevState: EtatFormulaire,
@@ -158,10 +194,7 @@ export async function genererDecision(
   avancementId: string,
   _prevState: EtatFormulaire
 ): Promise<EtatFormulaire> {
-  const avancement = await prisma.historiqueAvancement.findUnique({
-    where: { id: avancementId },
-    include: { enseignant: true, anciennePosition: true, nouvellePosition: true, session: true },
-  })
+  const avancement = await chargerAvancementPourDecision(avancementId)
   if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
 
   const buffer = genererDecisionAvancement({
@@ -170,7 +203,7 @@ export async function genererDecision(
     nouvellePosition: avancement.nouvellePosition,
     dateAncienEffet: avancement.dateAncienEffet,
     dateNouvelEffet: avancement.dateNouvelEffet,
-    numeroDecision: '', // brouillon : le numéro n'est pas encore attribué
+    numeroDecision: '', // brouillon : numéro attribué lors de la signature
     rapport: avancement.session,
   })
 
@@ -187,40 +220,37 @@ export async function validerDecision(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
-  const numeroDecision = formData.get('numeroDecision') as string
-  const dateValidation = new Date(formData.get('dateValidation') as string)
-  const auteurValidation = formData.get('auteurValidation') as string
-  if (!numeroDecision || isNaN(dateValidation.getTime()) || !auteurValidation) {
-    return { message: 'Numéro, date et auteur sont tous obligatoires.' }
+  const parsed = ValidationDecisionSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors }
   }
 
-  // const avancement = await prisma.historiqueAvancement.findUnique({
-  //   where: { id: avancementId },
-  //   include: { enseignant: true, anciennePosition: true, nouvellePosition: true, session: true },
-  // })
-  // if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
+  const { numeroDecision, dateValidation, auteurValidation } = parsed.data
+  const avancement = await chargerAvancementPourDecision(avancementId)
+  if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
 
-  // Régénération avec le numéro désormais connu — remplace le brouillon.
-  // const buffer = genererDecisionAvancement({
-  //   enseignant: avancement.enseignant,
-  //   anciennePosition: avancement.anciennePosition,
-  //   nouvellePosition: avancement.nouvellePosition,
-  //   dateAncienEffet: avancement.dateAncienEffet,
-  //   dateNouvelEffet: avancement.dateNouvelEffet,
-  //   numeroDecision,
-  //   rapport: avancement.session,
-  // })
+  const buffer = genererDecisionAvancement({
+    enseignant: avancement.enseignant,
+    anciennePosition: avancement.anciennePosition,
+    nouvellePosition: avancement.nouvellePosition,
+    dateAncienEffet: avancement.dateAncienEffet,
+    dateNouvelEffet: avancement.dateNouvelEffet,
+    numeroDecision,
+    rapport: avancement.session,
+    dateSignature: dateValidation,
+  })
 
   await prisma.historiqueAvancement.update({
     where: { id: avancementId },
     data: {
-      // decisionGeneree: buffer,
+      decisionGeneree: new Uint8Array(buffer),
       statutDecision: 'VALIDEE',
       numeroDecision,
       dateValidationDecision: dateValidation,
       auteurValidationDecision: auteurValidation,
     },
   })
+  revalidatePath(`/avancements/${avancement.sessionId}/${avancementId}`)
   revalidatePath('/avancements')
-  return { message: 'Décision validée.' }
+  return { message: 'Décision signée et régénérée.' }
 }

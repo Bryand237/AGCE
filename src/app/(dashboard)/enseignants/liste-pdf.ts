@@ -23,22 +23,27 @@ async function recupererDonnees() {
   })
 }
 
-function ligneTableau(e: {
-  matricule: string
-  nom: string
-  prenom: string
-  dateNaissance: Date
-  lieuNaissance: string
-  sexe: string
-  domaineRecherche: string | null
-  datePriseService: Date
-  estResident: boolean
-  contratCollaboration: boolean
-  posteResponsabilite: string | null
-  telephone: string | null
-  email: string | null
-  departementOrigine: { nom: string; region: { nom: string } } | null
-}, grade: string, index: number, nomDepartement: string) {
+function ligneTableau(
+  e: {
+    matricule: string
+    nom: string
+    prenom: string
+    dateNaissance: Date
+    lieuNaissance: string
+    sexe: string
+    domaineRecherche: string | null
+    datePriseService: Date
+    estResident: boolean
+    contratCollaboration: boolean
+    posteResponsabilite: string | null
+    telephone: string | null
+    email: string | null
+    departementOrigine: { nom: string; region: { nom: string } } | null
+  },
+  grade: string,
+  index: number,
+  nomDepartement: string
+) {
   const fmt = (d: Date) => d.toLocaleDateString('fr-FR')
   const anneeRetraitePrevue = calculerDateRetraitePrevue(e.dateNaissance, grade).getFullYear()
   return `<tr>
@@ -47,6 +52,7 @@ function ligneTableau(e: {
     <td>${fmt(e.dateNaissance)}</td>
     <td>${e.lieuNaissance}</td>
     <td>${e.matricule}</td>
+    <td>${LIBELLES_GRADE[grade] ?? grade}</td>
     <td>${e.sexe}</td>
     <td>${e.domaineRecherche ?? ''}</td>
     <td>${nomDepartement}</td>
@@ -68,6 +74,7 @@ const ENTETES = [
   'Date de Naissance',
   'Lieu de Naissance',
   'Matricule solde',
+  'Grade',
   'Sexe',
   'Domaine de Recherche',
   "Département d'attache",
@@ -103,7 +110,10 @@ function sectionEtablissement(etab: {
   // de A à N, sans regroupement par département visible).
   type EnseignantAvecDept = Parameters<typeof ligneTableau>[0] & { grade: string }
   const tousLesEnseignants = etab.departements.flatMap((dep) =>
-    (dep.enseignants as EnseignantAvecDept[]).map((e) => ({ enseignant: e, nomDepartement: dep.nom }))
+    (dep.enseignants as EnseignantAvecDept[]).map((e) => ({
+      enseignant: e,
+      nomDepartement: dep.nom,
+    }))
   )
   tousLesEnseignants.sort((a, b) => a.enseignant.nom.localeCompare(b.enseignant.nom, 'fr'))
 
@@ -120,6 +130,10 @@ function sectionEtablissement(etab: {
   // Professeurs → Maîtres de Conférences → Chargés de Cours, plutôt que
   // de repartir à 1 à chaque catégorie.
   let compteur = 0
+  if (tousLesEnseignants.length === 0) {
+    return ''
+  }
+
   const corpsParGrade = ORDRE_GRADE.filter((g) => parGrade.has(g))
     .map((grade) => {
       const lignes = parGrade
@@ -138,6 +152,10 @@ function sectionEtablissement(etab: {
 
   return `
     <section class="section-etablissement">
+      <div class="header-preamble">
+        <div class="header-left">Fichier des enseignants de l'Université de Ngaoundéré</div>
+        <div class="header-right">UN/R/VR-EPDTIC/SG/DAAC/DEPE/SSPE</div>
+      </div>
       <p class="titre-etablissement">${etab.nom}</p>
       <table>
         <thead><tr>${ENTETES.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
@@ -158,40 +176,71 @@ export async function genererListeEnseignantsPdf(): Promise<Buffer> {
   // Fonts), plus proches en graisse, avant de chercher plus loin.
   const html = `
     <style>
-      @font-face {
-        font-family: 'Tangerine';
-        src: url('file:///chemin/vers/Tangerine-Regular.ttf');
-      }
       * { box-sizing: border-box; }
       body { font-family: 'Times New Roman', Times, serif; font-size: 7.5pt; color: #000; margin: 0; }
-      .reference { text-align: right; font-size: 8pt; margin-bottom: 4px; }
-      .sous-titre { text-align: center; font-size: 10pt; margin: 0 0 8px; }
-      .titre-etablissement {
-        text-align: center;
-        font-family: 'Tangerine', cursive;
-        font-size: 26pt;
-        margin: 4px 0 10px;
-      }
-      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-      th, td {
-        border: 0.5pt solid #000;
-        padding: 2px 3px;
-        text-align: left;
-        overflow-wrap: break-word;
-      }
-      th { font-size: 7pt; font-weight: bold; background: #f2f2f2; }
-      .ligne-grade td {
-        background: #c5e0b4;
-        font-weight: bold;
-        text-align: center;
+      .page { width: 100%; padding: 14mm 10mm; }
+      .header-preamble {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 10px;
         font-size: 8pt;
       }
-      .section-etablissement { break-after: page; }
-      .section-etablissement:last-child { break-after: auto; }
+      .header-left, .header-right { width: 48%; }
+      .header-right { text-align: right; }
+      .titre-etablissement {
+        font-family: 'Lucida Calligraphy', 'Brush Script MT', 'Segoe Script', cursive;
+        font-size: 26pt;
+        text-align: center;
+        margin: 0 0 8px;
+      }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.2pt; }
+      thead tr { background: #f2f2f2; }
+      th, td {
+        border: 0.5pt solid #000;
+        padding: 3px 4px;
+        vertical-align: middle;
+      }
+      th {
+        font-weight: bold;
+        text-align: center;
+        padding: 4px 3px;
+      }
+      td { text-align: left; }
+      td:nth-child(1), th:nth-child(1) { width: 2.8%; }
+      td:nth-child(2), th:nth-child(2) { width: 13%; }
+      td:nth-child(3), th:nth-child(3) { width: 6%; }
+      td:nth-child(4), th:nth-child(4) { width: 6%; }
+      td:nth-child(5), th:nth-child(5) { width: 7%; }
+      td:nth-child(6), th:nth-child(6) { width: 6%; }
+      td:nth-child(7), th:nth-child(7) { width: 5%; }
+      td:nth-child(8), th:nth-child(8) { width: 12%; }
+      td:nth-child(9), th:nth-child(9) { width: 10%; }
+      td:nth-child(10), th:nth-child(10) { width: 7%; }
+      td:nth-child(11), th:nth-child(11) { width: 5%; }
+      td:nth-child(12), th:nth-child(12) { width: 5%; }
+      td:nth-child(13), th:nth-child(13) { width: 6%; }
+      td:nth-child(14), th:nth-child(14) { width: 6%; }
+      td:nth-child(15), th:nth-child(15) { width: 8%; }
+      td:nth-child(16), th:nth-child(16) { width: 7%; }
+      td:nth-child(17), th:nth-child(17) { width: 8%; }
+      td:nth-child(18), th:nth-child(18) { width: 10%; }
+      .ligne-grade td {
+        background: #c8dfb6;
+        font-weight: bold;
+        text-align: center;
+        padding: 5px 4px;
+        font-size: 7.7pt;
+      }
+      .section-etablissement { page-break-before: always; margin-top: 16px; }
+      .section-etablissement:first-child { page-break-before: auto; }
+      .section-etablissement:last-child { page-break-after: auto; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
     </style>
-    <div class="reference">UN/R/VR-EPDTIC/SG/DAAC/DEPE/SSPE</div>
-    <p class="sous-titre">Fichier des enseignants de l'Université de Ngaoundéré</p>
-    ${etablissements.map(sectionEtablissement).join('')}
+    <div class="page">
+      ${etablissements.map(sectionEtablissement).join('')}
+    </div>
   `
 
   return genererPdf(html, { paysage: true })

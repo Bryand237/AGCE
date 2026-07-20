@@ -17,21 +17,18 @@ import { LIBELLES_GRADE, ORDRE_GRADE } from '@/domain/enseignants/grade'
 type DonneeGrade = { grade: string; effectif: number }
 
 export function GraphiqueEffectifsParGrade({ donnees }: { donnees: DonneeGrade[] }) {
-  const data = ORDRE_GRADE.map((grade) => {
-    const ligne = donnees.find((d) => d.grade === grade)
-    return {
-      grade,
-      label: LIBELLES_GRADE[grade] ?? grade,
-      effectif: ligne?.effectif ?? 0,
-      fill: GRADE_FILL[grade] ?? '#34d399',
-    }
-  })
+  const data = donnees.map((donnee) => ({
+    grade: donnee.grade,
+    label: donnee.grade,
+    effectif: donnee.effectif,
+    fill: GRADE_FILL[donnee.grade as keyof typeof GRADE_FILL] ?? '#34d399',
+  }))
 
   const hasData = data.some((d) => d.effectif > 0)
 
   if (!hasData) {
     return (
-      <div className="flex h-[280px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+      <div className="border-border bg-muted/30 text-muted-foreground flex h-[280px] items-center justify-center rounded-xl border border-dashed text-sm">
         Aucune donnée disponible
       </div>
     )
@@ -39,11 +36,7 @@ export function GraphiqueEffectifsParGrade({ donnees }: { donnees: DonneeGrade[]
 
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 8, right: 48, left: 8, bottom: 8 }}
-      >
+      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 48, left: 8, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
         <XAxis type="number" tickLine={false} axisLine={false} />
         <YAxis

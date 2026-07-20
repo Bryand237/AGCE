@@ -6,7 +6,7 @@ export default async function LayoutDashboard({ children }: { children: ReactNod
   const utilisateur = await recupererUtilisateurConnecte()
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex h-screen overflow-hidden">
       <BarreLaterale />
       <EnTeteDashboard nomUtilisateur={utilisateur?.nomUtilisateur ?? 'Admin'}>
         {children}

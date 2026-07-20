@@ -77,6 +77,10 @@ export async function recupererRapportDetail(id: string) {
           positionProposee: true,
         },
       },
+      avancements: {
+        orderBy: { enseignant: { nom: 'asc' } },
+        include: { enseignant: true, anciennePosition: true, nouvellePosition: true },
+      },
     },
   })
 }

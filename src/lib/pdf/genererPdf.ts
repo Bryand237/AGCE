@@ -1,8 +1,35 @@
+import { existsSync } from 'node:fs'
 import { chromium } from 'playwright'
 
 type OptionsPdf = {
   paysage?: boolean
   piedDePage?: string
+}
+
+const EXECUTABLE_CANDIDATS = [
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+  process.env.CHROME_PATH,
+  process.env.CHROME_BIN,
+  '/snap/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/chromium',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+].filter(Boolean) as string[]
+
+function trouverExecutableChromium(): string | undefined {
+  for (const chemin of EXECUTABLE_CANDIDATS) {
+    if (existsSync(chemin)) return chemin
+  }
+
+  try {
+    const chemin = chromium.executablePath()
+    if (chemin && existsSync(chemin)) return chemin
+  } catch {
+    // ignore
+  }
+
+  return undefined
 }
 
 /**
@@ -15,7 +42,11 @@ type OptionsPdf = {
  * dans le Dockerfile (déjà présent — voir README).
  */
 export async function genererPdf(html: string, options: OptionsPdf = {}): Promise<Buffer> {
-  const browser = await chromium.launch()
+  const executablePath = trouverExecutableChromium()
+  const browser = await chromium.launch({
+    executablePath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  })
   try {
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle' })
