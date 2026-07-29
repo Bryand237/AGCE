@@ -13,7 +13,12 @@ export async function recupererStatsRapports() {
       include: { _count: { select: { selections: true } } },
     }),
   ])
-  return { total, valides, brouillons, enseignantsCeSemestre: dernierRapport?._count.selections ?? 0 }
+  return {
+    total,
+    valides,
+    brouillons,
+    enseignantsCeSemestre: dernierRapport?._count.selections ?? 0,
+  }
 }
 
 // Forme attendue par le composant GraphiqueEffectifsParSexe déjà existant :
@@ -44,7 +49,13 @@ export async function recupererEffectifsAvancementParGradeSexe(rapportId?: strin
   }))
 }
 
-export async function recupererRapports({ page = 1, recherche }: { page?: number; recherche?: string }) {
+export async function recupererRapports({
+  page = 1,
+  recherche,
+}: {
+  page?: number
+  recherche?: string
+}) {
   const commeDate = recherche ? new Date(recherche) : null
   const dateValide = commeDate && !isNaN(commeDate.getTime())
   const where = !recherche
@@ -66,6 +77,20 @@ export async function recupererRapports({ page = 1, recherche }: { page?: number
   return { rapports, page, totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)) }
 }
 
+export async function recupererGrilleEchelonIndiciaire() {
+  return prisma.echelonIndiciaire.findMany({
+    orderBy: [{ grade: 'asc' }, { ordre: 'asc' }],
+  })
+}
+
+export async function recupererEnseignantsActifsPourAvancement() {
+  return prisma.enseignant.findMany({
+    where: { statut: 'ACTIF' },
+    orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
+    select: { id: true, matricule: true, nom: true, prenom: true },
+  })
+}
+
 export async function recupererRapportDetail(id: string) {
   return prisma.sessionConseil.findUnique({
     where: { id },
@@ -73,7 +98,9 @@ export async function recupererRapportDetail(id: string) {
       selections: {
         orderBy: { enseignant: { nom: 'asc' } },
         include: {
-          enseignant: { include: { departement: { include: { etablissement: true } }, positionActuelle: true } },
+          enseignant: {
+            include: { departement: { include: { etablissement: true } }, positionActuelle: true },
+          },
           positionProposee: true,
         },
       },

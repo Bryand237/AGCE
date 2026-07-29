@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import {
   validerAbsence,
   terminerAbsence,
+  modifierAbsence,
   genererAttestation,
   validerAttestation,
   type EtatFormulaire,
@@ -25,7 +26,7 @@ export function FormulaireValidationAbsence({
   )
   return (
     <form action={formAction} className={classeFormulaire}>
-      <p className="text-sm font-semibold text-foreground">Valider la demande</p>
+      <p className="text-foreground text-sm font-semibold">Valider la demande</p>
       <label className="flex flex-col gap-1 text-sm">
         Date de validation
         <input type="date" name="dateValidation" required className={classeChamp} />
@@ -71,7 +72,7 @@ export function FormulaireTerminerAbsence({
   )
   return (
     <form action={formAction} className={classeFormulaire}>
-      <p className="text-sm font-semibold text-foreground">
+      <p className="text-foreground text-sm font-semibold">
         {estDepasse ? 'Enseignant de retour (durée dépassée)' : "Marquer l'enseignant de retour"}
       </p>
       <label className="flex flex-col gap-1 text-sm">
@@ -81,6 +82,59 @@ export function FormulaireTerminerAbsence({
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : 'Marquer terminé'}
+      </button>
+    </form>
+  )
+}
+
+export function FormulaireModifierAbsence({
+  absenceId,
+  dateDebut,
+  dateFin,
+  motif,
+}: {
+  absenceId: string
+  dateDebut: string
+  dateFin: string
+  motif: string | null
+}) {
+  const [state, formAction, isPending] = useActionState(
+    modifierAbsence.bind(null, absenceId),
+    etatInitial
+  )
+
+  return (
+    <form action={formAction} className={classeFormulaire}>
+      <p className="text-foreground text-sm font-semibold">Modifier l’absence</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-sm">
+          Date de début
+          <input
+            type="date"
+            name="dateDebut"
+            defaultValue={dateDebut}
+            required
+            className={classeChamp}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Date de fin
+          <input
+            type="date"
+            name="dateFin"
+            defaultValue={dateFin}
+            required
+            className={classeChamp}
+          />
+        </label>
+      </div>
+      <label className="flex flex-col gap-1 text-sm">
+        Motif
+        <textarea name="motif" rows={3} defaultValue={motif ?? ''} className={classeChamp} />
+      </label>
+      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
+        {isPending ? 'Enregistrement...' : 'Enregistrer'}
       </button>
     </form>
   )
@@ -119,7 +173,7 @@ export function BlocAttestationAbsence({
         <a
           href={`/absences/${absenceId}/attestation`}
           download
-          className="text-sm font-medium text-primary hover:underline"
+          className="text-primary text-sm font-medium hover:underline"
         >
           Télécharger le brouillon
         </a>
@@ -148,7 +202,7 @@ export function BlocAttestationAbsence({
     <a
       href={`/absences/${absenceId}/attestation`}
       download
-      className="text-sm font-medium text-primary hover:underline"
+      className="text-primary text-sm font-medium hover:underline"
     >
       Télécharger l&apos;attestation n°{numeroDecision}
     </a>

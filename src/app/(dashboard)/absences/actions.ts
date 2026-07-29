@@ -104,6 +104,7 @@ export async function terminerAbsence(
 
 export async function modifierAbsence(
   absenceId: string,
+  _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
   const dateDebut = new Date(formData.get('dateDebut') as string)

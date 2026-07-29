@@ -8,7 +8,9 @@ import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import type { EchelonIndiciaire, Enseignant, SessionConseil } from '@/generated/prisma/client'
 
 function formaterDateFr(date: Date | null | undefined): string {
-  return date ? date.toISOString().split('T')[0]! : ''
+  return date
+    ? date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : ''
 }
 
 type Params = {
