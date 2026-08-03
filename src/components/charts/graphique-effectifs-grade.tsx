@@ -11,17 +11,25 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { CHART_PALETTE } from '@/lib/chart-palette'
 import { GRADE_FILL } from '@/lib/dashboard-utils'
 import { LIBELLES_GRADE, ORDRE_GRADE } from '@/domain/enseignants/grade'
+
+const DEFAULT_FILL = '#1B4965'
+
+function couleurParIndex(index: number) {
+  return CHART_PALETTE[index % CHART_PALETTE.length]
+}
 
 type DonneeGrade = { grade: string; effectif: number }
 
 export function GraphiqueEffectifsParGrade({ donnees }: { donnees: DonneeGrade[] }) {
-  const data = donnees.map((donnee) => ({
+  const data = donnees.map((donnee, index) => ({
     grade: donnee.grade,
     label: donnee.grade,
     effectif: donnee.effectif,
-    fill: GRADE_FILL[donnee.grade as keyof typeof GRADE_FILL] ?? '#34d399',
+    fill:
+      GRADE_FILL[donnee.grade as keyof typeof GRADE_FILL] ?? couleurParIndex(index) ?? DEFAULT_FILL,
   }))
 
   const hasData = data.some((d) => d.effectif > 0)

@@ -5,48 +5,61 @@
  * cartes arrondies avec ombre légère.
  */
 @theme {
-  /* Couleurs sémantiques (shadcn-like) */
-  --color-background: oklch(98.5% 0.004 155);
-  --color-foreground: oklch(22% 0.02 155);
-  --color-card: oklch(100% 0 0);
-  --color-card-foreground: oklch(22% 0.02 155);
-  --color-muted: oklch(96% 0.008 155);
-  --color-muted-foreground: oklch(52% 0.02 155);
-  --color-border: oklch(91% 0.012 155);
-  --color-input: oklch(91% 0.012 155);
-  --color-destructive: oklch(58% 0.22 25);
-  --color-destructive-foreground: oklch(98% 0 0);
+  /* Couleurs sémantiques (palette institutionnelle, converties en oklch) */
+  /* Fond de page */
+  --color-background: oklch(99% 0.01 90); /* #FAF6EE */
+  /* Texte principal */
+  --color-foreground: oklch(12% 0.03 205); /* aprox. #1A2B36 */
 
-  /* Primaire émeraude */
-  --color-primary: oklch(52% 0.14 155);
-  --color-primary-foreground: oklch(99% 0 0);
+  /* Surfaces */
+  --color-card: oklch(100% 0 0); /* #FFFFFF */
+  --color-card-foreground: oklch(12% 0.03 205);
+  --color-muted: oklch(96% 0.01 90);
+  --color-muted-foreground: oklch(44% 0.02 200);
 
-  --color-success: oklch(55% 0.14 155);
-  --color-warning: oklch(75% 0.16 80);
-  --color-danger: oklch(58% 0.22 25);
+  /* Bordures / inputs */
+  --color-border: oklch(94% 0.03 90); /* aprox. #E4D9C4 */
+  --color-input: oklch(94% 0.03 90);
 
-  /* Grades — graphiques et badges */
-  --color-grade-pr: oklch(48% 0.13 155);
-  --color-grade-mc: oklch(55% 0.12 175);
-  --color-grade-cc: oklch(62% 0.11 145);
-  --color-grade-ass: oklch(72% 0.1 130);
+  /* Primaire (actions, navigation) */
+  --color-primary: oklch(16% 0.16 210); /* aprox. #1B4965 */
+  --color-primary-dark: oklch(12% 0.17 210); /* aprox. #12374D (hover/actif) */
+  --color-primary-foreground: oklch(98.5% 0 0); /* clair sur primaire */
 
-  --color-sexe-m: oklch(55% 0.14 230);
-  --color-sexe-f: oklch(62% 0.18 340);
+  /* Secondaire (or) — utilisation d'accent (badges, highlights), éviter en texte sur fond clair */
+  --color-secondary: oklch(70% 0.18 85); /* aprox. #D9A441 */
 
+  /* Destructif / danger */
+  --color-destructive: oklch(44% 0.25 20); /* aprox. #C0392B */
+  --color-destructive-foreground: oklch(98.5% 0 0);
+
+  /* Succès */
+  --color-success: oklch(34% 0.16 140); /* aprox. #3F8556 */
+
+  /* Grades — graphiques et badges (teintes sobres) */
+  --color-grade-pr: oklch(18% 0.14 210);
+  --color-grade-mc: oklch(28% 0.12 150);
+  --color-grade-cc: oklch(32% 0.11 170);
+  --color-grade-ass: oklch(42% 0.1 145);
+
+  /* Sexe (pour graphiques) */
+  --color-sexe-m: oklch(34% 0.14 230);
+  --color-sexe-f: oklch(40% 0.18 340);
+
+  /* Rayons */
   --radius-card: 1rem;
   --radius-lg: 0.875rem;
   --radius-xl: 1.25rem;
 
   /* Alias legacy — compatibilité modules existants */
   --surface-1: oklch(100% 0 0);
-  --surface-2: oklch(98.5% 0.004 155);
-  --border: oklch(91% 0.012 155);
-  --text-secondary: oklch(52% 0.02 155);
-  --text-accent: oklch(48% 0.13 155);
-  --bg-accent: oklch(95% 0.04 155);
-  --bg-danger: oklch(97% 0.02 25);
-  --text-danger: oklch(58% 0.22 25);
+  --surface-2: oklch(99% 0.01 90);
+  --border: oklch(94% 0.03 90);
+  --text-secondary: oklch(44% 0.02 200); /* aprox. #5C6B73 */
+  --text-accent: oklch(16% 0.16 210);
+  --bg-accent: oklch(98.5% 0.02 85);
+  --bg-danger: oklch(97% 0.02 20);
+  --text-danger: oklch(44% 0.25 20);
 }
 
 html,

@@ -4,12 +4,12 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import { recupererEnseignantDetail } from '../donnees'
 import { formaterPosition } from '@/domain/avancement/formaterPosition'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
-import { calculerDateRetraitePrevue, estEligibleRetraite, estProcheRetraite } from '@/domain/enseignants/retraite'
 import {
-  FormulaireTransfert,
-  FormulaireRetraite,
-  BoutonReactiver,
-} from '../formulaires'
+  calculerDateRetraitePrevue,
+  estEligibleRetraite,
+  estProcheRetraite,
+} from '@/domain/enseignants/retraite'
+import { FormulaireTransfert, FormulaireRetraite, BoutonReactiver } from '../formulaires'
 
 function formatDate(d: Date) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -20,16 +20,11 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
   const enseignant = await recupererEnseignantDetail(id)
   if (!enseignant) notFound()
 
-  const retraitePrevue = calculerDateRetraitePrevue(
-    enseignant.dateNaissance,
-    enseignant.grade
-  )
+  const retraitePrevue = calculerDateRetraitePrevue(enseignant.dateNaissance, enseignant.grade)
   const eligibleRetraite =
-    enseignant.statut === 'ACTIF' &&
-    estEligibleRetraite(enseignant.dateNaissance, enseignant.grade)
+    enseignant.statut === 'ACTIF' && estEligibleRetraite(enseignant.dateNaissance, enseignant.grade)
   const procheRetraite =
-    enseignant.statut === 'ACTIF' &&
-    estProcheRetraite(enseignant.dateNaissance, enseignant.grade)
+    enseignant.statut === 'ACTIF' && estProcheRetraite(enseignant.dateNaissance, enseignant.grade)
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
@@ -37,21 +32,29 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
         <div>
           <Link
             href="/enseignants"
-            className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-1.5 text-sm"
           >
             <ArrowLeft size={16} />
             Retour à la liste
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary">
-              {enseignant.prenom.charAt(0)}
-              {enseignant.nom.charAt(0)}
-            </div>
+            {enseignant.photoUrl ? (
+              <img
+                src={enseignant.photoUrl}
+                alt={`${enseignant.nom} ${enseignant.prenom}`}
+                className="h-14 w-14 rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="bg-primary/10 text-primary flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-bold">
+                {enseignant.prenom.charAt(0)}
+                {enseignant.nom.charAt(0)}
+              </div>
+            )}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-foreground text-2xl font-bold">
                 {enseignant.nom} {enseignant.prenom}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {enseignant.matricule} · {LIBELLES_GRADE[enseignant.grade]}
               </p>
             </div>
@@ -62,7 +65,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
           {enseignant.statut === 'ACTIF' && (
             <Link
               href={`/enseignants/${id}/modifier`}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted"
+              className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium shadow-sm"
             >
               <Pencil size={16} />
               Modifier
@@ -76,24 +79,24 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
           className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
           role="alert"
         >
-          Cet enseignant a dépassé l&apos;âge de retraite de son grade. Pensez à le marquer
-          retraité ci-dessous.
+          Cet enseignant a dépassé l&apos;âge de retraite de son grade. Pensez à le marquer retraité
+          ci-dessous.
         </div>
       )}
 
       {!eligibleRetraite && procheRetraite && (
         <div
-          className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm text-foreground"
+          className="border-primary/20 bg-primary/5 text-foreground rounded-2xl border px-5 py-4 text-sm"
           role="status"
         >
-          Retraite prévue le <strong>{formatDate(retraitePrevue)}</strong> — dans les 2
-          prochaines années.
+          Retraite prévue le <strong>{formatDate(retraitePrevue)}</strong> — dans les 2 prochaines
+          années.
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-foreground">Informations personnelles</h2>
+        <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+          <h2 className="text-foreground mb-4 text-sm font-bold">Informations personnelles</h2>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <Item label="Sexe" valeur={enseignant.sexe === 'M' ? 'Masculin' : 'Féminin'} />
             <Item label="Date de naissance" valeur={formatDate(enseignant.dateNaissance)} />
@@ -111,13 +114,10 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-foreground">Affectation et carrière</h2>
+        <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+          <h2 className="text-foreground mb-4 text-sm font-bold">Affectation et carrière</h2>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Item
-              label="Établissement"
-              valeur={enseignant.departement.etablissement.nom}
-            />
+            <Item label="Établissement" valeur={enseignant.departement.etablissement.nom} />
             <Item label="Département" valeur={enseignant.departement.nom} />
             <Item label="Grade" valeur={LIBELLES_GRADE[enseignant.grade] ?? enseignant.grade} />
             <Item
@@ -136,8 +136,8 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm lg:col-span-2">
-          <h2 className="mb-4 text-sm font-bold text-foreground">Contact</h2>
+        <section className="border-border bg-card rounded-2xl border p-6 shadow-sm lg:col-span-2">
+          <h2 className="text-foreground mb-4 text-sm font-bold">Contact</h2>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <Item label="Téléphone" valeur={enseignant.telephone ?? '—'} />
             <Item label="Courriel" valeur={enseignant.email ?? '—'} />
@@ -156,28 +156,27 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
       )}
 
       {enseignant.statut !== 'ACTIF' && (
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-3 text-sm font-bold text-foreground">Réactivation</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
+        <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+          <h2 className="text-foreground mb-3 text-sm font-bold">Réactivation</h2>
+          <p className="text-muted-foreground mb-4 text-sm">
             Statut actuel : {enseignant.statut === 'TRANSFERE' ? 'Transféré' : 'Retraité'}
-            {enseignant.dateFinService &&
-              ` — depuis le ${formatDate(enseignant.dateFinService)}`}
+            {enseignant.dateFinService && ` — depuis le ${formatDate(enseignant.dateFinService)}`}
           </p>
           <BoutonReactiver enseignantId={id} />
         </section>
       )}
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-bold text-foreground">Historique de carrière</h2>
+      <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+        <h2 className="text-foreground mb-4 text-sm font-bold">Historique de carrière</h2>
         {enseignant.historique.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Aucun avancement enregistré pour l&apos;instant.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-muted-foreground">
+                <tr className="border-border text-muted-foreground border-b text-left">
                   <th className="py-2 pr-4 font-medium">Édition</th>
                   <th className="py-2 pr-4 font-medium">Ancienne position</th>
                   <th className="py-2 pr-4 font-medium">Nouvelle position</th>
@@ -186,7 +185,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
               </thead>
               <tbody>
                 {enseignant.historique.map((h) => (
-                  <tr key={h.id} className="border-b border-border last:border-0">
+                  <tr key={h.id} className="border-border border-b last:border-0">
                     <td className="py-3 pr-4">{h.session?.numero ?? '—'}</td>
                     <td className="py-3 pr-4">
                       {formaterPosition(h.anciennePosition)} ({h.anciennePosition.indice})
@@ -197,7 +196,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
                     <td className="py-3">
                       <Link
                         href={`/avancements/${h.sessionId}/${h.id}`}
-                        className="font-medium text-primary hover:underline"
+                        className="text-primary font-medium hover:underline"
                       >
                         {h.statutDecision ? 'Voir la décision' : 'Générer la décision'}
                       </Link>
@@ -216,8 +215,8 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
 function Item({ label, valeur }: { label: string; valeur: string }) {
   return (
     <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-medium text-foreground">{valeur}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="text-foreground mt-0.5 font-medium">{valeur}</dd>
     </div>
   )
 }

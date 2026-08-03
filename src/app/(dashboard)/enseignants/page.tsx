@@ -50,21 +50,18 @@ export default async function PageEnseignants({
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Enseignants"
-        description="Gestion des dossiers et effectifs permanents"
-      >
+      <PageHeader title="Enseignants" description="Gestion des dossiers et effectifs permanents">
         <a
           href="/enseignants/liste-pdf"
           download
-          className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted"
+          className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium shadow-sm"
         >
           <FileDown size={16} />
           Exporter PDF
         </a>
         <Link
           href="/enseignants/nouveau"
-          className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
+          className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm hover:opacity-90"
         >
           <Plus size={16} />
           Nouvel enseignant
@@ -96,10 +93,10 @@ export default async function PageEnseignants({
 
       {prochesRetraite.length > 0 && (
         <div
-          className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm"
+          className="border-primary/20 bg-primary/5 rounded-2xl border px-5 py-4 text-sm"
           role="status"
         >
-          <p className="font-semibold text-foreground">
+          <p className="text-foreground font-semibold">
             {prochesRetraite.length} enseignant(s) proche(s) de la retraite (2 ans)
           </p>
           <ul className="mt-2 flex flex-wrap gap-2">
@@ -107,14 +104,14 @@ export default async function PageEnseignants({
               <li key={e.id}>
                 <Link
                   href={`/enseignants/${e.id}`}
-                  className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                  className="bg-primary/10 text-primary hover:bg-primary/20 rounded-full px-3 py-1 text-xs font-medium"
                 >
                   {e.nom} {e.prenom} ({e.dateRetraitePrevue.getFullYear()})
                 </Link>
               </li>
             ))}
             {prochesRetraite.length > 8 && (
-              <li className="px-2 py-1 text-xs text-muted-foreground">
+              <li className="text-muted-foreground px-2 py-1 text-xs">
                 +{prochesRetraite.length - 8} autre(s)
               </li>
             )}
@@ -172,12 +169,12 @@ export default async function PageEnseignants({
           name="recherche"
           defaultValue={params.recherche}
           placeholder="Rechercher par nom ou matricule..."
-          className="min-w-[200px] flex-1 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+          className="border-border bg-card focus:border-primary focus:ring-primary/20 min-w-[200px] flex-1 rounded-2xl border px-4 py-2.5 text-sm shadow-sm focus:ring-2 focus:outline-none"
         />
         <select
           name="trier"
           defaultValue={params.trier ?? ''}
-          className="rounded-2xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm"
+          className="border-border bg-card rounded-2xl border px-4 py-2.5 text-sm shadow-sm"
         >
           <option value="">Trier par nom</option>
           <option value="grade">Trier par grade</option>
@@ -185,16 +182,16 @@ export default async function PageEnseignants({
         </select>
         <button
           type="submit"
-          className="rounded-2xl border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-muted"
+          className="border-border bg-card hover:bg-muted rounded-2xl border px-4 py-2.5 text-sm font-medium shadow-sm"
         >
           Rechercher
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-muted-foreground">
+            <tr className="border-border bg-muted/30 text-muted-foreground border-b text-left">
               <th className="px-4 py-3 font-medium">Nom</th>
               <th className="px-3 py-3 font-medium">Matricule</th>
               <th className="px-3 py-3 font-medium">Grade</th>
@@ -207,44 +204,58 @@ export default async function PageEnseignants({
           <tbody>
             {liste.enseignants.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="text-muted-foreground px-4 py-10 text-center">
                   Aucun enseignant trouvé.
                 </td>
               </tr>
             ) : (
               liste.enseignants.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-border last:border-0 hover:bg-muted/20"
-                >
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    <Link href={`/enseignants/${e.id}`} className="hover:text-primary">
-                      {e.nom} {e.prenom}
+                <tr key={e.id} className="border-border hover:bg-muted/20 border-b last:border-0">
+                  <td className="text-foreground px-4 py-3 font-medium">
+                    <Link
+                      href={`/enseignants/${e.id}`}
+                      className="hover:text-primary flex items-center gap-3"
+                    >
+                      {e.photoUrl ? (
+                        <img
+                          src={e.photoUrl}
+                          alt={`${e.nom} ${e.prenom}`}
+                          className="h-10 w-10 rounded-2xl object-cover"
+                        />
+                      ) : (
+                        <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-bold">
+                          {e.prenom.charAt(0)}
+                          {e.nom.charAt(0)}
+                        </div>
+                      )}
+                      <span>
+                        {e.nom} {e.prenom}
+                      </span>
                     </Link>
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{e.matricule}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="text-muted-foreground px-3 py-3">{e.matricule}</td>
+                  <td className="text-muted-foreground px-3 py-3">
                     {LIBELLES_GRADE[e.grade] ?? e.grade}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="text-muted-foreground px-3 py-3">
                     {e.departement.etablissement.abreviation}
                   </td>
                   <td className="px-3 py-3">
                     <BadgeStatut statut={e.statut} />
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{e.anneeRetraitePrevue}</td>
+                  <td className="text-muted-foreground px-3 py-3">{e.anneeRetraitePrevue}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <Link
                         href={`/enseignants/${e.id}`}
-                        className="text-sm font-medium text-primary hover:underline"
+                        className="text-primary text-sm font-medium hover:underline"
                       >
                         Voir
                       </Link>
                       {e.statut === 'ACTIF' && (
                         <Link
                           href={`/enseignants/${e.id}/modifier`}
-                          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
                           title="Modifier"
                         >
                           <Pencil size={14} />
@@ -259,7 +270,7 @@ export default async function PageEnseignants({
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="text-muted-foreground flex items-center justify-between text-sm">
         <span>
           Page {liste.page} sur {liste.totalPages} ({liste.total} enseignant
           {liste.total > 1 ? 's' : ''})
@@ -268,7 +279,7 @@ export default async function PageEnseignants({
           {page > 1 && (
             <Link
               href={construireLien(params, page - 1)}
-              className="rounded-2xl border border-border bg-card px-3 py-1.5 shadow-sm hover:bg-muted"
+              className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
             >
               Précédent
             </Link>
@@ -276,7 +287,7 @@ export default async function PageEnseignants({
           {page < liste.totalPages && (
             <Link
               href={construireLien(params, page + 1)}
-              className="rounded-2xl border border-border bg-card px-3 py-1.5 shadow-sm hover:bg-muted"
+              className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
             >
               Suivant
             </Link>

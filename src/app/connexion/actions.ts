@@ -11,7 +11,10 @@ export type EtatFormulaire = { message?: string }
 const DUREE_SESSION_HEURES = 12
 const DUREE_SESSION_SOUVENIR_HEURES = 24 * 30
 
-export async function seConnecter(_prevState: EtatFormulaire, formData: FormData): Promise<EtatFormulaire> {
+export async function seConnecter(
+  _prevState: EtatFormulaire,
+  formData: FormData
+): Promise<EtatFormulaire> {
   const nomUtilisateur = formData.get('nomUtilisateur') as string
   const motDePasse = formData.get('motDePasse') as string
   const seSouvenir = formData.get('seSouvenir') === 'on'
@@ -19,7 +22,8 @@ export async function seConnecter(_prevState: EtatFormulaire, formData: FormData
   const utilisateur = await prisma.utilisateur.findUnique({ where: { nomUtilisateur } })
   // Comparaison systématique même si l'utilisateur n'existe pas, pour ne
   // pas révéler par le temps de réponse si le nom d'utilisateur est valide.
-  const hashReference = utilisateur?.motDePasseHash ?? '$2a$12$invalidplaceholderhashvalueinvalidplaceholder'
+  const hashReference =
+    utilisateur?.motDePasseHash ?? '$2a$12$invalidplaceholderhashvalueinvalidplaceholder'
   const motDePasseValide = await bcrypt.compare(motDePasse, hashReference)
 
   if (!utilisateur || !motDePasseValide) {
@@ -41,7 +45,7 @@ export async function seConnecter(_prevState: EtatFormulaire, formData: FormData
     path: '/',
   })
 
-  redirect('/etablissements')
+  redirect('/dashboard')
 }
 
 export async function seDeconnecter(): Promise<void> {

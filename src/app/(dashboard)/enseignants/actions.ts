@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { EnseignantSchema, TransfertSchema, RetraiteSchema } from '@/lib/validations/enseignant'
+import fs from 'fs/promises'
+import path from 'path'
 
 export type EtatFormulaire = {
   errors?: Record<string, string[]>
@@ -39,13 +41,32 @@ export async function creerEnseignant(
   }
 
   try {
-    await prisma.enseignant.create({
+    const created = await prisma.enseignant.create({
       data: {
         ...donnees,
         grade: position.grade,
         positionActuelleId: position.id,
       },
     })
+
+    // Gérer l'upload facultatif de la photo (champ `photo` dans le formulaire)
+    const photo = formData.get('photo') as File | null
+    if (photo && (photo as any).size) {
+      try {
+        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'enseignants')
+        await fs.mkdir(uploadsDir, { recursive: true })
+        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const filename = `${created.id}.${ext}`
+        const filepath = path.join(uploadsDir, filename)
+        await fs.writeFile(filepath, buffer)
+        const url = `/uploads/enseignants/${filename}`
+        await prisma.enseignant.update({ where: { id: created.id }, data: { photoUrl: url } })
+      } catch (err) {
+        // Ne pas empêcher la création pour un problème d'upload; on renvoie juste un message.
+        return { message: 'Enseignant créé, mais échec lors de l’enregistrement de la photo.' }
+      }
+    }
   } catch {
     return { message: 'Ce matricule existe déjà.' }
   }
@@ -71,6 +92,8 @@ export async function modifierEnseignant(
   }
 
   try {
+    const enseignantExistant = await prisma.enseignant.findUnique({ where: { id } })
+
     await prisma.enseignant.update({
       where: { id },
       data: {
@@ -79,6 +102,50 @@ export async function modifierEnseignant(
         positionActuelleId: position.id,
       },
     })
+
+    // Gérer suppression explicite de la photo si demandé
+    const removePhoto = (formData.get('removePhoto') as string | null) === 'on'
+    if (removePhoto && enseignantExistant?.photoUrl) {
+      try {
+        const existingPath = path.join(
+          process.cwd(),
+          'public',
+          enseignantExistant.photoUrl.replace(/^\//, '')
+        )
+        await fs.unlink(existingPath).catch(() => {})
+      } catch {}
+      await prisma.enseignant.update({ where: { id }, data: { photoUrl: null } })
+    }
+
+    // Si une nouvelle photo est fournie, l'enregistrer (remplacer l'ancienne si besoin)
+    const photo = formData.get('photo') as File | null
+    if (photo && (photo as any).size) {
+      try {
+        // Supprimer l'ancienne photo si elle existe
+        if (enseignantExistant?.photoUrl) {
+          const existingPath = path.join(
+            process.cwd(),
+            'public',
+            enseignantExistant.photoUrl.replace(/^\//, '')
+          )
+          await fs.unlink(existingPath).catch(() => {})
+        }
+
+        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'enseignants')
+        await fs.mkdir(uploadsDir, { recursive: true })
+        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const filename = `${id}.${ext}`
+        const filepath = path.join(uploadsDir, filename)
+        await fs.writeFile(filepath, buffer)
+        const url = `/uploads/enseignants/${filename}`
+        await prisma.enseignant.update({ where: { id }, data: { photoUrl: url } })
+      } catch {
+        return {
+          message: 'Modifications enregistrées, mais échec lors de l’enregistrement de la photo.',
+        }
+      }
+    }
   } catch {
     return { message: 'Ce matricule existe déjà pour un autre enseignant.' }
   }

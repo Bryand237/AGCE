@@ -19,9 +19,7 @@ export async function recupererEtablissements({
   recherche,
   tri = 'asc',
 }: ParametresListe) {
-  const where = recherche
-    ? { nom: { contains: recherche, mode: 'insensitive' as const } }
-    : {}
+  const where = recherche ? { nom: { contains: recherche, mode: 'insensitive' as const } } : {}
 
   const [etablissements, total] = await Promise.all([
     prisma.etablissement.findMany({
@@ -76,6 +74,41 @@ export async function recupererEtablissementParId(id: string) {
       _count: { select: { departements: true } },
     },
   })
+}
+
+export async function recupererEtablissementParIdPaged(id: string, page = 1, pageSize = 10) {
+  const etablissement = await prisma.etablissement.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      nom: true,
+      abreviation: true,
+      type: true,
+      photoUrl: true,
+      _count: { select: { departements: true } },
+    },
+  })
+
+  if (!etablissement) return null
+
+  const [departements, total] = await Promise.all([
+    prisma.departement.findMany({
+      where: { etablissementId: id },
+      orderBy: { nom: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { _count: { select: { enseignants: true } } },
+    }),
+    prisma.departement.count({ where: { etablissementId: id } }),
+  ])
+
+  return {
+    etablissement,
+    departements,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    total,
+  }
 }
 
 // Le graphique "effectif par établissement" (recupererEffectifsParEtablissement)

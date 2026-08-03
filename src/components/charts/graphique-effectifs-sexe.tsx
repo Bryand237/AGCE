@@ -13,9 +13,11 @@ import {
 
 type DonneeEffectif = { nom: string; masculin: number; feminin: number }
 
+import { CHART_PALETTE } from '@/lib/chart-palette'
+
 const COULEURS = {
-  masculin: '#059669',
-  feminin: '#2dd4bf',
+  masculin: CHART_PALETTE[3],
+  feminin: CHART_PALETTE[6],
 } as const
 
 export function GraphiqueEffectifsParSexe({ donnees }: { donnees: DonneeEffectif[] }) {
@@ -23,7 +25,7 @@ export function GraphiqueEffectifsParSexe({ donnees }: { donnees: DonneeEffectif
 
   if (!hasData) {
     return (
-      <div className="flex h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+      <div className="border-border bg-muted/30 text-muted-foreground flex h-[320px] items-center justify-center rounded-xl border border-dashed text-sm">
         Aucune donnée disponible
       </div>
     )

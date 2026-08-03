@@ -102,6 +102,7 @@ model Etablissement {
   id           String            @id @default(uuid())
   nom          String
   abreviation  String            @unique // FALSH, FSJP...
+  photoUrl     String?
   type         TypeEtablissement
   departements Departement[]
   // Pas de relation directe "enseignants" ici : un enseignant est lié à un
@@ -178,6 +179,7 @@ model Enseignant {
   matricule     String           @unique
   nom           String
   prenom        String
+  photoUrl      String?
   sexe          Sexe
   dateNaissance DateTime
   lieuNaissance String

@@ -22,6 +22,7 @@ type EtablissementExistant = {
   nom: string
   abreviation: string
   type: 'ECOLE' | 'FACULTE'
+  photoUrl?: string | null
 }
 
 export function FormulaireEtablissement({
@@ -32,9 +33,7 @@ export function FormulaireEtablissement({
   etablissement?: EtablissementExistant
 }) {
   const actionServeur =
-    action === 'creer'
-      ? creerEtablissement
-      : modifierEtablissement.bind(null, etablissement!.id)
+    action === 'creer' ? creerEtablissement : modifierEtablissement.bind(null, etablissement!.id)
   const [state, formAction, isPending] = useActionState(actionServeur, etatInitial)
 
   return (
@@ -60,12 +59,34 @@ export function FormulaireEtablissement({
 
       <label className="flex flex-col gap-1 text-sm">
         Type
-        <select name="type" required defaultValue={etablissement?.type ?? ''} className={classeChamp}>
+        <select
+          name="type"
+          required
+          defaultValue={etablissement?.type ?? ''}
+          className={classeChamp}
+        >
           <option value="">Choisir un type</option>
           <option value="ECOLE">École</option>
           <option value="FACULTE">Faculté</option>
         </select>
         {state.errors?.type && <p className="text-destructive text-sm">{state.errors.type[0]}</p>}
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Logo / image (facultatif)
+        <input name="photo" type="file" accept="image/*" className={classeChamp} />
+        {etablissement?.photoUrl && (
+          <div className="mt-2 flex items-center gap-3">
+            <img
+              src={etablissement.photoUrl}
+              alt={etablissement.nom}
+              className="h-16 w-16 rounded-md object-cover"
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="removePhoto" /> Supprimer l'image actuelle
+            </label>
+          </div>
+        )}
       </label>
 
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
@@ -82,7 +103,7 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
 
   return (
     <form action={formAction} className={classeFormulaire}>
-      <p className="text-sm font-semibold text-foreground">Ajouter un département</p>
+      <p className="text-foreground text-sm font-semibold">Ajouter un département</p>
       <input type="hidden" name="etablissementId" value={etablissementId} />
 
       <label className="flex flex-col gap-1 text-sm">
@@ -100,7 +121,9 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
       </label>
 
       {state.message && (
-        <p className={`text-sm ${state.message === 'Département ajouté.' ? 'text-primary' : 'text-destructive'}`}>
+        <p
+          className={`text-sm ${state.message === 'Département ajouté.' ? 'text-primary' : 'text-destructive'}`}
+        >
           {state.message}
         </p>
       )}
@@ -123,7 +146,11 @@ export function BoutonSupprimerEtablissement({ id }: { id: string }) {
   }
 
   return (
-    <form action={formAction} onSubmit={handleSubmit} className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
+    <form
+      action={formAction}
+      onSubmit={handleSubmit}
+      className="border-destructive/20 bg-destructive/5 rounded-2xl border p-5"
+    >
       {state.message && <p className="text-destructive mb-2 text-sm">{state.message}</p>}
       <button type="submit" disabled={isPending} className={classeBoutonDanger}>
         {isPending ? 'Suppression...' : "Supprimer l'établissement"}
