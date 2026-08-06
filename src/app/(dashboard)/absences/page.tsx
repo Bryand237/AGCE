@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CalendarOff, Clock, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
+import EtatPage from '@/components/etats/etat-page'
 import {
   synchroniserStatutsAbsences,
   recupererStatsAbsences,
@@ -53,25 +54,58 @@ export default async function PageAbsences({
   return (
     <div className="space-y-8">
       <PageHeader title="Absences" description="Congés, missions et suivi des retours">
-        <Link href="/absences/nouveau" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90">
+        <Link
+          href="/absences/nouveau"
+          className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm hover:opacity-90"
+        >
           <Plus size={16} />
           Nouvelle absence
         </Link>
       </PageHeader>
 
       {stats.depasse > 0 && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive" role="alert">
-          <strong>{stats.depasse} absence{stats.depasse > 1 ? 's ont' : ' a'}</strong> dépassé
-          {stats.depasse > 1 ? ' leur' : ' sa'} durée prévue — l&apos;enseignant n&apos;est pas encore
-          rentré.
+        <div
+          className="border-destructive/30 bg-destructive/5 text-destructive rounded-2xl border px-5 py-4 text-sm"
+          role="alert"
+        >
+          <strong>
+            {stats.depasse} absence{stats.depasse > 1 ? 's ont' : ' a'}
+          </strong>{' '}
+          dépassé
+          {stats.depasse > 1 ? ' leur' : ' sa'} durée prévue — l&apos;enseignant n&apos;est pas
+          encore rentré.
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total" value={stats.total} icon={CalendarOff} description="Absences enregistrées" color="blue" />
-        <StatCard title="En attente" value={stats.enAttente} icon={Clock} description="À valider" color="amber" />
-        <StatCard title="En période" value={stats.enPeriode} icon={CheckCircle2} description="Absences en cours" color="green" />
-        <StatCard title="Dépassées" value={stats.depasse} icon={AlertTriangle} description="Retour attendu" color="rose" />
+        <StatCard
+          title="Total"
+          value={stats.total}
+          icon={CalendarOff}
+          description="Absences enregistrées"
+          color="blue"
+        />
+        <StatCard
+          title="En attente"
+          value={stats.enAttente}
+          icon={Clock}
+          description="À valider"
+          color="amber"
+        />
+        <StatCard
+          title="En période"
+          value={stats.enPeriode}
+          icon={CheckCircle2}
+          description="Absences en cours"
+          color="green"
+        />
+        <StatCard
+          title="Dépassées"
+          value={stats.depasse}
+          icon={AlertTriangle}
+          description="Retour attendu"
+          color="rose"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -89,22 +123,29 @@ export default async function PageAbsences({
           name="recherche"
           defaultValue={params.recherche}
           placeholder="Rechercher par nom ou matricule..."
-          className="min-w-[200px] flex-1 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+          className="border-border bg-card focus:border-primary focus:ring-primary/20 min-w-[200px] flex-1 rounded-2xl border px-4 py-2.5 text-sm shadow-sm focus:ring-2 focus:outline-none"
         />
-        <select name="tri" defaultValue={params.tri ?? ''} className="rounded-2xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
+        <select
+          name="tri"
+          defaultValue={params.tri ?? ''}
+          className="border-border bg-card rounded-2xl border px-4 py-2.5 text-sm shadow-sm"
+        >
           <option value="">Trier par date</option>
           <option value="grade">Trier par grade</option>
           <option value="statut">Trier par statut</option>
         </select>
-        <button type="submit" className="rounded-2xl border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-muted">
+        <button
+          type="submit"
+          className="border-border bg-card hover:bg-muted rounded-2xl border px-4 py-2.5 text-sm font-medium shadow-sm"
+        >
           Rechercher
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-muted-foreground">
+            <tr className="border-border bg-muted/30 text-muted-foreground border-b text-left">
               <th className="px-4 py-3 font-medium">Enseignant</th>
               <th className="px-3 py-3 font-medium">Type</th>
               <th className="px-3 py-3 font-medium">Période</th>
@@ -114,21 +155,30 @@ export default async function PageAbsences({
           <tbody>
             {absences.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                  Aucune absence trouvée.
+                <td colSpan={4} className="px-4 py-10">
+                  <EtatPage
+                    icon={AlertTriangle}
+                    titre="Aucune absence trouvée"
+                    message="Aucune absence ne correspond aux critères sélectionnés."
+                    lienRetour="/absences"
+                    labelRetour="Nouvelle absence"
+                  />
                 </td>
               </tr>
             ) : (
               absences.map((a) => (
-                <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                <tr key={a.id} className="border-border hover:bg-muted/20 border-b last:border-0">
                   <td className="px-4 py-3 font-medium">
                     <Link href={`/absences/${a.id}`} className="hover:text-primary">
                       {a.enseignant.nom} {a.enseignant.prenom}
                     </Link>
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{LIBELLES_TYPE[a.type] ?? a.type}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
-                    {a.dateDebut.toLocaleDateString('fr-FR')} – {a.dateFin.toLocaleDateString('fr-FR')}
+                  <td className="text-muted-foreground px-3 py-3">
+                    {LIBELLES_TYPE[a.type] ?? a.type}
+                  </td>
+                  <td className="text-muted-foreground px-3 py-3">
+                    {a.dateDebut.toLocaleDateString('fr-FR')} –{' '}
+                    {a.dateFin.toLocaleDateString('fr-FR')}
                   </td>
                   <td className="px-3 py-3">
                     <BadgeStatut statut={a.statut} />
@@ -140,16 +190,24 @@ export default async function PageAbsences({
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>Page {page} sur {totalPages}</span>
+      <div className="text-muted-foreground flex items-center justify-between text-sm">
+        <span>
+          Page {page} sur {totalPages}
+        </span>
         <div className="flex gap-2">
           {page > 1 && (
-            <Link href={construireLien(page - 1)} className="rounded-2xl border border-border bg-card px-3 py-1.5 shadow-sm hover:bg-muted">
+            <Link
+              href={construireLien(page - 1)}
+              className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
+            >
               Précédent
             </Link>
           )}
           {page < totalPages && (
-            <Link href={construireLien(page + 1)} className="rounded-2xl border border-border bg-card px-3 py-1.5 shadow-sm hover:bg-muted">
+            <Link
+              href={construireLien(page + 1)}
+              className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
+            >
               Suivant
             </Link>
           )}
@@ -167,7 +225,9 @@ function BadgeStatut({ statut }: { statut: string }) {
     TERMINE: 'bg-muted text-muted-foreground ring-border',
   }
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[statut] ?? 'bg-muted text-muted-foreground'}`}>
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[statut] ?? 'bg-muted text-muted-foreground'}`}
+    >
       {LIBELLES_STATUT[statut] ?? statut}
     </span>
   )

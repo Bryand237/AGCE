@@ -47,6 +47,7 @@ export type EnseignantInput = z.infer<typeof EnseignantSchema>
 
 export const TransfertSchema = z.object({
   dateFinService: z.coerce.date(),
+  lieuTransfert: z.string().min(1, 'Le lieu de destination est obligatoire'),
   observations: z.string().optional(),
 })
 

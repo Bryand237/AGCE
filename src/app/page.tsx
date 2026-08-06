@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
-import { recupererUtilisateurConnecte, determinerDestinationInitiale } from '@/lib/auth'
+import { recupererUtilisateurConnecte } from '@/lib/auth'
+import { determinerDestinationInitiale } from '@/domain/auth/determinerDestinationInitiale'
 
 export default async function PageAccueil() {
   const utilisateur = await recupererUtilisateurConnecte()

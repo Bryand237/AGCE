@@ -1,12 +1,12 @@
 import { LIBELLES_GRADE, ORDRE_GRADE } from '@/domain/enseignants/grade'
-import { CHART_PALETTE } from './chart-palette'
+import { couleur } from './chart-palette'
 
 /** Couleurs des séries par grade — utilisez la palette variée partagée */
 export const GRADE_CHART_COLORS = {
-  professeurs: CHART_PALETTE[0],
-  maitreConferences: CHART_PALETTE[3],
-  chargesCours: CHART_PALETTE[5],
-  assistants: CHART_PALETTE[2],
+  professeurs: couleur(0),
+  maitreConferences: couleur(3),
+  chargesCours: couleur(5),
+  assistants: couleur(2),
 } as const
 
 export const GRADE_FILL: Record<string, string> = {

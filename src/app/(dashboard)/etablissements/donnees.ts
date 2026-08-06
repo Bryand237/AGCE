@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma'
-
-const TAILLE_PAGE = 6
+import { TAILLE_PAGE } from '@/lib/constantes'
 
 type ParametresListe = {
   page?: number
@@ -91,7 +90,7 @@ export async function recupererEtablissementParIdPaged(id: string, page = 1, pag
 
   if (!etablissement) return null
 
-  const [departements, total] = await Promise.all([
+  const [departements, total, totalEnseignants] = await Promise.all([
     prisma.departement.findMany({
       where: { etablissementId: id },
       orderBy: { nom: 'asc' },
@@ -100,11 +99,13 @@ export async function recupererEtablissementParIdPaged(id: string, page = 1, pag
       include: { _count: { select: { enseignants: true } } },
     }),
     prisma.departement.count({ where: { etablissementId: id } }),
+    prisma.enseignant.count({ where: { departement: { etablissementId: id } } }),
   ])
 
   return {
     etablissement,
     departements,
+    totalEnseignants,
     page,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     total,

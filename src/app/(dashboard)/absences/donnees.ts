@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
-
-const TAILLE_PAGE = 6
+import { TAILLE_PAGE } from '@/lib/constantes'
 const LIBELLES_TYPE: Record<string, string> = {
   MISSION: 'Mission',
   CONGE_MATERNITE: 'Congé de maternité',
@@ -91,7 +90,14 @@ export async function recupererAbsences({
       orderBy,
       skip: (page - 1) * TAILLE_PAGE,
       take: TAILLE_PAGE,
-      include: { enseignant: true },
+      select: {
+        id: true,
+        type: true,
+        dateDebut: true,
+        dateFin: true,
+        statut: true,
+        enseignant: { select: { id: true, nom: true, prenom: true, matricule: true } },
+      },
     }),
     prisma.absence.count({ where }),
   ])
@@ -101,7 +107,45 @@ export async function recupererAbsences({
 export async function recupererAbsenceDetail(id: string) {
   return prisma.absence.findUnique({
     where: { id },
-    include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
+    select: {
+      id: true,
+      dateDebut: true,
+      dateFin: true,
+      dateRetour: true,
+      type: true,
+      statut: true,
+      statutAttestation: true,
+      numeroDecision: true,
+      motif: true,
+      dateValidation: true,
+      auteurValidation: true,
+      referenceCorrespondance: true,
+      dateCorrespondance: true,
+      dateDemandeInteressee: true,
+      dateValidationAttestation: true,
+      auteurValidationAttestation: true,
+      createdAt: true,
+      enseignant: {
+        select: {
+          id: true,
+          nom: true,
+          prenom: true,
+          matricule: true,
+          grade: true,
+          sexe: true,
+          telephone: true,
+          email: true,
+          departement: {
+            select: {
+              id: true,
+              nom: true,
+              etablissement: { select: { id: true, nom: true, abreviation: true } },
+            },
+          },
+          _count: { select: { absences: true } },
+        },
+      },
+    },
   })
 }
 

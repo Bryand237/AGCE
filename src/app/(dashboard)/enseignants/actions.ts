@@ -51,18 +51,18 @@ export async function creerEnseignant(
 
     // Gérer l'upload facultatif de la photo (champ `photo` dans le formulaire)
     const photo = formData.get('photo') as File | null
-    if (photo && (photo as any).size) {
+    if (photo && photo.size) {
       try {
-        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const buffer = Buffer.from(await photo.arrayBuffer())
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'enseignants')
         await fs.mkdir(uploadsDir, { recursive: true })
-        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const ext = photo.type?.split('/')[1] || 'jpg'
         const filename = `${created.id}.${ext}`
         const filepath = path.join(uploadsDir, filename)
         await fs.writeFile(filepath, buffer)
         const url = `/uploads/enseignants/${filename}`
         await prisma.enseignant.update({ where: { id: created.id }, data: { photoUrl: url } })
-      } catch (err) {
+      } catch {
         // Ne pas empêcher la création pour un problème d'upload; on renvoie juste un message.
         return { message: 'Enseignant créé, mais échec lors de l’enregistrement de la photo.' }
       }
@@ -119,7 +119,7 @@ export async function modifierEnseignant(
 
     // Si une nouvelle photo est fournie, l'enregistrer (remplacer l'ancienne si besoin)
     const photo = formData.get('photo') as File | null
-    if (photo && (photo as any).size) {
+    if (photo && photo.size) {
       try {
         // Supprimer l'ancienne photo si elle existe
         if (enseignantExistant?.photoUrl) {
@@ -131,10 +131,10 @@ export async function modifierEnseignant(
           await fs.unlink(existingPath).catch(() => {})
         }
 
-        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const buffer = Buffer.from(await photo.arrayBuffer())
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'enseignants')
         await fs.mkdir(uploadsDir, { recursive: true })
-        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const ext = photo.type?.split('/')[1] || 'jpg'
         const filename = `${id}.${ext}`
         const filepath = path.join(uploadsDir, filename)
         await fs.writeFile(filepath, buffer)
@@ -166,7 +166,11 @@ export async function marquerTransfere(
 
   await prisma.enseignant.update({
     where: { id },
-    data: { statut: 'TRANSFERE', dateFinService: parsed.data.dateFinService },
+    data: {
+      statut: 'TRANSFERE',
+      dateFinService: parsed.data.dateFinService,
+      lieuTransfert: parsed.data.lieuTransfert,
+    },
   })
 
   revalidatePath('/enseignants')

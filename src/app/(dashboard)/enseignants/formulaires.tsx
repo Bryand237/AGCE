@@ -9,8 +9,7 @@ import {
 } from './actions'
 
 const etatInitial: EtatFormulaire = {}
-const classeChamp =
-  'rounded-xl border border-border bg-background px-3 py-2 text-sm'
+const classeChamp = 'rounded-xl border border-border bg-background px-3 py-2 text-sm'
 
 export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) {
   const [state, formAction, isPending] = useActionState(
@@ -19,7 +18,7 @@ export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) 
   )
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    if (!confirm('Confirmer le transfert de cet enseignant hors de l\'UN ?')) {
+    if (!confirm("Confirmer le transfert de cet enseignant hors de l'UN ?")) {
       e.preventDefault()
     }
   }
@@ -30,8 +29,8 @@ export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) 
       onSubmit={handleSubmit}
       className="flex flex-col gap-3 rounded-2xl border border-amber-100 bg-amber-50/50 p-5 shadow-sm"
     >
-      <p className="text-sm font-semibold text-foreground">Marquer comme transféré</p>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-foreground text-sm font-semibold">Marquer comme transféré</p>
+      <p className="text-muted-foreground text-xs">
         L&apos;enseignant quittera l&apos;effectif actif de l&apos;UN.
       </p>
       <label className="flex flex-col gap-1 text-sm">
@@ -39,6 +38,18 @@ export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) 
         <input type="date" name="dateFinService" required className={classeChamp} />
         {state.errors?.dateFinService && (
           <p className="text-destructive text-sm">{state.errors.dateFinService[0]}</p>
+        )}
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Lieu de destination
+        <input
+          name="lieuTransfert"
+          required
+          placeholder="Ex: Université de Douala"
+          className={classeChamp}
+        />
+        {state.errors?.lieuTransfert && (
+          <p className="text-destructive text-sm">{state.errors.lieuTransfert[0]}</p>
         )}
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -85,11 +96,11 @@ export function FormulaireRetraite({
     <form
       action={formAction}
       onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-5 shadow-sm"
+      className="border-border bg-muted/30 flex flex-col gap-3 rounded-2xl border p-5 shadow-sm"
     >
-      <p className="text-sm font-semibold text-foreground">Marquer comme retraité</p>
+      <p className="text-foreground text-sm font-semibold">Marquer comme retraité</p>
       {dateRetraitePrevue && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Retraite prévue le{' '}
           {new Date(dateRetraitePrevue).toLocaleDateString('fr-FR', {
             day: 'numeric',
@@ -125,7 +136,7 @@ export function FormulaireRetraite({
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted"
+        className="border-border bg-card hover:bg-muted rounded-xl border px-4 py-2.5 text-sm font-medium"
       >
         {isPending ? 'Enregistrement...' : 'Confirmer la retraite'}
       </button>
@@ -151,7 +162,7 @@ export function BoutonReactiver({ enseignantId }: { enseignantId: string }) {
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
+        className="bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-medium shadow-sm hover:opacity-90"
       >
         {isPending ? 'Réactivation...' : 'Réactiver l&apos;enseignant'}
       </button>

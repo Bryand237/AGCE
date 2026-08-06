@@ -13,7 +13,6 @@ import {
 } from 'recharts'
 import { CHART_PALETTE } from '@/lib/chart-palette'
 import { GRADE_FILL } from '@/lib/dashboard-utils'
-import { LIBELLES_GRADE, ORDRE_GRADE } from '@/domain/enseignants/grade'
 
 const DEFAULT_FILL = '#1B4965'
 

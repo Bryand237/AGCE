@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Building2, Layers, Pencil, Users } from 'lucide-react'
 import { recupererEtablissementParIdPaged } from '../donnees'
 import { FormulaireDepartement, BoutonSupprimerEtablissement } from '../formulaires'
+import { StatCard } from '@/components/dashboard/stat-card'
 
 const LIBELLES_TYPE: Record<string, string> = {
   ECOLE: 'École',
@@ -23,55 +25,103 @@ export default async function DetailEtablissement({
   const data = await recupererEtablissementParIdPaged(id, page, 10)
   if (!data) notFound()
 
-  const { etablissement, departements, total, totalPages } = data
+  const { etablissement, departements, total, totalPages, totalEnseignants } = data
 
-  const nombreEnseignants = departements.reduce((somme, d) => somme + d._count.enseignants, 0)
+  const moyenneParDept =
+    etablissement._count.departements > 0
+      ? Math.round(totalEnseignants / etablissement._count.departements)
+      : 0
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link
-            href="/etablissements"
-            className="text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-1.5 text-sm"
-          >
-            <ArrowLeft size={16} />
-            Retour à la liste
-          </Link>
-          <div className="flex items-center gap-3">
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <Link
+        href="/etablissements"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+      >
+        <ArrowLeft size={16} />
+        Retour à la liste
+      </Link>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Zone gauche — carte établissement */}
+        <aside className="border-border bg-card flex flex-col gap-6 rounded-2xl border p-6 shadow-sm lg:col-span-1">
+          <div className="flex flex-col items-center gap-4 text-center">
             {etablissement.photoUrl ? (
-              <img
+              <Image
                 src={etablissement.photoUrl}
                 alt={etablissement.nom}
-                className="h-14 w-14 rounded-2xl object-cover"
+                className="rounded-2xl object-cover"
+                width={96}
+                height={96}
               />
             ) : (
-              <div className="bg-primary/10 text-primary flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-bold">
+              <div className="bg-primary/10 text-primary flex h-24 w-24 items-center justify-center rounded-2xl text-3xl font-bold">
                 {etablissement.abreviation.slice(0, 2)}
               </div>
             )}
-            <div>
-              <h1 className="text-foreground text-2xl font-bold">{etablissement.nom}</h1>
-              <p className="text-muted-foreground text-sm">
-                {LIBELLES_TYPE[etablissement.type]} · {etablissement.abreviation} ·{' '}
-                {etablissement._count.departements} département
-                {etablissement._count.departements > 1 ? 's' : ''} · {nombreEnseignants} enseignant
-                {nombreEnseignants > 1 ? 's' : ''}
-              </p>
+            <div className="space-y-1">
+              <h1 className="text-foreground text-xl font-bold">{etablissement.nom}</h1>
+              <p className="text-muted-foreground text-sm">{etablissement.abreviation}</p>
+              <p className="text-muted-foreground text-sm">{LIBELLES_TYPE[etablissement.type]}</p>
             </div>
+            <Link
+              href={`/etablissements/${id}/modifier`}
+              className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
+            >
+              <Pencil size={14} />
+              Modifier
+            </Link>
           </div>
-        </div>
-        <Link
-          href={`/etablissements/${id}/modifier`}
-          className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium shadow-sm"
-        >
-          <Pencil size={16} />
-          Modifier
-        </Link>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="md:col-span-2">
+          <div className="border-border border-t pt-5">
+            <h2 className="text-foreground mb-3 text-xs font-bold tracking-wide uppercase">
+              Vue d&apos;ensemble
+            </h2>
+            <dl className="space-y-3 text-sm">
+              <Item label="Type" valeur={LIBELLES_TYPE[etablissement.type] ?? etablissement.type} />
+              <Item label="Abréviation" valeur={etablissement.abreviation} />
+              <Item label="Départements" valeur={String(etablissement._count.departements)} />
+              <Item label="Enseignants" valeur={String(totalEnseignants)} />
+            </dl>
+          </div>
+        </aside>
+
+        {/* Zone droite */}
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <section className="border-primary/20 bg-primary/5 rounded-2xl border px-6 py-5 shadow-sm">
+            <h2 className="text-foreground mb-1 text-sm font-bold">Effectif</h2>
+            <p className="text-foreground text-sm">
+              <strong>{totalEnseignants}</strong> enseignant{totalEnseignants > 1 ? 's' : ''}{' '}
+              réparti{totalEnseignants > 1 ? 's' : ''} sur{' '}
+              <strong>{etablissement._count.departements}</strong> département
+              {etablissement._count.departements > 1 ? 's' : ''}
+            </p>
+          </section>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              title="Départements"
+              value={etablissement._count.departements}
+              icon={Layers}
+              description="Unités rattachées"
+              color="blue"
+            />
+            <StatCard
+              title="Enseignants"
+              value={totalEnseignants}
+              icon={Users}
+              description="Effectif total"
+              color="green"
+            />
+            <StatCard
+              title="Moyenne / dept."
+              value={moyenneParDept}
+              icon={Building2}
+              description="Enseignants par département"
+              color="amber"
+            />
+          </div>
+
           <section className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
             <div className="border-border border-b px-6 py-4">
               <h2 className="text-foreground text-sm font-bold">Départements rattachés</h2>
@@ -126,17 +176,26 @@ export default async function DetailEtablissement({
               </div>
             </div>
           </section>
-        </div>
 
-        <aside className="md:col-span-1">
-          <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
-            <FormulaireDepartement etablissementId={id} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+              <FormulaireDepartement etablissementId={id} />
+            </div>
+            <div className="border-border bg-card flex items-start rounded-2xl border p-6 shadow-sm">
+              <BoutonSupprimerEtablissement id={id} />
+            </div>
           </div>
-          <div className="mt-4">
-            <BoutonSupprimerEtablissement id={id} />
-          </div>
-        </aside>
+        </div>
       </div>
+    </div>
+  )
+}
+
+function Item({ label, valeur }: { label: string; valeur: string }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="text-foreground mt-0.5 font-medium">{valeur}</dd>
     </div>
   )
 }

@@ -13,11 +13,12 @@ export const CHART_PALETTE = [
   '#7A6F9B', // lavande sombre
 ]
 
-export function paletteFor(n: number) {
-  // Retourne les n premières couleurs en roulant si besoin
-  const out: string[] = []
-  for (let i = 0; i < n; i++) out.push(CHART_PALETTE[i % CHART_PALETTE.length])
-  return out
+export function couleur(index: number): string {
+  return CHART_PALETTE[index % CHART_PALETTE.length]!
+}
+
+export function paletteFor(n: number): string[] {
+  return Array.from({ length: n }, (_, i) => couleur(i))
 }
 
 export default CHART_PALETTE

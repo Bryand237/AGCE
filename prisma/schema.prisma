@@ -26,7 +26,7 @@ model Session {
   id            String      @id @default(uuid())
   token         String      @unique
   utilisateurId String
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Restrict)
   expiresAt     DateTime
   createdAt     DateTime    @default(now())
 
@@ -117,7 +117,7 @@ model Departement {
   nom             String // "Département d'Histoire" — académique, distinct de l'origine géographique
   abreviation     String
   etablissementId String
-  etablissement   Etablissement @relation(fields: [etablissementId], references: [id])
+  etablissement   Etablissement @relation(fields: [etablissementId], references: [id], onDelete: Restrict)
   enseignants     Enseignant[]
 
   @@unique([etablissementId, nom])
@@ -138,13 +138,11 @@ model DepartementOrigine {
   id          String       @id @default(uuid())
   nom         String       @unique // Djérem, Mfoundi, Wouri... (58 au total)
   regionId    String
-  region      Region       @relation(fields: [regionId], references: [id])
-  enseignants Enseignant[]
+  region      Region       @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  enseignantsOrigine Enseignant[]
+  
 }
 
-// Grille indiciaire — table de référence, jamais de logique conditionnelle en dur.
-// Voir prisma/seed.ts pour le chargement à partir du document officiel.
-//
 // ATTENTION à ne pas confondre deux notions qui se ressemblent :
 // - `voie` : embranchement parallèle et EXCLUSIF. Seul le grade Assistant
 //   en a un (SANS_THESE / AVEC_THESE) — on ne "passe" jamais de l'un à
@@ -157,7 +155,7 @@ model DepartementOrigine {
 model EchelonIndiciaire {
   id            String  @id @default(uuid())
   grade         Grade
-  voie          String? // SANS_THESE | AVEC_THESE — uniquement pour ASSISTANT
+  voie          String @default("AUCUNE") // SANS_THESE | AVEC_THESE — uniquement pour ASSISTANT
   sousCategorie String? // DELEGUE | STAGIAIRE | CLASSE_EXCEPTIONNELLE | HORS_ECHELLE (affichage seul)
   classe        Int? // 1 ou 2 ; null si palier hors numérotation
   echelon       Int? // null pour les paliers uniques
@@ -187,6 +185,7 @@ model Enseignant {
   // Renseignée quand statut passe à TRANSFERE (date effective du transfert
   // hors UN) ou RETRAITE (date effective de départ). Null tant que ACTIF.
   dateFinService DateTime?
+  lieuTransfert  String?
 
   grade Grade // dénormalisé volontairement (recherche/tri fréquents) — voir note plus bas
   diplomePlusEleve     String?
@@ -204,12 +203,12 @@ model Enseignant {
   // différents, une incohérence impossible à empêcher au niveau du schéma.
   // "Quel établissement ?" se répond toujours par enseignant.departement.etablissement.
   departementId String
-  departement   Departement @relation(fields: [departementId], references: [id])
+  departement   Departement @relation(fields: [departementId], references: [id], onDelete: Restrict)
 
   // Même principe : departementOrigine porte la région (via son propre lien
   // vers Region). Pas de regionOrigineId séparé sur Enseignant.
   departementOrigineId String?
-  departementOrigine   DepartementOrigine? @relation(fields: [departementOrigineId], references: [id])
+  departementOrigine   DepartementOrigine? @relation(fields: [departementOrigineId], references: [id], onDelete: SetNull)
 
   // Position actuelle sur la grille — une vraie référence, pas 3 entiers
   // recopiés à la main. Impossible d'avoir une combinaison classe/échelon/
@@ -226,7 +225,7 @@ model Enseignant {
   // dans la même écriture, à partir de positionActuelle.grade — jamais les
   // deux indépendamment (voir actions.ts du module Enseignants).
   positionActuelleId String
-  positionActuelle   EchelonIndiciaire @relation("PositionActuelle", fields: [positionActuelleId], references: [id])
+  positionActuelle   EchelonIndiciaire @relation("PositionActuelle", fields: [positionActuelleId], references: [id], onDelete: Restrict)
   dateEffetEchelon   DateTime
 
   historique HistoriqueAvancement[]
@@ -269,11 +268,11 @@ model SessionConseil {
 model SelectionAvancement {
   id                 String            @id @default(uuid())
   rapportId          String
-  rapport            SessionConseil    @relation(fields: [rapportId], references: [id], onDelete: Cascade)
+  rapport            SessionConseil    @relation(fields: [rapportId], references: [id], onDelete: Restrict)
   enseignantId       String
-  enseignant         Enseignant        @relation(fields: [enseignantId], references: [id])
+  enseignant         Enseignant        @relation(fields: [enseignantId], references: [id], onDelete: Restrict)
   positionProposeeId String
-  positionProposee   EchelonIndiciaire @relation("PositionProposee", fields: [positionProposeeId], references: [id])
+  positionProposee   EchelonIndiciaire @relation("PositionProposee", fields: [positionProposeeId], references: [id], onDelete: Restrict)
 
   @@unique([rapportId, enseignantId])
 }
@@ -281,16 +280,16 @@ model SelectionAvancement {
 model HistoriqueAvancement {
   id           String          @id @default(uuid())
   enseignantId String
-  enseignant   Enseignant      @relation(fields: [enseignantId], references: [id])
+  enseignant   Enseignant      @relation(fields: [enseignantId], references: [id], onDelete: Restrict)
   sessionId    String?
-  session      SessionConseil? @relation(fields: [sessionId], references: [id])
+  session      SessionConseil? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   anciennePositionId String
-  anciennePosition   EchelonIndiciaire @relation("PositionAncienne", fields: [anciennePositionId], references: [id])
+  anciennePosition   EchelonIndiciaire @relation("PositionAncienne", fields: [anciennePositionId], references: [id], onDelete: Restrict)
   dateAncienEffet    DateTime
 
   nouvellePositionId String
-  nouvellePosition   EchelonIndiciaire @relation("PositionNouvelle", fields: [nouvellePositionId], references: [id])
+  nouvellePosition   EchelonIndiciaire @relation("PositionNouvelle", fields: [nouvellePositionId], references: [id], onDelete: Restrict)
   dateNouvelEffet    DateTime
   auteurValidationDecision String?
 
@@ -306,12 +305,13 @@ model HistoriqueAvancement {
   creeLe DateTime @default(now())
 
   @@index([enseignantId, dateNouvelEffet])
+  @@index([sessionId])
 }
 
 model Absence {
   id           String        @id @default(uuid())
   enseignantId String
-  enseignant   Enseignant    @relation(fields: [enseignantId], references: [id])
+  enseignant   Enseignant    @relation(fields: [enseignantId], references: [id], onDelete: Restrict)
   type         TypeAbsence
   statut       StatutAbsence @default(EN_ATTENTE)
 
@@ -340,4 +340,5 @@ model Absence {
 
   @@index([enseignantId, dateDebut])
   @@index([enseignantId, statut])
+  @@index([statut, dateFin])
 }

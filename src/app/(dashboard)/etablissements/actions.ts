@@ -30,12 +30,12 @@ export async function creerEtablissement(
     const created = await prisma.etablissement.create({ data: parsed.data })
 
     const photo = formData.get('photo') as File | null
-    if (photo && (photo as any).size) {
+    if (photo && photo.size) {
       try {
-        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const buffer = Buffer.from(await photo.arrayBuffer())
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'etablissements')
         await fs.mkdir(uploadsDir, { recursive: true })
-        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const ext = photo.type?.split('/')[1] || 'jpg'
         const filename = `${created.id}.${ext}`
         const filepath = path.join(uploadsDir, filename)
         await fs.writeFile(filepath, buffer)
@@ -88,7 +88,7 @@ export async function modifierEtablissement(
     }
 
     const photo = formData.get('photo') as File | null
-    if (photo && (photo as any).size) {
+    if (photo && photo.size) {
       try {
         if (etablissementExistant?.photoUrl) {
           const existingPath = path.join(
@@ -99,10 +99,10 @@ export async function modifierEtablissement(
           await fs.unlink(existingPath).catch(() => {})
         }
 
-        const buffer = Buffer.from(await (photo as any).arrayBuffer())
+        const buffer = Buffer.from(await photo.arrayBuffer())
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'etablissements')
         await fs.mkdir(uploadsDir, { recursive: true })
-        const ext = (photo as any).type?.split('/')[1] || 'jpg'
+        const ext = photo.type?.split('/')[1] || 'jpg'
         const filename = `${id}.${ext}`
         const filepath = path.join(uploadsDir, filename)
         await fs.writeFile(filepath, buffer)

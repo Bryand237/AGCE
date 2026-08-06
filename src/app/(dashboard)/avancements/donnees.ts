@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
-
-const TAILLE_PAGE = 6
+import { TAILLE_PAGE } from '@/lib/constantes'
 
 export async function recupererStatsRapports() {
   const [total, valides, brouillons, dernierRapport] = await Promise.all([
@@ -106,7 +105,43 @@ export async function recupererRapportDetail(id: string) {
       },
       avancements: {
         orderBy: { enseignant: { nom: 'asc' } },
-        include: { enseignant: true, anciennePosition: true, nouvellePosition: true },
+        select: {
+          id: true,
+          statutDecision: true,
+          dateAncienEffet: true,
+          dateNouvelEffet: true,
+          numeroDecision: true,
+          avisCU: true,
+          avisCA: true,
+          observations: true,
+          enseignant: {
+            select: { id: true, matricule: true, nom: true, prenom: true, grade: true },
+          },
+          anciennePosition: {
+            select: {
+              id: true,
+              grade: true,
+              classe: true,
+              echelon: true,
+              indice: true,
+              ordre: true,
+              sousCategorie: true,
+              voie: true,
+            },
+          },
+          nouvellePosition: {
+            select: {
+              id: true,
+              grade: true,
+              classe: true,
+              echelon: true,
+              indice: true,
+              ordre: true,
+              sousCategorie: true,
+              voie: true,
+            },
+          },
+        },
       },
     },
   })
@@ -115,6 +150,41 @@ export async function recupererRapportDetail(id: string) {
 export async function recupererAvancementDetail(rapportId: string, avancementId: string) {
   return prisma.historiqueAvancement.findFirst({
     where: { id: avancementId, sessionId: rapportId },
-    include: { enseignant: true, anciennePosition: true, nouvellePosition: true, session: true },
+    select: {
+      statutDecision: true,
+      id: true,
+      dateAncienEffet: true,
+      dateNouvelEffet: true,
+      numeroDecision: true,
+      avisCU: true,
+      avisCA: true,
+      observations: true,
+      enseignant: { select: { id: true, matricule: true, nom: true, prenom: true, grade: true } },
+      anciennePosition: {
+        select: {
+          id: true,
+          grade: true,
+          classe: true,
+          echelon: true,
+          indice: true,
+          ordre: true,
+          sousCategorie: true,
+          voie: true,
+        },
+      },
+      nouvellePosition: {
+        select: {
+          id: true,
+          grade: true,
+          classe: true,
+          echelon: true,
+          indice: true,
+          ordre: true,
+          sousCategorie: true,
+          voie: true,
+        },
+      },
+      session: { select: { id: true, numero: true, periodeDebut: true, periodeFin: true } },
+    },
   })
 }

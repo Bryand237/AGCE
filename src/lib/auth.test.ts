@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { determinerDestinationInitiale } from './auth'
+import { determinerDestinationInitiale } from '../domain/auth/determinerDestinationInitiale'
 
 describe('determinerDestinationInitiale', () => {
   it('redirige vers la page de connexion si aucun utilisateur n’est connecté', () => {

@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { Building2, Layers, Users, GraduationCap, Plus } from 'lucide-react'
+import EtatPage from '@/components/etats/etat-page'
+import Image from 'next/image'
 import { recupererEtablissements, recupererStatsEtablissements } from './donnees'
 import { recupererEffectifsParEtablissement } from '@/lib/statistiques/effectifs'
 import { GraphiqueEffectifsParSexe } from '@/components/charts/graphique-effectifs-sexe'
@@ -129,8 +131,14 @@ export default async function PageEtablissements({
           <tbody>
             {liste.etablissements.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-10 text-center">
-                  Aucun établissement trouvé.
+                <td colSpan={6} className="px-4 py-10">
+                  <EtatPage
+                    icon={Building2}
+                    titre="Aucun établissement trouvé"
+                    message="Aucun établissement ne correspond aux critères sélectionnés."
+                    lienRetour="/etablissements"
+                    labelRetour="Nouvel établissement"
+                  />
                 </td>
               </tr>
             ) : (
@@ -142,10 +150,12 @@ export default async function PageEtablissements({
                       className="text-foreground hover:text-primary flex items-center gap-3"
                     >
                       {e.photoUrl ? (
-                        <img
+                        <Image
                           src={e.photoUrl}
                           alt={e.nom}
-                          className="h-10 w-10 rounded-2xl object-cover"
+                          className="rounded-2xl object-cover"
+                          width={40}
+                          height={40}
                         />
                       ) : (
                         <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold">

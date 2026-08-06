@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { UserCheck, UserMinus, UserX, Users, FileDown, Plus, Pencil } from 'lucide-react'
+import EtatPage from '@/components/etats/etat-page'
+import Image from 'next/image'
 import {
   recupererEnseignants,
   recupererStatsEnseignants,
@@ -204,8 +206,14 @@ export default async function PageEnseignants({
           <tbody>
             {liste.enseignants.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-muted-foreground px-4 py-10 text-center">
-                  Aucun enseignant trouvé.
+                <td colSpan={7} className="px-4 py-10">
+                  <EtatPage
+                    icon={Users}
+                    titre="Aucun enseignant trouvé"
+                    message="Aucun enseignant ne correspond aux critères sélectionnés."
+                    lienRetour="/enseignants"
+                    labelRetour="Nouvel enseignant"
+                  />
                 </td>
               </tr>
             ) : (
@@ -217,10 +225,12 @@ export default async function PageEnseignants({
                       className="hover:text-primary flex items-center gap-3"
                     >
                       {e.photoUrl ? (
-                        <img
+                        <Image
                           src={e.photoUrl}
                           alt={`${e.nom} ${e.prenom}`}
-                          className="h-10 w-10 rounded-2xl object-cover"
+                          className="rounded-2xl object-cover"
+                          width={40}
+                          height={40}
                         />
                       ) : (
                         <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-bold">

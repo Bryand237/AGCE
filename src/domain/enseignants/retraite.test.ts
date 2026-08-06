@@ -44,7 +44,7 @@ describe('calculerDateRetraitePrevue', () => {
 describe('estEligibleRetraite', () => {
   it('est vrai le jour même de la date de retraite prévue', () => {
     const naissance = new Date('1965-01-01')
-    const jourDeRetraite = new Date('2025-01-01') // Professeur : 1965 + 65 ans
+    const jourDeRetraite = new Date('2030-01-01') // Professeur : 1965 + 65 ans
     expect(estEligibleRetraite(naissance, 'PROFESSEUR', jourDeRetraite)).toBe(true)
   })
 

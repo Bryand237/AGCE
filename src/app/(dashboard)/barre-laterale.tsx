@@ -109,20 +109,22 @@ export function EnTeteDashboard({
           <Link href="/dashboard" className="hover:text-foreground transition-colors">
             Accueil
           </Link>
-          {segments.map((seg, i) => (
-            <span key={i} className="flex items-center gap-1.5">
-              <span className="text-border">/</span>
-              <span
-                className={
-                  i === segments.length - 1
-                    ? 'text-foreground font-medium'
-                    : 'hover:text-foreground'
-                }
-              >
-                {libelleSegment(seg)}
+          {segments.map((seg, i) => {
+            const href = `/${segments.slice(0, i + 1).join('/')}`
+            const isLast = i === segments.length - 1
+            return (
+              <span key={i} className="flex items-center gap-1.5">
+                <span className="text-border">/</span>
+                {isLast ? (
+                  <span className="text-foreground font-medium">{libelleSegment(seg)}</span>
+                ) : (
+                  <Link href={href} className="hover:text-foreground transition-colors">
+                    {libelleSegment(seg)}
+                  </Link>
+                )}
               </span>
-            </span>
-          ))}
+            )
+          })}
         </nav>
 
         <form onSubmit={handleRecherche} className="mx-auto hidden max-w-lg flex-1 md:block">

@@ -1,0 +1,40 @@
+*** Begin Patch
+*** Update File: src/app/(dashboard)/absences/donnees.ts
+@@
+-    prisma.absence.findMany({
++    prisma.absence.findMany({
+       where,
+       orderBy,
+       skip: (page - 1) * TAILLE_PAGE,
+       take: TAILLE_PAGE,
+-      include: { enseignant: true },
++      select: { enseignant: { select: { id: true, nom: true, prenom: true, matricule: true } } },
+     }),
+@@
+-  return prisma.absence.findUnique({
+-    where: { id },
+-    include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
+-  })
++  return prisma.absence.findUnique({
++    where: { id },
++    select: {
++      id: true,
++      dateDebut: true,
++      dateFin: true,
++      type: true,
++      statut: true,
++      statutAttestation: true,
++      numeroDecision: true,
++      dateRetour: true,
++      enseignant: {
++        select: {
++          id: true,
++          nom: true,
++          prenom: true,
++          matricule: true,
++          departement: { select: { id: true, nom: true, etablissement: { select: { id: true, nom: true, abreviation: true } } } },
++        },
++      },
++    },
++  })
+*** End Patch

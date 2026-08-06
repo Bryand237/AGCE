@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import Image from 'next/image'
 import {
   creerEtablissement,
   modifierEtablissement,
@@ -77,13 +78,15 @@ export function FormulaireEtablissement({
         <input name="photo" type="file" accept="image/*" className={classeChamp} />
         {etablissement?.photoUrl && (
           <div className="mt-2 flex items-center gap-3">
-            <img
-              src={etablissement.photoUrl}
+            <Image
+              src={etablissement.photoUrl!}
               alt={etablissement.nom}
-              className="h-16 w-16 rounded-md object-cover"
+              className="rounded-md object-cover"
+              width={64}
+              height={64}
             />
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="removePhoto" /> Supprimer l'image actuelle
+              <input type="checkbox" name="removePhoto" /> Supprimer l’image actuelle
             </label>
           </div>
         )}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { useActionState } from 'react'
 import { creerEnseignant, modifierEnseignant, type EtatFormulaire } from './actions'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
@@ -147,10 +148,12 @@ export function FormulaireEnseignant({
           <input name="photo" type="file" accept="image/*" className={classeChamp} />
           {enseignant?.photoUrl && (
             <div className="mt-2 flex items-center gap-3">
-              <img
-                src={enseignant.photoUrl}
+              <Image
+                src={enseignant.photoUrl!}
                 alt={`${enseignant.nom} ${enseignant.prenom}`}
-                className="h-16 w-16 rounded-md object-cover"
+                className="rounded-md object-cover"
+                width={64}
+                height={64}
               />
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="removePhoto" /> Supprimer la photo actuelle

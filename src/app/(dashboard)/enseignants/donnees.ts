@@ -1,11 +1,17 @@
 import { prisma } from '@/lib/prisma'
-import { calculerDateRetraitePrevue, estEligibleRetraite, estProcheRetraite } from '@/domain/enseignants/retraite'
-import { recupererEffectifsParEtablissement, recupererEffectifsParGrade } from '@/lib/statistiques/effectifs'
+import {
+  calculerDateRetraitePrevue,
+  estEligibleRetraite,
+  estProcheRetraite,
+} from '@/domain/enseignants/retraite'
+import {
+  recupererEffectifsParEtablissement,
+  recupererEffectifsParGrade,
+} from '@/lib/statistiques/effectifs'
 import { formaterPosition } from '@/domain/avancement/formaterPosition'
+import { TAILLE_PAGE } from '@/lib/constantes'
 
 export { recupererEffectifsParEtablissement, recupererEffectifsParGrade }
-
-const TAILLE_PAGE = 6
 
 type ParametresListe = {
   page?: number
@@ -30,7 +36,11 @@ export async function recupererEnseignants({
       }
     : {}
 
-  const orderBy = triGrade ? { grade: triGrade } : triStatut ? { statut: triStatut } : { nom: 'asc' as const }
+  const orderBy = triGrade
+    ? { grade: triGrade }
+    : triStatut
+      ? { statut: triStatut }
+      : { nom: 'asc' as const }
 
   const [enseignants, total] = await Promise.all([
     prisma.enseignant.findMany({
@@ -130,8 +140,63 @@ export async function recupererEnseignantDetail(id: string) {
       positionActuelle: true,
       historique: {
         orderBy: { dateNouvelEffet: 'desc' },
-        include: { anciennePosition: true, nouvellePosition: true, session: true },
+        select: {
+          id: true,
+          dateAncienEffet: true,
+          dateNouvelEffet: true,
+          numeroDecision: true,
+          typeAvancement: true,
+          avisCU: true,
+          avisCA: true,
+          observations: true,
+          statutDecision: true,
+          dateValidationDecision: true,
+          auteurValidationDecision: true,
+          creeLe: true,
+          anciennePosition: {
+            select: {
+              id: true,
+              grade: true,
+              voie: true,
+              classe: true,
+              echelon: true,
+              indice: true,
+              ordre: true,
+              sousCategorie: true,
+            },
+          },
+          nouvellePosition: {
+            select: {
+              id: true,
+              grade: true,
+              voie: true,
+              classe: true,
+              echelon: true,
+              indice: true,
+              ordre: true,
+              sousCategorie: true,
+            },
+          },
+          session: {
+            select: {
+              id: true,
+              numero: true,
+              periodeDebut: true,
+              periodeFin: true,
+              statut: true,
+              dateSignatureDecisions: true,
+              dateValidation: true,
+              auteurValidation: true,
+            },
+          },
+        },
       },
+      absences: {
+        orderBy: { dateDebut: 'desc' },
+        take: 5,
+        select: { type: true, dateDebut: true, dateFin: true, statut: true },
+      },
+      _count: { select: { absences: true } },
     },
   })
 }
