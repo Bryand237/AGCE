@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { exigerUtilisateur } from '@/lib/auth'
 import { AbsenceSchema } from '@/lib/validations/absence'
 import { calculerFinCongeMaternite } from '@/domain/absences/calculerFinCongeMaternite'
 import { genererAttestationAbsence } from '@/lib/documents/genererAttestationAbsence'
@@ -13,6 +14,7 @@ export async function creerAbsence(
   _prevStat: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = AbsenceSchema.safeParse({
     matricule: formData.get('matricule'),
     type: formData.get('type'),
@@ -62,6 +64,7 @@ export async function validerAbsence(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const dateValidation = new Date(formData.get('dateValidation') as string)
   const auteurValidation = formData.get('auteurValidation') as string
   if (isNaN(dateValidation.getTime()) || !auteurValidation) {
@@ -93,6 +96,7 @@ export async function terminerAbsence(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const dateRetour = new Date(formData.get('dateRetour') as string)
   if (isNaN(dateRetour.getTime())) return { message: 'Date de retour obligatoire.' }
 
@@ -107,6 +111,7 @@ export async function modifierAbsence(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const dateDebut = new Date(formData.get('dateDebut') as string)
   const dateFin = new Date(formData.get('dateFin') as string)
   if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) return { message: 'Dates invalides.' }
@@ -120,6 +125,7 @@ export async function modifierAbsence(
 }
 
 export async function supprimerAbsence(absenceId: string): Promise<void> {
+  await exigerUtilisateur()
   await prisma.absence.delete({ where: { id: absenceId } })
   revalidatePath('/absences')
   redirect('/absences')
@@ -129,6 +135,7 @@ export async function genererAttestation(
   absenceId: string,
   _prevState: EtatFormulaire
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const absence = await prisma.absence.findUnique({
     where: { id: absenceId },
     include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
@@ -166,6 +173,7 @@ export async function validerAttestation(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const numeroDecision = formData.get('numeroDecision') as string
   const dateValidation = new Date(formData.get('dateValidation') as string)
   const auteurValidation = formData.get('auteurValidation') as string

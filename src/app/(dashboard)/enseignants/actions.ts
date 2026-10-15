@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { exigerUtilisateur } from '@/lib/auth'
 import { EnseignantSchema, TransfertSchema, RetraiteSchema } from '@/lib/validations/enseignant'
 import fs from 'fs/promises'
 import path from 'path'
@@ -26,6 +27,7 @@ export async function creerEnseignant(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = EnseignantSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
@@ -80,6 +82,7 @@ export async function modifierEnseignant(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = EnseignantSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
@@ -159,6 +162,7 @@ export async function marquerTransfere(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = TransfertSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
@@ -183,6 +187,7 @@ export async function marquerRetraite(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = RetraiteSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
@@ -203,6 +208,7 @@ export async function reactiverEnseignant(
   _prevState: EtatFormulaire,
   _formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   await prisma.enseignant.update({
     where: { id },
     data: { statut: 'ACTIF', dateFinService: null },

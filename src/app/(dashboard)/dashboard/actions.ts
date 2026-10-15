@@ -6,6 +6,7 @@
  */
 'use server'
 
+import { exigerUtilisateur } from '@/lib/auth'
 import {
   recupererStatsDashboard,
   recupererRepartitionParGrade,
@@ -24,17 +25,21 @@ async function envelopper<T>(fn: () => Promise<T>): Promise<Result<T>> {
 }
 
 export async function getDashboardStats() {
+  await exigerUtilisateur()
   return envelopper(recupererStatsDashboard)
 }
 
 export async function getRepartitionParGrade() {
+  await exigerUtilisateur()
   return envelopper(recupererRepartitionParGrade)
 }
 
 export async function getRepartitionParRegion() {
+  await exigerUtilisateur()
   return envelopper(recupererRepartitionParRegion)
 }
 
 export async function getRepartitionParEtablissement() {
+  await exigerUtilisateur()
   return envelopper(recupererRepartitionParEtablissement)
 }

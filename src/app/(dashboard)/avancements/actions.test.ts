@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // La base est simulée : on vérifie ici ce que l'action demande à Prisma (quelles
 // suppressions, dans quel ordre, dans une transaction) et ce qu'elle répond à
 // l'écran. Le comportement réel des clés étrangères se contrôle sur la base.
-const { journal, prismaFactice, tx } = vi.hoisted(() => {
+const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
   const journal: string[] = []
   const tracer = (nom: string) =>
     vi.fn(async () => {
@@ -20,10 +20,13 @@ const { journal, prismaFactice, tx } = vi.hoisted(() => {
     sessionConseil: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   }
-  return { journal, prismaFactice, tx }
+  return { exigerUtilisateur: vi.fn(), journal, prismaFactice, tx }
 })
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
+// La session est testée à part (auth-session.test.ts et actions-protegees.test.ts) :
+// ici, l'utilisateur est simplement connecté.
+vi.mock('@/lib/auth', () => ({ exigerUtilisateur }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // Comme dans Next.js, redirect() interrompt l'exécution en levant une exception.
 vi.mock('next/navigation', () => ({
@@ -47,6 +50,7 @@ describe('supprimerRapport', () => {
   beforeEach(() => {
     journal.length = 0
     vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
     prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
   })
 
@@ -86,6 +90,16 @@ describe('supprimerRapport', () => {
     const etat = await supprimerRapport(RAPPORT, {}, new FormData())
 
     expect(etat.message).toBe('Un rapport validé ne peut pas être supprimé.')
+    expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('exige une session avant de lire quoi que ce soit dans la base', async () => {
+    exigerUtilisateur.mockRejectedValue(new Error('NEXT_REDIRECT /connexion'))
+
+    await expect(supprimerRapport(RAPPORT, {}, new FormData())).rejects.toThrow(
+      'NEXT_REDIRECT /connexion'
+    )
+    expect(prismaFactice.sessionConseil.findUnique).not.toHaveBeenCalled()
     expect(prismaFactice.$transaction).not.toHaveBeenCalled()
   })
 

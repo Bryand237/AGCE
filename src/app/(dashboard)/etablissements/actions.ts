@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { exigerUtilisateur } from '@/lib/auth'
 import { EtablissementSchema, DepartementSchema } from '@/lib/validations/etablissement'
 import fs from 'fs/promises'
 import path from 'path'
@@ -16,6 +17,7 @@ export async function creerEtablissement(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = EtablissementSchema.safeParse({
     nom: formData.get('nom'),
     abreviation: formData.get('abreviation'),
@@ -59,6 +61,7 @@ export async function modifierEtablissement(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = EtablissementSchema.safeParse({
     nom: formData.get('nom'),
     abreviation: formData.get('abreviation'),
@@ -127,6 +130,7 @@ export async function supprimerEtablissement(
   _prevState: EtatFormulaire,
   _formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const departements = await prisma.departement.count({ where: { etablissementId: id } })
   if (departements > 0) {
     return {
@@ -143,6 +147,7 @@ export async function creerDepartement(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = DepartementSchema.safeParse({
     nom: formData.get('nom'),
     abreviation: formData.get('abreviation'),

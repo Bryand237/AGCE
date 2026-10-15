@@ -139,6 +139,16 @@ décision, attestation) refusent en plus, par `refuserSiNonConnecte()`
 (`src/lib/auth.ts`), toute requête sans session valide (réponse `401`) : ce
 second verrou joue même si le proxy est contourné ou désactivé.
 
+Chaque action serveur (créer, modifier, supprimer, valider… un enseignant, une
+absence, un rapport, un établissement) vérifie elle-même la session :
+`await exigerUtilisateur()`, **en toute première ligne** de la fonction
+(`src/lib/auth.ts`). Sans session valide, l'action n'exécute rien et renvoie
+vers `/connexion`. Une action est en effet une adresse HTTP appelable sans
+passer par la page qui l'affiche ; le proxy et le layout seuls ne suffisent pas.
+Les seules exceptions sont `seConnecter` et `seDeconnecter`
+(`src/app/connexion/actions.ts`). **Toute nouvelle action doit commencer par la
+même ligne** : le test `src/app/actions-protegees.test.ts` échoue sinon.
+
 **Exception : les photos** (`/uploads`). Elles s'affichent grâce à
 l'optimiseur d'images de Next.js, qui relit chaque fichier sans le cookie
 de connexion : leur imposer une connexion ferait disparaître toutes les

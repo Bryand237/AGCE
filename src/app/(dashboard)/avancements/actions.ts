@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { exigerUtilisateur } from '@/lib/auth'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
@@ -22,6 +23,7 @@ export async function mettreAJourMetadonneesSession(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = MetadonneesSessionSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
@@ -42,6 +44,7 @@ export async function creerRapport(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const numero = formData.get('numero') as string
   const periodeDebut = new Date(formData.get('periodeDebut') as string)
   const periodeFin = new Date(formData.get('periodeFin') as string)
@@ -96,6 +99,7 @@ export async function ajouterSelection(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const enseignantId = formData.get('enseignantId') as string
   if (!enseignantId) {
     return { message: 'Veuillez sélectionner un enseignant.' }
@@ -139,6 +143,7 @@ export async function mettreAJourRapport(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const numero = (formData.get('numero') as string)?.trim()
   const periodeDebut = new Date(formData.get('periodeDebut') as string)
   const periodeFin = new Date(formData.get('periodeFin') as string)
@@ -162,6 +167,7 @@ export async function modifierSelection(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const positionProposeeId = formData.get('positionProposeeId') as string
   if (!positionProposeeId) {
     return { message: 'Veuillez choisir une position proposée valide.' }
@@ -210,6 +216,7 @@ export async function modifierSelection(
 }
 
 export async function retirerSelection(rapportId: string, enseignantId: string): Promise<void> {
+  await exigerUtilisateur()
   const [rapport, selection] = await Promise.all([
     prisma.sessionConseil.findUnique({ where: { id: rapportId } }),
     prisma.selectionAvancement.findUnique({
@@ -255,6 +262,7 @@ export async function supprimerRapport(
   _prevState: EtatFormulaire,
   _formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
     include: { avancements: { include: { enseignant: true } } },
@@ -303,6 +311,7 @@ export async function supprimerRapport(
 }
 
 export async function rejeterRapport(rapportId: string, formData: FormData): Promise<void> {
+  await exigerUtilisateur()
   const motif = formData.get('motif') as string
   await prisma.sessionConseil.update({ where: { id: rapportId }, data: { motifRejet: motif } })
   revalidatePath(`/avancements/${rapportId}`)
@@ -313,6 +322,7 @@ export async function validerRapport(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const dateValidation = new Date(formData.get('dateValidation') as string)
   const auteurValidation = formData.get('auteurValidation') as string
   if (isNaN(dateValidation.getTime()) || !auteurValidation) {
@@ -358,6 +368,7 @@ export async function genererDecision(
   avancementId: string,
   _prevState: EtatFormulaire
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const avancement = await chargerAvancementPourDecision(avancementId)
   if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
 
@@ -384,6 +395,7 @@ export async function validerDecision(
   _prevState: EtatFormulaire,
   formData: FormData
 ): Promise<EtatFormulaire> {
+  await exigerUtilisateur()
   const parsed = ValidationDecisionSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors }
