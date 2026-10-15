@@ -311,16 +311,32 @@ export function FormulaireModifierSelection({
   )
 }
 
-export function FormulaireSupprimerRapport({ rapportId }: { rapportId: string }) {
-  const [, formAction] = useActionState(
+export function FormulaireSupprimerRapport({
+  rapportId,
+  numero,
+  nombreSelections,
+}: {
+  rapportId: string
+  numero: string
+  nombreSelections: number
+}) {
+  const [state, formAction, isPending] = useActionState(
     supprimerRapport.bind(null, rapportId),
-    undefined as unknown as void
+    etatInitial
   )
 
+  function confirmer(e: React.FormEvent<HTMLFormElement>) {
+    const detail =
+      nombreSelections > 0 ? ` ainsi que ses ${nombreSelections} sélection(s) d'enseignants` : ''
+    const question = `Supprimer définitivement le rapport ${numero}${detail} ? Cette action est irréversible.`
+    if (!confirm(question)) e.preventDefault()
+  }
+
   return (
-    <form action={formAction} className="flex items-center justify-end">
-      <button type="submit" className={classeBoutonDanger}>
-        Supprimer ce rapport
+    <form action={formAction} onSubmit={confirmer} className="flex flex-col items-end gap-2">
+      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      <button type="submit" disabled={isPending} className={classeBoutonDanger}>
+        {isPending ? 'Suppression…' : 'Supprimer ce rapport'}
       </button>
     </form>
   )

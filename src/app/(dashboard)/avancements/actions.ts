@@ -250,32 +250,53 @@ export async function retirerSelection(rapportId: string, enseignantId: string):
   revalidatePath(`/avancements/${rapportId}`)
 }
 
-export async function supprimerRapport(rapportId: string): Promise<void> {
+export async function supprimerRapport(
+  rapportId: string,
+  _prevState: EtatFormulaire,
+  _formData: FormData
+): Promise<EtatFormulaire> {
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
-    include: {
-      avancements: { include: { enseignant: true } },
-      selections: true,
-    },
+    include: { avancements: { include: { enseignant: true } } },
   })
-  if (!rapport) return
+  // Déjà supprimé (autre onglet, double clic) : le résultat voulu est atteint.
+  if (!rapport) redirect('/avancements')
 
-  await prisma.$transaction(async (tx) => {
-    for (const avancement of rapport.avancements) {
-      if (avancement.enseignant.positionActuelleId === avancement.nouvellePositionId) {
-        await tx.enseignant.update({
-          where: { id: avancement.enseignantId },
-          data: {
-            positionActuelleId: avancement.anciennePositionId,
-            dateEffetEchelon: avancement.dateAncienEffet,
-          },
-        })
+  // Un rapport validé a modifié les échelons et porte l'historique des décisions
+  // signées. L'écran ne propose pas sa suppression : le serveur doit refuser lui
+  // aussi, sinon l'historique officiel disparaîtrait.
+  if (rapport.statut === 'VALIDE') {
+    return { message: 'Un rapport validé ne peut pas être supprimé.' }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const avancement of rapport.avancements) {
+        if (avancement.enseignant.positionActuelleId === avancement.nouvellePositionId) {
+          await tx.enseignant.update({
+            where: { id: avancement.enseignantId },
+            data: {
+              positionActuelleId: avancement.anciennePositionId,
+              dateEffetEchelon: avancement.dateAncienEffet,
+            },
+          })
+        }
       }
-    }
 
-    await tx.historiqueAvancement.deleteMany({ where: { sessionId: rapportId } })
-    await tx.sessionConseil.delete({ where: { id: rapportId } })
-  })
+      // Les sélections référencent le rapport avec onDelete: Restrict : tant
+      // qu'il en reste une, la suppression du rapport est refusée par la base.
+      await tx.selectionAvancement.deleteMany({ where: { rapportId } })
+      await tx.historiqueAvancement.deleteMany({ where: { sessionId: rapportId } })
+      await tx.sessionConseil.delete({ where: { id: rapportId } })
+    })
+  } catch (erreur) {
+    // La transaction est annulée en bloc : rien n'a été supprimé.
+    console.error('supprimerRapport : échec de la suppression', erreur)
+    return {
+      message:
+        "La suppression a échoué. Le rapport n'a pas été modifié ; réessayez, ou contactez le responsable technique si le problème persiste.",
+    }
+  }
 
   revalidatePath('/avancements')
   redirect('/avancements')

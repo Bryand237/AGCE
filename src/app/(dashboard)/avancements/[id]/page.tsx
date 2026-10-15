@@ -198,7 +198,11 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
           <BlocValiderOuRejeter rapportId={id} />
           <div className="border-border bg-card rounded-2xl border p-4 shadow-sm">
             <p className="text-foreground text-sm font-semibold">Actions de rapport</p>
-            <FormulaireSupprimerRapport rapportId={id} />
+            <FormulaireSupprimerRapport
+              rapportId={id}
+              numero={rapport.numero}
+              nombreSelections={rapport.selections.length}
+            />
           </div>
         </>
       )}
