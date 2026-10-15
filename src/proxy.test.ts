@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NextRequest } from 'next/server'
@@ -137,7 +137,9 @@ describe('proxy — chemins concernés (matcher)', () => {
 // le dossier app. Ici l'application vit dans src/app : un proxy.ts à la racine du
 // dépôt est ignoré sans aucun message, et plus rien n'est protégé.
 describe('proxy — emplacement du fichier', () => {
-  const racine = fileURLToPath(new URL('..', import.meta.url))
+  // Même méthode que src/app/directives.test.ts : partir du chemin du fichier de test
+  // (new URL(...) donne un objet que fileURLToPath refuse dans l'environnement jsdom).
+  const racine = join(dirname(fileURLToPath(import.meta.url)), '..')
 
   it('se trouve dans src/, à côté de app', () => {
     expect(existsSync(join(racine, 'src', 'proxy.ts'))).toBe(true)
