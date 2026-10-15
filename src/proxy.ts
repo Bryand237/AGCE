@@ -28,5 +28,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Exclus du contrôle : les fichiers statiques de Next.js, et /uploads (photos).
+  // Les photos s'affichent via l'optimiseur d'images (/_next/image), qui relit
+  // chaque fichier par une requête interne SANS le cookie de connexion : si
+  // /uploads exigeait une session, toutes les photos cesseraient de s'afficher.
+  // Elles restent atteignables sans connexion par qui connaît l'adresse exacte
+  // (nom de fichier = identifiant aléatoire) ; voir le README.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|uploads/).*)'],
 }

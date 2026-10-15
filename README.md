@@ -126,6 +126,32 @@ Déjà présents dans le `package.json` fourni (rien à ajouter à la main) :
 }
 ```
 
+## Contrôle d'accès
+
+Toutes les pages et tous les téléchargements (liste des enseignants,
+rapports, décisions, attestations) exigent une connexion. Ce contrôle est
+fait par `src/proxy.ts`. Ce fichier doit rester dans `src/`, à côté du
+dossier `app` : placé à la racine du dépôt, Next.js l'ignore sans aucun
+message et plus rien n'est protégé.
+
+**Exception : les photos** (`/uploads`). Elles s'affichent grâce à
+l'optimiseur d'images de Next.js, qui relit chaque fichier sans le cookie
+de connexion : leur imposer une connexion ferait disparaître toutes les
+photos. Elles restent donc atteignables sans connexion, mais seulement par
+qui connaît l'adresse exacte du fichier (son nom est un identifiant
+aléatoire, jamais affiché hors des pages protégées).
+
+**Vérifier**, application lancée et sans être connecté :
+
+```bash
+curl -i http://localhost:3000/enseignants/liste-pdf
+```
+
+La réponse attendue est `HTTP/1.1 307` avec un en-tête `location` qui
+désigne `/connexion` (ou une réponse `401`). Une réponse `200` avec un PDF
+signifie que le contrôle d'accès est inactif. Les tests automatiques
+équivalents : `npm run test:e2e -- acces-protege`.
+
 ## Accès réseau à la base de données
 
 Le port de la base (`DR_PORT`, 51213 par défaut) est publié par
