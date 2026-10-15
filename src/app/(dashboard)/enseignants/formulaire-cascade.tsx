@@ -345,7 +345,7 @@ export function FormulaireEnseignant({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          Département
+          Département d&apos;affectation
           <select
             id="departementId"
             name="departementId"

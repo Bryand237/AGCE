@@ -26,7 +26,9 @@ test.describe('Enseignants', () => {
     await page.getByLabel(/date d'effet/i).fill('2018-09-01')
 
     await page.getByLabel(/établissement/i).selectOption({ label: 'Faculté de Test' })
-    await page.getByLabel(/département/i).selectOption({ label: 'Département de Test' })
+    await page
+      .getByLabel(/département d'affectation/i)
+      .selectOption({ label: 'Département de Test' })
 
     await page.getByLabel(/^grade$/i).selectOption('CHARGE_DE_COURS')
     await page.getByLabel(/position|échelon/i).selectOption({ index: 1 })
