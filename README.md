@@ -11,6 +11,11 @@ rapports semestriels.
 - Docker Desktop (ou Docker Engine + Compose sur Linux)
 - Git
 
+Les commandes de ce document s'écrivent `docker compose ...` (Compose v2).
+Si le terminal répond `unknown shorthand flag: 'd' in -d`, c'est que Compose
+v2 n'est pas installé : écrivez alors `docker-compose ...` (avec un trait
+d'union) à la place, ou installez le plugin Compose v2.
+
 ## Mise en place initiale (une seule fois)
 
 `create-next-app` refuse de générer un projet dans un dossier non vide
@@ -137,12 +142,18 @@ dépôt) : faire d'abord `npm run db:sauvegarder`, arrêter `npm run dev`,
 puis
 
 ```bash
+docker compose stop db
+docker compose rm -f db
 docker compose up -d db
 ```
 
 Cela recrée le conteneur `db` avec le nouveau réglage, en quelques
 secondes. Les données sont dans le volume `pgdata` : elles ne sont pas
-touchées.
+touchées. Avec l'ancien `docker-compose`, mêmes commandes avec un trait
+d'union ; la séquence `stop`, `rm`, `up` évite l'erreur `ContainerConfig`
+que cet ancien outil provoque parfois à la recréation d'un conteneur.
+N'ajoutez jamais l'option `-v` à ces commandes : elle supprimerait les
+données de la base.
 
 **Si l'application ne se connecte plus** après ce changement (erreur
 `ECONNREFUSED`, souvent avec `::1`) : dans `.env`, remplacer `localhost`
