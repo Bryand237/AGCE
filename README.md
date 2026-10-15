@@ -121,6 +121,37 @@ Déjà présents dans le `package.json` fourni (rien à ajouter à la main) :
 }
 ```
 
+## Accès réseau à la base de données
+
+Le port de la base (`DR_PORT`, 51213 par défaut) est publié par
+`docker-compose.yml` sur `127.0.0.1` uniquement : la base n'est joignable
+que depuis la machine qui l'héberge, jamais depuis le réseau. Les
+identifiants du fichier `.env` ne protègent donc plus seuls les données.
+
+**Vérifier** : `docker compose ps` doit afficher `127.0.0.1:51213->5432/tcp`
+pour le service `db`. Une ligne `0.0.0.0:51213->5432/tcp` signifie que
+l'ancien réglage est encore actif.
+
+**Appliquer sur une installation existante** (après mise à jour du
+dépôt) : faire d'abord `npm run db:sauvegarder`, arrêter `npm run dev`,
+puis
+
+```bash
+docker compose up -d db
+```
+
+Cela recrée le conteneur `db` avec le nouveau réglage, en quelques
+secondes. Les données sont dans le volume `pgdata` : elles ne sont pas
+touchées.
+
+**Si l'application ne se connecte plus** après ce changement (erreur
+`ECONNREFUSED`, souvent avec `::1`) : dans `.env`, remplacer `localhost`
+par `127.0.0.1` dans `DATABASE_URL`, puis relancer l'application.
+
+**Besoin d'ouvrir la base à une autre machine** (outil de requêtes
+installé ailleurs) : ne pas retirer `127.0.0.1`. Passer par un tunnel
+SSH (`ssh -L 51213:127.0.0.1:51213 utilisateur@machine`).
+
 ## Sauvegarde et restauration
 
 La base de données contient toute la carrière des enseignants : sans
