@@ -134,6 +134,11 @@ fait par `src/proxy.ts`. Ce fichier doit rester dans `src/`, à côté du
 dossier `app` : placé à la racine du dépôt, Next.js l'ignore sans aucun
 message et plus rien n'est protégé.
 
+Les quatre routes de téléchargement (liste des enseignants, rapport PDF,
+décision, attestation) refusent en plus, par `refuserSiNonConnecte()`
+(`src/lib/auth.ts`), toute requête sans session valide (réponse `401`) : ce
+second verrou joue même si le proxy est contourné ou désactivé.
+
 **Exception : les photos** (`/uploads`). Elles s'affichent grâce à
 l'optimiseur d'images de Next.js, qui relit chaque fichier sans le cookie
 de connexion : leur imposer une connexion ferait disparaître toutes les

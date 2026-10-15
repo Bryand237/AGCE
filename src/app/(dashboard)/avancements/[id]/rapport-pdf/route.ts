@@ -4,6 +4,7 @@ import { genererPdf } from '@/lib/pdf/genererPdf'
 import { lireLogo } from '@/lib/pdf/logo'
 import { formaterPositionCompacte } from '@/domain/avancement/formaterPositionCompacte'
 import { LIBELLES_GRADE_PLURIEL, ORDRE_GRADE } from '@/domain/enseignants/grade'
+import { refuserSiNonConnecte } from '@/lib/auth'
 
 const ENTETES = [
   'N°',
@@ -17,6 +18,9 @@ const ENTETES = [
 ]
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const refus = await refuserSiNonConnecte()
+  if (refus) return refus
+
   const { id } = await params
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id },

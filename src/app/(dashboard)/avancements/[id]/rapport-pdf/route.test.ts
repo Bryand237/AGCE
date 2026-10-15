@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Le moteur PDF (Chromium) et la base sont simulés : on vérifie le HTML que la
 // route fabrique et ce qu'elle répond, pas le rendu final du PDF.
-const { prismaFactice, genererPdf, lireLogo } = vi.hoisted(() => ({
+const { prismaFactice, genererPdf, lireLogo, refuserSiNonConnecte } = vi.hoisted(() => ({
   prismaFactice: { sessionConseil: { findUnique: vi.fn() } },
   genererPdf: vi.fn(async (_html: string) => Buffer.from('%PDF-1.4')),
   lireLogo: vi.fn(),
+  refuserSiNonConnecte: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
 vi.mock('@/lib/pdf/genererPdf', () => ({ genererPdf }))
 vi.mock('@/lib/pdf/logo', () => ({ lireLogo }))
+// Le contrôle de connexion a ses propres tests (acces-routes-fichiers.test.ts) : ici, connecté.
+vi.mock('@/lib/auth', () => ({ refuserSiNonConnecte }))
 vi.mock('next/server', () => ({
   NextResponse: class {
     constructor(
@@ -45,6 +48,7 @@ describe('GET /avancements/[id]/rapport-pdf', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     prismaFactice.sessionConseil.findUnique.mockResolvedValue(RAPPORT)
+    refuserSiNonConnecte.mockResolvedValue(null)
   })
 
   it('produit le PDF sans logo, sans erreur, quand le logo est absent', async () => {
