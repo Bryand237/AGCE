@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { genererPdf } from '@/lib/pdf/genererPdf'
+import { lireLogo } from '@/lib/pdf/logo'
 import { formaterPositionCompacte } from '@/domain/avancement/formaterPositionCompacte'
 import { LIBELLES_GRADE_PLURIEL, ORDRE_GRADE } from '@/domain/enseignants/grade'
 
@@ -125,7 +124,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     .toUpperCase()
 
-  const logoBase64 = readFileSync(join(process.cwd(), 'reference-docs', 'logo.jpeg'), 'base64')
+  const logo = lireLogo()
 
   const html = `
     <style>
@@ -309,7 +308,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         </div>
 
         <div class="center-logo">
-          <img src="data:image/jpeg;base64,${logoBase64}" alt="Logo Université de Ngaoundéré" />
+          ${logo ? `<img src="${logo}" alt="Logo Université de Ngaoundéré" />` : ''}
         </div>
 
         <div class="bloc-entete droite">
