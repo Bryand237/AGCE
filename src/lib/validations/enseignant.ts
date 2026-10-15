@@ -9,6 +9,17 @@ const texteOptionnel = z
   .optional()
   .transform((v) => (v ? v : undefined))
 
+// Un <select> dont l'option « Non renseigné » a la valeur "" envoie une
+// chaîne vide, jamais « absent » : z.string().uuid().optional() la refusait
+// ("Invalid uuid") et le formulaire n'affichait aucune erreur. On traite
+// donc "" comme « pas de valeur » et on renvoie null, ce qui permet aussi
+// d'effacer la valeur d'une fiche existante (Prisma ignore undefined, mais
+// écrit null).
+const uuidOptionnel = (messageInvalide: string) =>
+  z
+    .preprocess((v) => (v === '' ? undefined : v), z.string().uuid(messageInvalide).optional())
+    .transform((v) => v ?? null)
+
 export const EnseignantSchema = z.object({
   matricule: z.string().min(1, 'Le matricule est obligatoire'),
   nom: z.string().min(1, 'Le nom est obligatoire'),
@@ -30,7 +41,7 @@ export const EnseignantSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
 
   departementId: z.string().uuid("Le département d'affectation est obligatoire"),
-  departementOrigineId: z.string().uuid().optional(),
+  departementOrigineId: uuidOptionnel("Le département d'origine est invalide"),
 
   // Référence une ligne EchelonIndiciaire précise plutôt que de laisser
   // saisir classe/échelon/indice librement : impossible d'enregistrer une

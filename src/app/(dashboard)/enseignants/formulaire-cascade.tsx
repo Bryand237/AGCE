@@ -223,6 +223,9 @@ export function FormulaireEnseignant({
               </optgroup>
             ))}
           </select>
+          {state.errors?.departementOrigineId && (
+            <p className="text-destructive text-sm">{state.errors.departementOrigineId[0]}</p>
+          )}
         </label>
       </SectionFormulaire>
 
@@ -446,6 +449,13 @@ export function FormulaireEnseignant({
         </label>
       </SectionFormulaire>
 
+      {/* Filet de sécurité : si un champ est refusé sans message à côté de lui
+          (ou hors de l'écran), l'utilisateur sait au moins que l'envoi a échoué. */}
+      {state.errors && Object.keys(state.errors).length > 0 && (
+        <p className="text-destructive text-sm">
+          Le formulaire n&apos;a pas été enregistré : corrigez les champs signalés en rouge.
+        </p>
+      )}
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
 
       <button
