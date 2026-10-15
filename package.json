@@ -22,7 +22,9 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:sauvegarder": "bash scripts/sauvegarder.sh",
+    "db:restaurer": "bash scripts/restaurer.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.0",

@@ -121,6 +121,83 @@ Déjà présents dans le `package.json` fourni (rien à ajouter à la main) :
 }
 ```
 
+## Sauvegarde et restauration
+
+La base de données contient toute la carrière des enseignants : sans
+sauvegarde, une panne de disque ou un `docker compose down -v` la fait
+perdre définitivement. Deux scripts (bash, à lancer depuis le dossier du
+projet, sous WSL ou Linux) s'en chargent. Ils lisent `DB_USER`, `DB_NAME`
+et `DR_PORT` dans `.env` et demandent que le conteneur `db` tourne
+(`docker compose up -d db`).
+
+**Faire une sauvegarde**
+
+```bash
+npm run db:sauvegarder
+```
+
+Crée dans `backups/` deux fichiers datés : `agce_AAAAMMJJ_HHMMSS.dump`
+(la base) et `fichiers_AAAAMMJJ_HHMMSS.tar.gz` (photos de `public/uploads`
+et logo de `reference-docs`, qui ne sont pas dans Git). L'archive de la
+base est relue avant d'être déclarée valide. Les sauvegardes de plus de
+14 jours sont supprimées (`JOURS_CONSERVATION=30 npm run db:sauvegarder`
+pour changer la durée).
+
+**Copier hors du disque de la machine.** Une sauvegarde qui reste sur le
+même disque ne protège pas d'une panne de ce disque. Indiquer un second
+dossier (clé USB, dossier OneDrive) avec `DOSSIER_COPIE` :
+
+```bash
+DOSSIER_COPIE=/mnt/e/Sauvegardes npm run db:sauvegarder
+```
+
+(`E:` côté Windows devient `/mnt/e` sous WSL.) Si ce dossier est
+inaccessible, le script le signale et se termine avec le code 3 ; la
+sauvegarde, elle, est bien faite.
+
+**Planifier chaque jour (Windows)**. Planificateur de tâches → « Créer
+une tâche » → onglet Actions → programme `wsl.exe`, arguments :
+
+```text
+-d Ubuntu -e bash -lc "cd ~/AGCE && DOSSIER_COPIE=/mnt/e/Sauvegardes bash scripts/sauvegarder.sh >> backups/sauvegarde.log 2>&1"
+```
+
+Remplacer `~/AGCE` par le dossier du projet et `Ubuntu` par le nom de la
+distribution (`wsl -l`). Dans l'onglet Paramètres, cocher « Exécuter la
+tâche dès que possible si un démarrage planifié a été manqué ». Docker
+Desktop doit être lancé à l'heure de la tâche. Coller d'abord la ligne
+`wsl.exe …` dans PowerShell pour vérifier qu'elle fonctionne, puis
+consulter `backups/sauvegarde.log` le lendemain.
+
+**Vérifier qu'une sauvegarde est utilisable** (à faire dès la première,
+puis une fois par mois). Cette commande restaure dans une base de
+contrôle séparée et ne touche pas à la base en service :
+
+```bash
+bash scripts/restaurer.sh backups/agce_AAAAMMJJ_HHMMSS.dump
+```
+
+Elle indique la `DATABASE_URL` à mettre temporairement dans `.env` pour
+ouvrir l'application sur cette copie et constater que les données y sont.
+
+**Restaurer après un sinistre.** Arrêter l'application (`npm run dev`) et
+tout outil connecté à la base (`prisma studio`), puis :
+
+```bash
+bash scripts/restaurer.sh backups/agce_AAAAMMJJ_HHMMSS.dump --production
+bash scripts/restaurer.sh --fichiers backups/fichiers_AAAAMMJJ_HHMMSS.tar.gz
+```
+
+La première commande remplace la base en service, après avoir demandé de
+taper `RESTAURER` et fait une sauvegarde de sécurité de l'état actuel. La
+seconde extrait photos et logo dans `restauration_fichiers/` sans rien
+écraser : copier ensuite leur contenu dans le projet.
+
+**À garder à part.** Le fichier `.env` (mots de passe) n'est pas dans la
+sauvegarde, pour ne pas faire circuler des secrets avec les copies : en
+conserver un exemplaire dans un endroit sûr. Ne jamais lancer
+`docker compose down -v` : l'option `-v` supprime le volume de la base.
+
 ## Architecture
 
 ```
