@@ -1,7 +1,7 @@
 'use client'
 
-import { useActionState } from 'react'
 import { creerRapport, type EtatFormulaire } from '../actions'
+import { useActionConservee } from '@/lib/action-conservee'
 import { PageHeader } from '@/components/layout/page-header'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
@@ -15,7 +15,7 @@ function semestrePrecedentParDefaut() {
 }
 
 export default function NouveauRapport() {
-  const [state, formAction, isPending] = useActionState(creerRapport, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(creerRapport, etatInitial)
   const defaut = semestrePrecedentParDefaut()
 
   return (
@@ -24,7 +24,11 @@ export default function NouveauRapport() {
         title="Nouveau rapport d'avancement"
         description="Générer la sélection automatique pour une session"
       />
-      <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <form
+        method="post"
+        onSubmit={surEnvoi}
+        className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+      >
         <div className="flex max-w-lg flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             Édition (numéro de session)

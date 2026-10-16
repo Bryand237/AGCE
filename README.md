@@ -324,6 +324,16 @@ try {
 `redirect()` reste en dehors du `try` : il interrompt l'exécution en levant
 une exception qu'un `catch` avalerait.
 
+**Conserver la saisie quand un formulaire est refusé.** Avec
+`<form action={…}>`, React 19 remet tous les champs à leur valeur de départ dès
+que l'action se termine, même sur une erreur : l'utilisateur perdait toute sa
+saisie (vérifié dans Chromium, listes déroulantes comprises). Les formulaires
+de création et de modification d'un enseignant, d'une absence, d'un
+établissement et d'un rapport utilisent donc `useActionConservee()`
+(`src/lib/action-conservee.ts`) avec `<form method="post" onSubmit={…}>`. Un
+formulaire qui reste affiché après un succès (ajout d'un département) garde
+`<form action={…}>` : il a besoin de cette remise à zéro pour se vider.
+
 ## Erreurs fréquentes à éviter
 
 - **Oublier `output: 'standalone'`** dans `next.config.ts` : le

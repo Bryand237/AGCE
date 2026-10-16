@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState } from 'react'
 import { creerAbsence, type EtatFormulaire } from './actions'
+import { useActionConservee } from '@/lib/action-conservee'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
 const etatInitial: EtatFormulaire = {}
@@ -11,11 +12,11 @@ export function FormulaireAbsence({
 }: {
   enseignants: Array<{ id: string; nom: string; prenom: string; matricule: string }>
 }) {
-  const [state, formAction, isPending] = useActionState(creerAbsence, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(creerAbsence, etatInitial)
   const [type, setType] = useState('CONGE_MATERNITE')
 
   return (
-    <form action={formAction} className="flex max-w-lg flex-col gap-4">
+    <form method="post" onSubmit={surEnvoi} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
         Enseignant
         <select name="matricule" required className={classeChamp} defaultValue="">

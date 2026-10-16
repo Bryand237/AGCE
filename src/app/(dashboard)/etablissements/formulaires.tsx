@@ -15,6 +15,7 @@ import {
   classeChamp,
   classeFormulaire,
 } from '@/lib/ui-classes'
+import { useActionConservee } from '@/lib/action-conservee'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -35,10 +36,10 @@ export function FormulaireEtablissement({
 }) {
   const actionServeur =
     action === 'creer' ? creerEtablissement : modifierEtablissement.bind(null, etablissement!.id)
-  const [state, formAction, isPending] = useActionState(actionServeur, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(actionServeur, etatInitial)
 
   return (
-    <form action={formAction} className="flex max-w-lg flex-col gap-4">
+    <form method="post" onSubmit={surEnvoi} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
         Nom
         <input name="nom" required defaultValue={etablissement?.nom} className={classeChamp} />

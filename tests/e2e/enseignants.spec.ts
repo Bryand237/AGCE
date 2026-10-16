@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { creerEtablissementTest, creerDepartementTest, seConnecter } from './helpers'
+import {
+  creerEtablissementTest,
+  creerDepartementTest,
+  creerEnseignantTest,
+  seConnecter,
+} from './helpers'
 
 test.describe('Enseignants', () => {
   test.beforeAll(async () => {
@@ -36,6 +41,40 @@ test.describe('Enseignants', () => {
     await page.getByRole('button', { name: /enregistrer|créer/i }).click()
 
     await expect(page.getByText('0000TESTPW')).toBeVisible()
+  })
+
+  test('un refus du serveur (matricule déjà utilisé) conserve toute la saisie', async ({
+    page,
+  }) => {
+    const etab = await creerEtablissementTest()
+    const dep = await creerDepartementTest(etab.id)
+    await creerEnseignantTest(dep.id, '0000TESTDUP')
+
+    await page.goto('/enseignants/nouveau')
+    await page.getByLabel(/matricule/i).fill('0000TESTDUP')
+    await page.getByLabel(/^nom$/i).fill('MBARGA')
+    await page.getByLabel(/prénom/i).fill('Alice')
+    await page.getByLabel(/sexe/i).selectOption('F')
+    await page.getByLabel(/date de naissance/i).fill('1988-03-20')
+    await page.getByLabel(/lieu de naissance/i).fill('Yaoundé')
+    await page.getByLabel(/date de prise de service/i).fill('2018-09-01')
+    await page.getByLabel(/date d'effet/i).fill('2018-09-01')
+    await page.getByLabel(/établissement/i).selectOption({ label: 'Faculté de Test' })
+    await page
+      .getByLabel(/département d'affectation/i)
+      .selectOption({ label: 'Département de Test' })
+    await page.getByLabel(/^grade$/i).selectOption('CHARGE_DE_COURS')
+    await page.getByLabel(/position|échelon/i).selectOption({ index: 1 })
+
+    await page.getByRole('button', { name: /enregistrer|créer/i }).click()
+
+    // Le doublon est annoncé pour ce qu'il est, et rien de ce qui a été saisi n'est effacé.
+    await expect(page.getByText('Ce matricule existe déjà.')).toBeVisible()
+    await expect(page.getByLabel(/matricule/i)).toHaveValue('0000TESTDUP')
+    await expect(page.getByLabel(/^nom$/i)).toHaveValue('MBARGA')
+    await expect(page.getByLabel(/sexe/i)).toHaveValue('F')
+    await expect(page.getByLabel(/établissement/i)).toHaveValue(etab.id)
+    await expect(page.getByLabel(/^grade$/i)).toHaveValue('CHARGE_DE_COURS')
   })
 
   test('recherche par matricule et affichage du détail avec historique', async ({ page }) => {

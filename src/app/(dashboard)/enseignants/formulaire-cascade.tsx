@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
-import { useActionState } from 'react'
 import { creerEnseignant, modifierEnseignant, type EtatFormulaire } from './actions'
+import { useActionConservee } from '@/lib/action-conservee'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 
 type Etablissement = { id: string; nom: string; abreviation: string }
@@ -78,7 +78,7 @@ export function FormulaireEnseignant({
   const actionServeur =
     mode === 'creer' ? creerEnseignant : modifierEnseignant.bind(null, enseignant!.id)
 
-  const [state, formAction, isPending] = useActionState(actionServeur, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(actionServeur, etatInitial)
   const [etablissementId, setEtablissementId] = useState(
     enseignant?.departement.etablissementId ?? ''
   )
@@ -108,7 +108,7 @@ export function FormulaireEnseignant({
   }, [departementsOrigine])
 
   return (
-    <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+    <form method="post" onSubmit={surEnvoi} className="flex max-w-2xl flex-col gap-6">
       <SectionFormulaire titre="Identité">
         <label className="flex flex-col gap-1 text-sm">
           Matricule
