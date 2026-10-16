@@ -30,8 +30,15 @@ function calculerAncienneteAnnees(datePriseService: Date): number {
   return Math.max(0, annees)
 }
 
-export default async function DetailEnseignant({ params }: { params: Promise<{ id: string }> }) {
+export default async function DetailEnseignant({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ photo?: string }>
+}) {
   const { id } = await params
+  const { photo } = await searchParams
   const [enseignant, grille] = await Promise.all([
     recupererEnseignantDetail(id),
     recupererGrilleEchelonIndiciaire(),
@@ -62,6 +69,16 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
         <ArrowLeft size={16} />
         Retour à la liste
       </Link>
+
+      {photo === 'echec' && (
+        <div
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+          role="alert"
+        >
+          Les informations sont enregistrées, mais la photo n&apos;a pas pu l&apos;être. Ouvrez «
+          Modifier » pour la renvoyer.
+        </div>
+      )}
 
       {eligibleRetraite && (
         <div

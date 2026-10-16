@@ -301,6 +301,29 @@ Règle de dépendance : `app` peut importer `domain` et `lib`. `domain` ne
 doit jamais importer `lib/prisma` ni quoi que ce soit de React — c'est
 ce qui le garde testable sans base de données ni navigateur.
 
+## Erreurs de la base dans les actions
+
+Une action qui écrit dans la base entoure cet appel d'un `try/catch` et
+traduit l'exception par `messageErreur()` (`src/lib/erreurs.ts`), qui lit le
+code d'erreur de Prisma : un doublon (`P2002`) annonce le doublon, un
+élément disparu (`P2025`) annonce qu'il n'existe plus, une base arrêtée ou
+toute erreur inattendue reçoit un message distinct, jamais un faux doublon.
+Les erreurs inattendues sont écrites dans la console du serveur avec le nom
+de l'action : c'est là que le responsable technique cherche la cause.
+
+```ts
+try {
+  await prisma.enseignant.create({ data })
+} catch (erreur) {
+  return {
+    message: messageErreur(erreur, 'creerEnseignant', { unicite: 'Ce matricule existe déjà.' }),
+  }
+}
+```
+
+`redirect()` reste en dehors du `try` : il interrompt l'exécution en levant
+une exception qu'un `catch` avalerait.
+
 ## Erreurs fréquentes à éviter
 
 - **Oublier `output: 'standalone'`** dans `next.config.ts` : le

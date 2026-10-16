@@ -212,9 +212,9 @@ describe('actions serveur : avec une session valide, elles s’exécutent normal
   })
 
   it('une suppression d’absence atteint la base puis revient à la liste', async () => {
-    await expect(modulesDActions.absences.supprimerAbsence('abs-1')).rejects.toThrow(
-      'NEXT_REDIRECT /absences'
-    )
+    await expect(
+      modulesDActions.absences.supprimerAbsence('abs-1', {}, new FormData())
+    ).rejects.toThrow('NEXT_REDIRECT /absences')
     expect(accesBase).toContain('absence.delete')
   })
 

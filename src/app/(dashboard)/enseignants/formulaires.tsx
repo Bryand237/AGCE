@@ -57,9 +57,7 @@ export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) 
         <textarea name="observations" rows={2} className={classeChamp} />
       </label>
       {state.message && (
-        <p
-          className={`text-sm ${state.message.includes('transféré') ? 'text-primary' : 'text-destructive'}`}
-        >
+        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
           {state.message}
         </p>
       )}
@@ -127,9 +125,7 @@ export function FormulaireRetraite({
         <textarea name="observations" rows={2} className={classeChamp} />
       </label>
       {state.message && (
-        <p
-          className={`text-sm ${state.message.includes('retraité') ? 'text-primary' : 'text-destructive'}`}
-        >
+        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
           {state.message}
         </p>
       )}
@@ -158,13 +154,17 @@ export function BoutonReactiver({ enseignantId }: { enseignantId: string }) {
 
   return (
     <form action={formAction} onSubmit={handleSubmit}>
-      {state.message && <p className="text-primary mb-2 text-sm">{state.message}</p>}
+      {state.message && (
+        <p className={`mb-2 text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
+          {state.message}
+        </p>
+      )}
       <button
         type="submit"
         disabled={isPending}
         className="bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-medium shadow-sm hover:opacity-90"
       >
-        {isPending ? 'Réactivation...' : 'Réactiver l&apos;enseignant'}
+        {isPending ? 'Réactivation...' : "Réactiver l'enseignant"}
       </button>
     </form>
   )

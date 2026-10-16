@@ -1,10 +1,12 @@
 'use client'
 
 import { useActionState } from 'react'
+import { Trash2 } from 'lucide-react'
 import {
   validerAbsence,
   terminerAbsence,
   modifierAbsence,
+  supprimerAbsence,
   genererAttestation,
   validerAttestation,
   type EtatFormulaire,
@@ -149,7 +151,7 @@ export function BlocAttestationAbsence({
   statutAttestation: string | null
   numeroDecision: string | null
 }) {
-  const [, formActionGenerer] = useActionState(
+  const [etatGenerer, formActionGenerer, isPendingGenerer] = useActionState(
     genererAttestation.bind(null, absenceId),
     etatInitial
   )
@@ -160,9 +162,14 @@ export function BlocAttestationAbsence({
 
   if (!statutAttestation) {
     return (
-      <form action={formActionGenerer}>
-        <button type="submit" className={classeBoutonPrimaire}>
-          Générer le brouillon d&apos;attestation
+      <form action={formActionGenerer} className="flex flex-col gap-2">
+        {etatGenerer.message && (
+          <p className={`text-sm ${etatGenerer.succes ? 'text-primary' : 'text-destructive'}`}>
+            {etatGenerer.message}
+          </p>
+        )}
+        <button type="submit" disabled={isPendingGenerer} className={classeBoutonPrimaire}>
+          {isPendingGenerer ? 'Génération...' : "Générer le brouillon d'attestation"}
         </button>
       </form>
     )
@@ -190,7 +197,11 @@ export function BlocAttestationAbsence({
             Auteur de la validation
             <input name="auteurValidation" required className={classeChamp} />
           </label>
-          {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+          {state.message && (
+            <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
+              {state.message}
+            </p>
+          )}
           <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
             {isPending ? 'Enregistrement...' : 'Marquer signée'}
           </button>
@@ -206,5 +217,26 @@ export function BlocAttestationAbsence({
     >
       Télécharger l&apos;attestation n°{numeroDecision}
     </a>
+  )
+}
+
+export function FormulaireSupprimerAbsence({ absenceId }: { absenceId: string }) {
+  const [state, formAction, isPending] = useActionState(
+    supprimerAbsence.bind(null, absenceId),
+    etatInitial
+  )
+
+  return (
+    <form action={formAction} className="flex flex-col items-center gap-2">
+      <button
+        type="submit"
+        disabled={isPending}
+        className="border-border bg-card text-destructive hover:bg-destructive/5 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm disabled:opacity-50"
+      >
+        <Trash2 size={14} />
+        {isPending ? 'Suppression...' : 'Supprimer'}
+      </button>
+      {state.message && <p className="text-destructive max-w-60 text-xs">{state.message}</p>}
+    </form>
   )
 }

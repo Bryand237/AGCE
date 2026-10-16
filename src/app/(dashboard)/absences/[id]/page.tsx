@@ -1,20 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import {
-  ArrowLeft,
-  CalendarDays,
-  CalendarOff,
-  Clock,
-  Mail,
-  Pencil,
-  Phone,
-  Trash2,
-} from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarOff, Clock, Mail, Pencil, Phone } from 'lucide-react'
 import { recupererAbsenceDetail } from '../donnees'
-import { supprimerAbsence } from '../actions'
 import {
   FormulaireValidationAbsence,
   FormulaireTerminerAbsence,
+  FormulaireSupprimerAbsence,
   BlocAttestationAbsence,
 } from '../formulaires'
 import { TYPES_AVEC_ATTESTATION } from '@/domain/absences/typesAvecAttestation'
@@ -66,7 +57,6 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   const absence = await recupererAbsenceDetail(id)
   if (!absence) notFound()
 
-  const supprimerAvecId = supprimerAbsence.bind(null, id)
   const dureeJours = calculerDureeJours(absence.dateDebut, absence.dateFin)
   const joursRestants =
     absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE'
@@ -117,15 +107,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
                 <Pencil size={14} />
                 Modifier
               </Link>
-              <form action={supprimerAvecId}>
-                <button
-                  type="submit"
-                  className="border-border bg-card text-destructive hover:bg-destructive/5 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
-                >
-                  <Trash2 size={14} />
-                  Supprimer
-                </button>
-              </form>
+              <FormulaireSupprimerAbsence absenceId={id} />
             </div>
           </div>
 

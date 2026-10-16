@@ -124,9 +124,7 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
       </label>
 
       {state.message && (
-        <p
-          className={`text-sm ${state.message === 'Département ajouté.' ? 'text-primary' : 'text-destructive'}`}
-        >
+        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
           {state.message}
         </p>
       )}
