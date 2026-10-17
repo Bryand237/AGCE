@@ -292,6 +292,15 @@ export function FormulaireModifierSelection({
     return [...map.entries()]
   }, [grille])
 
+  // En fin de grille, la liste filtrée est vide : mieux vaut le dire qu'afficher une liste muette.
+  if (grille.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Aucune position supérieure n’est disponible pour cet enseignant.
+      </p>
+    )
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <select name="positionProposeeId" defaultValue={positionProposeeId} className={classeChamp}>

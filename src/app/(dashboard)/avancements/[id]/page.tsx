@@ -8,6 +8,7 @@ import {
 } from '../donnees'
 import { retirerSelection } from '../actions'
 import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
+import { positionsProposables } from '@/domain/avancement/positionProposee'
 import {
   FormulaireAjouterEnseignant,
   FormulaireModifierSelection,
@@ -133,7 +134,7 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
                           rapportId={id}
                           selectionId={s.id}
                           positionProposeeId={s.positionProposee.id}
-                          grille={grille}
+                          grille={positionsProposables(grille, s.enseignant.positionActuelle)}
                         />
                       </div>
                     )}

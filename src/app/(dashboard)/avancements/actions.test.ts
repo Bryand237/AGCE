@@ -11,13 +11,27 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
     })
 
   const tx = {
-    enseignant: { update: tracer('enseignant.update') },
-    selectionAvancement: { deleteMany: tracer('selection.deleteMany') },
-    historiqueAvancement: { deleteMany: tracer('historique.deleteMany') },
-    sessionConseil: { delete: tracer('rapport.delete') },
+    enseignant: { update: tracer('enseignant.update'), findUnique: vi.fn() },
+    selectionAvancement: {
+      deleteMany: tracer('selection.deleteMany'),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
+    historiqueAvancement: {
+      deleteMany: tracer('historique.deleteMany'),
+      delete: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    sessionConseil: { delete: tracer('rapport.delete'), update: vi.fn() },
   }
   const prismaFactice = {
     sessionConseil: { findUnique: vi.fn(), update: vi.fn() },
+    selectionAvancement: { findUnique: vi.fn() },
+    echelonIndiciaire: { findUnique: vi.fn() },
+    enseignant: { findUnique: vi.fn() },
+    historiqueAvancement: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   }
   return { exigerUtilisateur: vi.fn(), journal, prismaFactice, tx }
@@ -38,8 +52,15 @@ vi.mock('@/lib/documents/genererDecisionAvancement', () => ({
   genererDecisionAvancement: vi.fn(),
 }))
 
-const { creerRapport, mettreAJourRapport, supprimerRapport, validerDecision } =
-  await import('./actions')
+const {
+  creerRapport,
+  mettreAJourRapport,
+  modifierSelection,
+  retirerSelection,
+  supprimerRapport,
+  validerDecision,
+  validerRapport,
+} = await import('./actions')
 
 const RAPPORT = 'r-1'
 
@@ -178,5 +199,291 @@ describe('rapports : cohérence de la période', () => {
 
     expect(etat.message).toBe('Le numéro de décision est obligatoire')
     expect(etat.errors?.numeroDecision).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// A2 : la position d'un avancement reste dans le grade et la voie de l'enseignant, et
+// chaque écriture de position fixe le grade dans la même requête.
+
+const position = (id: string, grade: string, voie: string, ordre: number) => ({
+  id,
+  grade,
+  voie,
+  ordre,
+})
+const A1 = position('pos-a1', 'ASSISTANT', 'SANS_THESE', 1)
+const A2 = position('pos-a2', 'ASSISTANT', 'SANS_THESE', 2)
+const A3 = position('pos-a3', 'ASSISTANT', 'SANS_THESE', 3)
+const A5 = position('pos-a5', 'ASSISTANT', 'SANS_THESE', 5)
+const A_AVEC_THESE = position('pos-at', 'ASSISTANT', 'AVEC_THESE', 6)
+const PROFESSEUR = position('pos-p', 'PROFESSEUR', 'AUCUNE', 9)
+
+const PERIODE_FIN = new Date('2025-12-31')
+const ANCIEN_EFFET = new Date('2023-07-01')
+
+function formulairePosition(positionProposeeId: string) {
+  return donnees({ positionProposeeId })
+}
+
+describe('modifierSelection : position proposée', () => {
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+      id: RAPPORT,
+      statut: 'BROUILLON',
+      periodeFin: PERIODE_FIN,
+    })
+    prismaFactice.selectionAvancement.findUnique.mockResolvedValue({
+      id: 'sel-1',
+      rapportId: RAPPORT,
+      enseignantId: 'ens-1',
+    })
+    prismaFactice.enseignant.findUnique.mockResolvedValue({
+      id: 'ens-1',
+      positionActuelleId: A2.id,
+      positionActuelle: A2,
+    })
+  })
+
+  describe('rapport en brouillon', () => {
+    it('refuse un autre grade (Assistant proposé vers Professeur), sans rien écrire', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(PROFESSEUR)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(PROFESSEUR.id))
+
+      expect(etat.message).toMatch(/rester dans le grade de l'enseignant \(Assistant\)/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('refuse une autre voie du même grade', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A_AVEC_THESE)
+
+      const etat = await modifierSelection(
+        RAPPORT,
+        'sel-1',
+        {},
+        formulairePosition(A_AVEC_THESE.id)
+      )
+
+      expect(etat.message).toMatch(/même voie/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['la position actuelle elle-même', A2],
+      ['une position inférieure', A1],
+    ])('refuse %s', async (_libelle, proposee) => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(proposee)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(proposee.id))
+
+      expect(etat.message).toMatch(/supérieure/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('accepte de franchir plusieurs paliers, et ne touche pas à la fiche de l’enseignant', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+      expect(etat.message).toBe('Position proposée mise à jour.')
+      expect(tx.selectionAvancement.update).toHaveBeenCalledWith({
+        where: { id: 'sel-1' },
+        data: { positionProposeeId: A5.id },
+      })
+      expect(tx.enseignant.update).not.toHaveBeenCalled()
+      expect(tx.historiqueAvancement.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('rapport validé', () => {
+    const historique = (surcharge: Record<string, unknown> = {}) => ({
+      id: 'h-1',
+      statutDecision: null,
+      anciennePosition: A2,
+      nouvellePositionId: A3.id,
+      ...surcharge,
+    })
+
+    beforeEach(() => {
+      prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+        id: RAPPORT,
+        statut: 'VALIDE',
+        periodeFin: PERIODE_FIN,
+      })
+      // Après la validation, la fiche porte la position issue du rapport.
+      prismaFactice.enseignant.findUnique.mockResolvedValue({
+        id: 'ens-1',
+        positionActuelleId: A3.id,
+        positionActuelle: A3,
+      })
+      prismaFactice.historiqueAvancement.findFirst.mockResolvedValue(historique())
+    })
+
+    it('refuse quand l’historique de l’avancement est introuvable', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+      prismaFactice.historiqueAvancement.findFirst.mockResolvedValue(null)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+      expect(etat.message).toMatch(/historique de cet avancement est introuvable/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it.each(['EN_ATTENTE', 'VALIDEE'])(
+      'refuse quand la décision est déjà générée (« %s »)',
+      async (statutDecision) => {
+        prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+        prismaFactice.historiqueAvancement.findFirst.mockResolvedValue(
+          historique({ statutDecision })
+        )
+
+        const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+        expect(etat.message).toMatch(/décision a déjà été générée/)
+        expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+      }
+    )
+
+    it('refuse quand l’enseignant a avancé depuis : sa position actuelle ne doit pas être écrasée', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+      prismaFactice.enseignant.findUnique.mockResolvedValue({
+        id: 'ens-1',
+        positionActuelleId: A5.id,
+        positionActuelle: A5,
+      })
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+      expect(etat.message).toMatch(/a changé de position depuis/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('juge la position à partir de celle d’AVANT l’avancement : refuse de ne pas avancer', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A2)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A2.id))
+
+      expect(etat.message).toMatch(/supérieure/)
+      expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('refuse un autre grade', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(PROFESSEUR)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(PROFESSEUR.id))
+
+      expect(etat.message).toMatch(/rester dans le grade/)
+      expect(tx.enseignant.update).not.toHaveBeenCalled()
+    })
+
+    it('met à jour la proposition, l’historique et la fiche, grade compris, dans une transaction', async () => {
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+      expect(etat.message).toBe('Position proposée mise à jour.')
+      expect(prismaFactice.$transaction).toHaveBeenCalledTimes(1)
+      expect(tx.selectionAvancement.update).toHaveBeenCalledWith({
+        where: { id: 'sel-1' },
+        data: { positionProposeeId: A5.id },
+      })
+      expect(tx.historiqueAvancement.update).toHaveBeenCalledWith({
+        where: { id: 'h-1' },
+        data: { nouvellePositionId: A5.id },
+      })
+      expect(tx.enseignant.update).toHaveBeenCalledWith({
+        where: { id: 'ens-1' },
+        data: { positionActuelleId: A5.id, grade: 'ASSISTANT', dateEffetEchelon: PERIODE_FIN },
+      })
+    })
+  })
+})
+
+describe('écritures de la position : le grade suit', () => {
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
+  })
+
+  it('validerRapport écrit le grade de la position proposée avec la position', async () => {
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+      id: RAPPORT,
+      statut: 'BROUILLON',
+      periodeFin: PERIODE_FIN,
+      selections: [
+        {
+          enseignantId: 'ens-1',
+          positionProposeeId: A3.id,
+          positionProposee: A3,
+          enseignant: { positionActuelleId: A2.id, dateEffetEchelon: ANCIEN_EFFET },
+        },
+      ],
+    })
+
+    await expect(
+      validerRapport(
+        RAPPORT,
+        {},
+        donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+      )
+    ).rejects.toThrow(`NEXT_REDIRECT /avancements/${RAPPORT}`)
+
+    expect(tx.enseignant.update).toHaveBeenCalledWith({
+      where: { id: 'ens-1' },
+      data: { positionActuelleId: A3.id, grade: 'ASSISTANT', dateEffetEchelon: PERIODE_FIN },
+    })
+  })
+
+  it('retirerSelection (rapport validé) rétablit la position ET le grade d’avant', async () => {
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue({ id: RAPPORT, statut: 'VALIDE' })
+    prismaFactice.selectionAvancement.findUnique.mockResolvedValue({ id: 'sel-1' })
+    tx.historiqueAvancement.findFirst.mockResolvedValue({
+      id: 'h-1',
+      anciennePositionId: A2.id,
+      anciennePosition: A2,
+      nouvellePositionId: A3.id,
+      dateAncienEffet: ANCIEN_EFFET,
+    })
+    tx.enseignant.findUnique.mockResolvedValue({ positionActuelleId: A3.id })
+
+    await retirerSelection(RAPPORT, 'ens-1')
+
+    expect(tx.enseignant.update).toHaveBeenCalledWith({
+      where: { id: 'ens-1' },
+      data: { positionActuelleId: A2.id, grade: 'ASSISTANT', dateEffetEchelon: ANCIEN_EFFET },
+    })
+  })
+
+  it('supprimerRapport rétablit la position ET le grade d’avant pour un avancement resté en base', async () => {
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+      id: RAPPORT,
+      statut: 'BROUILLON',
+      avancements: [
+        {
+          enseignantId: 'ens-1',
+          anciennePositionId: A2.id,
+          anciennePosition: A2,
+          nouvellePositionId: A3.id,
+          dateAncienEffet: ANCIEN_EFFET,
+          enseignant: { positionActuelleId: A3.id },
+        },
+      ],
+    })
+
+    await expect(supprimerRapport(RAPPORT, {}, new FormData())).rejects.toThrow(
+      'NEXT_REDIRECT /avancements'
+    )
+
+    expect(tx.enseignant.update).toHaveBeenCalledWith({
+      where: { id: 'ens-1' },
+      data: { positionActuelleId: A2.id, grade: 'ASSISTANT', dateEffetEchelon: ANCIEN_EFFET },
+    })
   })
 })

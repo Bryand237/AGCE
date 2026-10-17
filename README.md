@@ -321,6 +321,25 @@ Chaque formulaire est validé côté serveur par un schéma zod
 Aucun âge minimal à la prise de service n'est imposé : c'est une règle à
 confirmer avec le client.
 
+## Positions proposées dans un rapport d'avancement
+
+Un avancement d'échelon reste **dans le même grade et la même voie** que la
+position de départ de l'enseignant et la **dépasse strictement**
+(`src/domain/avancement/positionProposee.ts`). Plusieurs paliers peuvent être
+franchis d'un coup. Le serveur refuse tout le reste, et la liste déroulante du
+formulaire « Mettre à jour » ne propose que des positions acceptées.
+
+- Un changement de **grade** ou de **voie** (par exemple Assistant sans thèse →
+  avec thèse) n'est pas un avancement d'échelon et ne passe pas par un rapport :
+  sans cette règle, `Enseignant.grade` ne correspondrait plus à sa position et
+  les âges de retraite, les tris et les statistiques seraient faux. Si le
+  service en a besoin, c'est un processus à concevoir à part.
+- Dans un rapport **validé**, la position se juge à partir de celle d'avant
+  l'avancement, et elle n'est modifiable que si aucune décision n'a été générée
+  et si l'enseignant occupe toujours la position issue du rapport
+  (`rapportValideModifiable.ts`).
+- Toute écriture de `positionActuelleId` écrit `grade` dans la même requête.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

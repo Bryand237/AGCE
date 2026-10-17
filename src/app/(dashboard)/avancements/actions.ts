@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
+import { erreurPositionProposee } from '@/domain/avancement/positionProposee'
+import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
 import {
   MetadonneesSessionSchema,
@@ -190,25 +192,60 @@ export async function modifierSelection(
     return { message: 'Position proposée invalide.' }
   }
 
+  const enseignant = await prisma.enseignant.findUnique({
+    where: { id: selection.enseignantId },
+    include: { positionActuelle: true },
+  })
+  if (!enseignant) return { message: 'Enseignant introuvable.' }
+
+  // Position à partir de laquelle l'avancement se juge : celle de la fiche pour un brouillon ;
+  // pour un rapport validé, celle d'AVANT l'avancement (la fiche porte déjà la position
+  // issue du rapport).
+  let depart = enseignant.positionActuelle
+  let historique: { id: string } | null = null
+  if (rapport.statut === 'VALIDE') {
+    const trouve = await prisma.historiqueAvancement.findFirst({
+      where: { sessionId: rapportId, enseignantId: selection.enseignantId },
+      include: { anciennePosition: true },
+    })
+    if (!trouve) {
+      return {
+        message:
+          "L'historique de cet avancement est introuvable : la position ne peut pas être modifiée.",
+      }
+    }
+    const refus = erreurModificationRapportValide({
+      statutDecision: trouve.statutDecision,
+      positionActuelleId: enseignant.positionActuelleId,
+      nouvellePositionId: trouve.nouvellePositionId,
+    })
+    if (refus) return { message: refus }
+    depart = trouve.anciennePosition
+    historique = trouve
+  }
+
+  const incoherence = erreurPositionProposee(depart, position)
+  if (incoherence) return { message: incoherence }
+
   await prisma.$transaction(async (tx) => {
     await tx.selectionAvancement.update({
       where: { id: selectionId },
       data: { positionProposeeId },
     })
 
-    if (rapport.statut === 'VALIDE') {
-      const historique = await tx.historiqueAvancement.findFirst({
-        where: { sessionId: rapportId, enseignantId: selection.enseignantId },
+    if (historique) {
+      await tx.historiqueAvancement.update({
+        where: { id: historique.id },
+        data: { nouvellePositionId: positionProposeeId },
       })
-      if (historique) {
-        await tx.historiqueAvancement.update({
-          where: { id: historique.id },
-          data: { nouvellePositionId: positionProposeeId },
-        })
-      }
+      // Position et grade s'écrivent ensemble (voir le commentaire du modèle Enseignant).
       await tx.enseignant.update({
         where: { id: selection.enseignantId },
-        data: { positionActuelleId: positionProposeeId, dateEffetEchelon: rapport.periodeFin },
+        data: {
+          positionActuelleId: positionProposeeId,
+          grade: position.grade,
+          dateEffetEchelon: rapport.periodeFin,
+        },
       })
     }
   })
@@ -235,6 +272,7 @@ export async function retirerSelection(rapportId: string, enseignantId: string):
     if (rapport.statut === 'VALIDE') {
       const historique = await tx.historiqueAvancement.findFirst({
         where: { sessionId: rapportId, enseignantId },
+        include: { anciennePosition: true },
       })
       if (historique) {
         const enseignant = await tx.enseignant.findUnique({ where: { id: enseignantId } })
@@ -243,6 +281,7 @@ export async function retirerSelection(rapportId: string, enseignantId: string):
             where: { id: enseignantId },
             data: {
               positionActuelleId: historique.anciennePositionId,
+              grade: historique.anciennePosition.grade,
               dateEffetEchelon: historique.dateAncienEffet,
             },
           })
@@ -267,7 +306,7 @@ export async function supprimerRapport(
   await exigerUtilisateur()
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
-    include: { avancements: { include: { enseignant: true } } },
+    include: { avancements: { include: { enseignant: true, anciennePosition: true } } },
   })
   // Déjà supprimé (autre onglet, double clic) : le résultat voulu est atteint.
   if (!rapport) redirect('/avancements')
@@ -287,6 +326,7 @@ export async function supprimerRapport(
             where: { id: avancement.enseignantId },
             data: {
               positionActuelleId: avancement.anciennePositionId,
+              grade: avancement.anciennePosition.grade,
               dateEffetEchelon: avancement.dateAncienEffet,
             },
           })
@@ -333,7 +373,7 @@ export async function validerRapport(
 
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
-    include: { selections: { include: { enseignant: true } } },
+    include: { selections: { include: { enseignant: true, positionProposee: true } } },
   })
   if (!rapport) return { message: 'Rapport introuvable.' }
   if (rapport.statut === 'VALIDE') return { message: 'Ce rapport est déjà validé.' }
@@ -353,7 +393,11 @@ export async function validerRapport(
       })
       await tx.enseignant.update({
         where: { id: s.enseignantId },
-        data: { positionActuelleId: s.positionProposeeId, dateEffetEchelon: rapport.periodeFin },
+        data: {
+          positionActuelleId: s.positionProposeeId,
+          grade: s.positionProposee.grade,
+          dateEffetEchelon: rapport.periodeFin,
+        },
       })
     }
     await tx.sessionConseil.update({
