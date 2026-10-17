@@ -301,6 +301,26 @@ Règle de dépendance : `app` peut importer `domain` et `lib`. `domain` ne
 doit jamais importer `lib/prisma` ni quoi que ce soit de React — c'est
 ce qui le garde testable sans base de données ni navigateur.
 
+## Validation des saisies
+
+Chaque formulaire est validé côté serveur par un schéma zod
+(`src/lib/validations/`). Trois règles s'appliquent à tous :
+
+- **Importer les briques de `champs.ts`**, jamais `zod` seul pour un champ
+  courant : ce fichier charge `messages-fr.ts`, qui met les messages de zod en
+  français (« Date invalide. », « Adresse e-mail invalide. »…). Un message
+  écrit dans le schéma reste prioritaire.
+- **`texteObligatoire()`** retire les espaces avant le contrôle : un nom
+  réduit à des espaces est refusé au lieu d'être enregistré.
+- **Les dates sont comparées entre elles** dans le schéma (`superRefine`) :
+  naissance non future, prise de service après la naissance, date d'effet
+  d'échelon non antérieure à la prise de service, fin d'absence ou de période
+  non antérieure au début. Une faute de frappe sur l'année (2099 pour 1999)
+  fausserait l'âge de retraite et l'éligibilité à l'avancement.
+
+Aucun âge minimal à la prise de service n'est imposé : c'est une règle à
+confirmer avec le client.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et
