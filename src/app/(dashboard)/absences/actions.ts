@@ -5,8 +5,14 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
 import { analyserErreur, messageErreur } from '@/lib/erreurs'
-import { AbsenceSchema } from '@/lib/validations/absence'
+import {
+  AbsenceSchema,
+  ModificationAbsenceSchema,
+  RetourAbsenceSchema,
+} from '@/lib/validations/absence'
+import { erreursDeSaisie } from '@/lib/validations/champs'
 import { calculerFinCongeMaternite } from '@/domain/absences/calculerFinCongeMaternite'
+import { erreurDateRetour } from '@/domain/absences/retourAbsence'
 import { genererAttestationAbsence } from '@/lib/documents/genererAttestationAbsence'
 
 export type EtatFormulaire = {
@@ -31,7 +37,8 @@ export async function creerAbsence(
     dateFin: formData.get('dateFin') || undefined,
     motif: formData.get('motif') || undefined,
   })
-  if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors }
+  // Le formulaire n'affiche qu'une ligne d'erreur : le premier message y est joint.
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
 
   let absenceId: string
   try {
@@ -118,10 +125,19 @@ export async function terminerAbsence(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const dateRetour = new Date(formData.get('dateRetour') as string)
-  if (isNaN(dateRetour.getTime())) return { message: 'Date de retour obligatoire.' }
+  const parsed = RetourAbsenceSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
+  const { dateRetour } = parsed.data
 
   try {
+    const absence = await prisma.absence.findUnique({
+      where: { id: absenceId },
+      select: { dateDebut: true },
+    })
+    if (!absence) return { message: ABSENCE_DISPARUE }
+    const incoherence = erreurDateRetour(absence.dateDebut, dateRetour)
+    if (incoherence) return { message: incoherence }
+
     await prisma.absence.update({
       where: { id: absenceId },
       data: { statut: 'TERMINE', dateRetour },
@@ -140,15 +156,11 @@ export async function modifierAbsence(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const dateDebut = new Date(formData.get('dateDebut') as string)
-  const dateFin = new Date(formData.get('dateFin') as string)
-  if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) return { message: 'Dates invalides.' }
+  const parsed = ModificationAbsenceSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
 
   try {
-    await prisma.absence.update({
-      where: { id: absenceId },
-      data: { dateDebut, dateFin, motif: (formData.get('motif') as string) || null },
-    })
+    await prisma.absence.update({ where: { id: absenceId }, data: parsed.data })
   } catch (erreur) {
     return { message: messageErreur(erreur, 'modifierAbsence', { introuvable: ABSENCE_DISPARUE }) }
   }

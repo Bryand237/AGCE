@@ -73,7 +73,11 @@ describe('actions enseignants : erreurs de la base', () => {
       grade: 'ASSISTANT',
     })
     prismaFactice.enseignant.create.mockResolvedValue({ id: 'ens-1' })
-    prismaFactice.enseignant.findUnique.mockResolvedValue({ id: 'ens-1', photoUrl: null })
+    prismaFactice.enseignant.findUnique.mockResolvedValue({
+      id: 'ens-1',
+      photoUrl: null,
+      datePriseService: new Date('2018-09-01'),
+    })
     prismaFactice.enseignant.update.mockResolvedValue({})
     fsFactice.mkdir.mockResolvedValue(undefined)
     fsFactice.writeFile.mockResolvedValue(undefined)
@@ -134,6 +138,15 @@ describe('actions enseignants : erreurs de la base', () => {
       const etat = await creerEnseignant({}, formulaire({ ...SAISIE, matricule: '' }))
 
       expect(etat.errors?.matricule).toBeDefined()
+      expect(prismaFactice.enseignant.create).not.toHaveBeenCalled()
+    })
+
+    it('refuse une naissance dans le futur, avec un message en français, sans toucher à la base', async () => {
+      const etat = await creerEnseignant({}, formulaire({ ...SAISIE, dateNaissance: '2099-01-01' }))
+
+      expect(etat.errors?.dateNaissance).toEqual([
+        'La date de naissance ne peut pas être dans le futur.',
+      ])
       expect(prismaFactice.enseignant.create).not.toHaveBeenCalled()
     })
 
@@ -202,6 +215,47 @@ describe('actions enseignants : erreurs de la base', () => {
       await expect(modifierEnseignant('ens-1', {}, formulaire())).rejects.toThrow(
         'NEXT_REDIRECT /enseignants/ens-1'
       )
+    })
+  })
+
+  describe.each([
+    [
+      'marquerTransfere',
+      (date: string) =>
+        marquerTransfere(
+          'ens-1',
+          {},
+          formulaire({ dateFinService: date, lieuTransfert: 'Douala' })
+        ),
+    ],
+    [
+      'marquerRetraite',
+      (date: string) => marquerRetraite('ens-1', {}, formulaire({ dateFinService: date })),
+    ],
+  ])('%s : cohérence de la date de fin de service', (_nom, lancer) => {
+    it('refuse une fin antérieure à la prise de service (le 01/09/2018), sans rien modifier', async () => {
+      const etat = await lancer('1900-01-01')
+
+      expect(etat.errors?.dateFinService).toEqual([
+        'La date de fin de service ne peut pas précéder la prise de service (le 01/09/2018).',
+      ])
+      expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
+    })
+
+    it('accepte une fin le jour même de la prise de service', async () => {
+      const etat = await lancer('2018-09-01')
+
+      expect(etat.succes).toBe(true)
+      expect(prismaFactice.enseignant.update).toHaveBeenCalledTimes(1)
+    })
+
+    it('annonce un enseignant disparu quand sa fiche n’existe plus', async () => {
+      prismaFactice.enseignant.findUnique.mockResolvedValue(null)
+
+      const etat = await lancer('2026-09-01')
+
+      expect(etat.message).toMatch(/n'existe plus/)
+      expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
     })
   })
 

@@ -36,3 +36,8 @@ export const ModificationAbsenceSchema = z
       ctx.addIssue({ code: 'custom', path: ['dateFin'], message: FIN_AVANT_DEBUT })
     }
   })
+
+/** Retour d'une absence. La comparaison avec le début de l'absence se fait dans l'action. */
+export const RetourAbsenceSchema = z.object({
+  dateRetour: date('La date de retour'),
+})

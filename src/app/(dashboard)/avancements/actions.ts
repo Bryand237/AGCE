@@ -7,9 +7,19 @@ import { exigerUtilisateur } from '@/lib/auth'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
-import { MetadonneesSessionSchema, ValidationDecisionSchema } from '@/lib/validations/avancement'
+import {
+  MetadonneesSessionSchema,
+  RapportSchema,
+  ValidationDecisionSchema,
+} from '@/lib/validations/avancement'
+import { erreursDeSaisie } from '@/lib/validations/champs'
 
-export type EtatFormulaire = { errors?: Record<string, string[]>; message?: string }
+export type EtatFormulaire = {
+  errors?: Record<string, string[]>
+  message?: string
+  /** Vrai quand `message` annonce une réussite (et non une erreur). */
+  succes?: boolean
+}
 
 async function chargerAvancementPourDecision(avancementId: string) {
   return prisma.historiqueAvancement.findUnique({
@@ -45,12 +55,9 @@ export async function creerRapport(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const numero = formData.get('numero') as string
-  const periodeDebut = new Date(formData.get('periodeDebut') as string)
-  const periodeFin = new Date(formData.get('periodeFin') as string)
-  if (!numero || isNaN(periodeDebut.getTime()) || isNaN(periodeFin.getTime())) {
-    return { message: "L'édition et la période sont obligatoires." }
-  }
+  const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
+  const { numero, periodeDebut, periodeFin } = parsed.data
 
   const [candidatsBruts, grille] = await Promise.all([
     prisma.enseignant.findMany({
@@ -144,21 +151,16 @@ export async function mettreAJourRapport(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const numero = (formData.get('numero') as string)?.trim()
-  const periodeDebut = new Date(formData.get('periodeDebut') as string)
-  const periodeFin = new Date(formData.get('periodeFin') as string)
-
-  if (!numero || isNaN(periodeDebut.getTime()) || isNaN(periodeFin.getTime())) {
-    return { message: 'Le numéro et les dates de période sont obligatoires.' }
-  }
+  const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
 
   await prisma.sessionConseil.update({
     where: { id: rapportId },
-    data: { numero, periodeDebut, periodeFin },
+    data: parsed.data,
   })
 
   revalidatePath(`/avancements/${rapportId}`)
-  return { message: 'Informations du rapport mises à jour.' }
+  return { message: 'Informations du rapport mises à jour.', succes: true }
 }
 
 export async function modifierSelection(
@@ -397,9 +399,8 @@ export async function validerDecision(
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
   const parsed = ValidationDecisionSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors }
-  }
+  // Le formulaire n'affiche qu'une ligne d'erreur : le premier message y est joint.
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
 
   const { numeroDecision, dateValidation, auteurValidation } = parsed.data
   const avancement = await chargerAvancementPourDecision(avancementId)

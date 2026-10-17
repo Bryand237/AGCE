@@ -17,7 +17,7 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
     sessionConseil: { delete: tracer('rapport.delete') },
   }
   const prismaFactice = {
-    sessionConseil: { findUnique: vi.fn() },
+    sessionConseil: { findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   }
   return { exigerUtilisateur: vi.fn(), journal, prismaFactice, tx }
@@ -38,7 +38,8 @@ vi.mock('@/lib/documents/genererDecisionAvancement', () => ({
   genererDecisionAvancement: vi.fn(),
 }))
 
-const { supprimerRapport } = await import('./actions')
+const { creerRapport, mettreAJourRapport, supprimerRapport, validerDecision } =
+  await import('./actions')
 
 const RAPPORT = 'r-1'
 
@@ -110,5 +111,72 @@ describe('supprimerRapport', () => {
       'NEXT_REDIRECT /avancements'
     )
     expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+function donnees(valeurs: Record<string, string>) {
+  const formData = new FormData()
+  for (const [cle, valeur] of Object.entries(valeurs)) formData.set(cle, valeur)
+  return formData
+}
+
+describe('rapports : cohérence de la période', () => {
+  const PERIODE = { numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2025-12-31' }
+  const INVERSEE = { ...PERIODE, periodeDebut: '2025-12-31', periodeFin: '2025-07-01' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.update.mockResolvedValue({})
+  })
+
+  it('creerRapport refuse une période inversée : message et erreur par champ, sans toucher à la base', async () => {
+    const etat = await creerRapport({}, donnees(INVERSEE))
+
+    expect(etat.message).toBe('La fin de période ne peut pas précéder son début.')
+    expect(etat.errors?.periodeFin).toEqual(['La fin de période ne peut pas précéder son début.'])
+  })
+
+  it('creerRapport refuse une édition réduite à des espaces', async () => {
+    const etat = await creerRapport({}, donnees({ ...PERIODE, numero: '   ' }))
+
+    expect(etat.message).toBe("L'édition (numéro de session) est obligatoire.")
+  })
+
+  it('mettreAJourRapport refuse une période inversée, sans rien modifier', async () => {
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees(INVERSEE))
+
+    expect(etat.message).toBe('La fin de période ne peut pas précéder son début.')
+    expect(etat.succes).toBeUndefined()
+    expect(prismaFactice.sessionConseil.update).not.toHaveBeenCalled()
+  })
+
+  it('mettreAJourRapport enregistre une période cohérente et annonce la réussite', async () => {
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees({ ...PERIODE, numero: ' 55ème ' }))
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: {
+        numero: '55ème',
+        periodeDebut: new Date('2025-07-01'),
+        periodeFin: new Date('2025-12-31'),
+      },
+    })
+  })
+
+  it('validerDecision affiche un message (et non une erreur invisible) pour un numéro réduit à des espaces', async () => {
+    const etat = await validerDecision(
+      'avancement-1',
+      {},
+      donnees({
+        numeroDecision: '   ',
+        dateValidation: '2026-02-01',
+        auteurValidation: 'Le Recteur',
+      })
+    )
+
+    expect(etat.message).toBe('Le numéro de décision est obligatoire')
+    expect(etat.errors?.numeroDecision).toBeDefined()
   })
 })

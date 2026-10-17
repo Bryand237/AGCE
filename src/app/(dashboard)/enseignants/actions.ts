@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
 import { messageErreur } from '@/lib/erreurs'
 import { EnseignantSchema, TransfertSchema, RetraiteSchema } from '@/lib/validations/enseignant'
+import { erreurFinDeService } from '@/domain/enseignants/finDeService'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -193,6 +194,14 @@ export async function marquerTransfere(
   }
 
   try {
+    const enseignant = await prisma.enseignant.findUnique({
+      where: { id },
+      select: { datePriseService: true },
+    })
+    if (!enseignant) return { message: ENSEIGNANT_DISPARU }
+    const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
+    if (incoherence) return { errors: { dateFinService: [incoherence] } }
+
     await prisma.enseignant.update({
       where: { id },
       data: {
@@ -224,6 +233,14 @@ export async function marquerRetraite(
   }
 
   try {
+    const enseignant = await prisma.enseignant.findUnique({
+      where: { id },
+      select: { datePriseService: true },
+    })
+    if (!enseignant) return { message: ENSEIGNANT_DISPARU }
+    const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
+    if (incoherence) return { errors: { dateFinService: [incoherence] } }
+
     await prisma.enseignant.update({
       where: { id },
       data: { statut: 'RETRAITE', dateFinService: parsed.data.dateFinService },

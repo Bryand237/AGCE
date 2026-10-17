@@ -40,3 +40,19 @@ export const texteOptionnel = z
 export function premierMessage(erreur: z.ZodError): string {
   return erreur.issues[0]?.message ?? 'Saisie invalide.'
 }
+
+/**
+ * Réponse d'une action dont la saisie est invalide : les erreurs par champ (pour les
+ * formulaires qui les affichent sous chaque champ) ET le premier message (pour ceux qui
+ * n'ont qu'une ligne d'erreur). Un formulaire qui n'afficherait ni l'un ni l'autre
+ * échouerait sans rien dire.
+ */
+export function erreursDeSaisie(erreur: z.ZodError): {
+  errors: Record<string, string[]>
+  message: string
+} {
+  return {
+    errors: erreur.flatten().fieldErrors as Record<string, string[]>,
+    message: premierMessage(erreur),
+  }
+}

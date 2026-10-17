@@ -52,6 +52,7 @@ function formulaire(valeurs: Record<string, string> = {}) {
 const ABSENCE_COMPLETE = {
   id: 'abs-1',
   type: 'MISSION',
+  dateDebut: new Date('2026-10-01'),
   enseignant: {
     departement: { etablissement: { id: 'etab-1' } },
   },
@@ -101,6 +102,25 @@ describe('actions absences : erreurs de la base', () => {
 
       expect(etat.message).toMatch(/erreur technique/i)
       expect(erreurConsole).toHaveBeenCalled()
+    })
+
+    it('refuse une fin antérieure au début : erreur par champ ET message, sans toucher à la base', async () => {
+      const etat = await creerAbsence(
+        {},
+        formulaire({
+          matricule: '12345',
+          type: 'MISSION',
+          dateDebut: '2026-10-10',
+          dateFin: '2026-10-01',
+        })
+      )
+
+      expect(etat.errors?.dateFin).toEqual([
+        'La date de fin ne peut pas précéder la date de début.',
+      ])
+      expect(etat.message).toBe('La date de fin ne peut pas précéder la date de début.')
+      expect(prismaFactice.enseignant.findUnique).not.toHaveBeenCalled()
+      expect(prismaFactice.absence.create).not.toHaveBeenCalled()
     })
 
     it('garde les messages métier existants', async () => {
@@ -175,6 +195,70 @@ describe('actions absences : erreurs de la base', () => {
 
       expect(etat.message).toMatch(/erreur technique/i)
       expect(erreurConsole).toHaveBeenCalled()
+    })
+  })
+
+  describe('terminerAbsence : cohérence de la date de retour', () => {
+    it('refuse un retour antérieur au début de l’absence (le 01/10/2026), sans rien modifier', async () => {
+      const etat = await terminerAbsence('abs-1', {}, formulaire({ dateRetour: '2026-09-15' }))
+
+      expect(etat.message).toBe(
+        "La date de retour ne peut pas précéder le début de l'absence (le 01/10/2026)."
+      )
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('accepte un retour anticipé, avant la fin prévue', async () => {
+      const etat = await terminerAbsence('abs-1', {}, formulaire({ dateRetour: '2026-10-02' }))
+
+      expect(etat.message).toBeUndefined()
+      expect(prismaFactice.absence.update).toHaveBeenCalledTimes(1)
+    })
+
+    it('annonce une absence disparue quand elle n’existe plus', async () => {
+      prismaFactice.absence.findUnique.mockResolvedValue(null)
+
+      const etat = await terminerAbsence('abs-1', {}, formulaire({ dateRetour: '2026-10-12' }))
+
+      expect(etat.message).toMatch(/Cette absence n'existe plus/)
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('demande une date de retour lisible, en français', async () => {
+      const etat = await terminerAbsence('abs-1', {}, formulaire({ dateRetour: '' }))
+
+      expect(etat.message).toBe('La date de retour est invalide ou absente.')
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('modifierAbsence : cohérence des dates', () => {
+    it('refuse une fin antérieure au début, sans rien modifier', async () => {
+      const etat = await modifierAbsence(
+        'abs-1',
+        {},
+        formulaire({ dateDebut: '2026-10-10', dateFin: '2026-10-01' })
+      )
+
+      expect(etat.message).toBe('La date de fin ne peut pas précéder la date de début.')
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('enregistre les dates et un motif vide devient null', async () => {
+      await modifierAbsence(
+        'abs-1',
+        {},
+        formulaire({ dateDebut: '2026-10-01', dateFin: '2026-10-10', motif: '  ' })
+      )
+
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: {
+          dateDebut: new Date('2026-10-01'),
+          dateFin: new Date('2026-10-10'),
+          motif: null,
+        },
+      })
     })
   })
 

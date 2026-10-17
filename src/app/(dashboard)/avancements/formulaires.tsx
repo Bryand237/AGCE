@@ -243,7 +243,11 @@ export function FormulaireModifierRapport({
           />
         </label>
       </div>
-      {state.message && <p className="text-muted-foreground text-sm">{state.message}</p>}
+      {state.message && (
+        <p className={`text-sm ${state.succes ? 'text-muted-foreground' : 'text-destructive'}`}>
+          {state.message}
+        </p>
+      )}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
       </button>
