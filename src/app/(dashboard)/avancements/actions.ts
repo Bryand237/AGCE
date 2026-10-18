@@ -8,6 +8,7 @@ import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEch
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { erreurPositionProposee } from '@/domain/avancement/positionProposee'
 import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
+import { separerSelections } from '@/domain/avancement/selectionsAValider'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
 import {
   MetadonneesSessionSchema,
@@ -21,6 +22,10 @@ export type EtatFormulaire = {
   message?: string
   /** Vrai quand `message` annonce une réussite (et non une erreur). */
   succes?: boolean
+  /** Sélections qui ne peuvent plus avancer, à montrer à l'utilisateur avant de valider. */
+  exclusions?: { enseignantId: string; nom: string; matricule: string; motif: string }[]
+  /** Vrai quand l'utilisateur peut valider quand même, sans les enseignants de `exclusions`. */
+  peutConfirmer?: boolean
 }
 
 async function chargerAvancementPourDecision(avancementId: string) {
@@ -371,16 +376,59 @@ export async function validerRapport(
     return { message: 'Date et auteur de la validation sont obligatoires.' }
   }
 
-  const rapport = await prisma.sessionConseil.findUnique({
-    where: { id: rapportId },
-    include: { selections: { include: { enseignant: true, positionProposee: true } } },
-  })
-  if (!rapport) return { message: 'Rapport introuvable.' }
-  if (rapport.statut === 'VALIDE') return { message: 'Ce rapport est déjà validé.' }
-  if (rapport.selections.length === 0) return { message: 'Aucun enseignant sélectionné.' }
+  // Enseignants que l'utilisateur a déjà vus dans la liste d'exclusion et accepté de laisser de côté.
+  const exclusionsConfirmees = new Set(
+    ((formData.get('exclusionsConfirmees') as string | null) ?? '').split(',').filter(Boolean)
+  )
 
-  await prisma.$transaction(async (tx) => {
-    for (const s of rapport.selections) {
+  // Les enseignants sont relus dans la transaction qui valide : les sélections datent de la
+  // création du rapport et peuvent être périmées (voir selectionsAValider.ts).
+  const refus = await prisma.$transaction(async (tx): Promise<EtatFormulaire | null> => {
+    const rapport = await tx.sessionConseil.findUnique({
+      where: { id: rapportId },
+      include: {
+        selections: {
+          include: { enseignant: { include: { positionActuelle: true } }, positionProposee: true },
+        },
+      },
+    })
+    if (!rapport) return { message: 'Rapport introuvable.' }
+    if (rapport.statut === 'VALIDE') return { message: 'Ce rapport est déjà validé.' }
+    if (rapport.selections.length === 0) return { message: 'Aucun enseignant sélectionné.' }
+
+    const { valides, perimees } = separerSelections(
+      rapport.selections.map((s) => ({
+        ligne: s,
+        statutEnseignant: s.enseignant.statut,
+        positionActuelle: s.enseignant.positionActuelle,
+        positionProposee: s.positionProposee,
+      }))
+    )
+    const exclusions = perimees.map(({ ligne: s, motif }) => ({
+      enseignantId: s.enseignantId,
+      nom: `${s.enseignant.nom} ${s.enseignant.prenom}`,
+      matricule: s.enseignant.matricule,
+      motif,
+    }))
+
+    if (valides.length === 0) {
+      return {
+        message:
+          'Aucun enseignant de ce rapport ne peut plus avancer. Rien n’a été validé : retirez-les du rapport, ou rejetez-le.',
+        exclusions,
+        peutConfirmer: false,
+      }
+    }
+    // Aucune exclusion en silence : elles doivent avoir été montrées, puis confirmées.
+    if (exclusions.some((e) => !exclusionsConfirmees.has(e.enseignantId))) {
+      return {
+        message: `${exclusions.length} enseignant(s) ne peuvent plus avancer. Rien n’a encore été validé.`,
+        exclusions,
+        peutConfirmer: true,
+      }
+    }
+
+    for (const { ligne: s } of valides) {
       await tx.historiqueAvancement.create({
         data: {
           enseignantId: s.enseignantId,
@@ -400,11 +448,17 @@ export async function validerRapport(
         },
       })
     }
+    // Le rapport validé ne doit lister que les enseignants qui ont réellement avancé.
+    for (const { ligne: s } of perimees) {
+      await tx.selectionAvancement.delete({ where: { id: s.id } })
+    }
     await tx.sessionConseil.update({
       where: { id: rapportId },
       data: { statut: 'VALIDE', motifRejet: null, dateValidation, auteurValidation },
     })
+    return null
   })
+  if (refus) return refus
 
   revalidatePath('/avancements')
   redirect(`/avancements/${rapportId}`)

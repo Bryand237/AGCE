@@ -67,7 +67,7 @@ describe('EnseignantSchema — département d’origine', () => {
   })
 })
 
-function erreurs(entree: Record<string, unknown>) {
+function erreurs(entree: Record<string, unknown>): Record<string, string[] | undefined> {
   const resultat = EnseignantSchema.safeParse(entree)
   return resultat.success ? {} : resultat.error.flatten().fieldErrors
 }

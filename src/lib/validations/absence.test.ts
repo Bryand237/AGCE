@@ -12,7 +12,10 @@ function absence(surcharge: Record<string, unknown> = {}) {
   }
 }
 
-function erreurs(schema: typeof AbsenceSchema | typeof ModificationAbsenceSchema, entree: unknown) {
+function erreurs(
+  schema: typeof AbsenceSchema | typeof ModificationAbsenceSchema,
+  entree: unknown
+): Record<string, string[] | undefined> {
   const resultat = schema.safeParse(entree)
   return resultat.success ? {} : resultat.error.flatten().fieldErrors
 }

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useActionState } from 'react'
+import { useActionConservee } from '@/lib/action-conservee'
 import type { Grade } from '@/generated/prisma/enums'
 import {
   ajouterSelection,
@@ -356,14 +357,17 @@ export function FormulaireSupprimerRapport({
 }
 
 export function BlocValiderOuRejeter({ rapportId }: { rapportId: string }) {
-  const [state, formActionValider, isPendingValider] = useActionState(
+  // Le formulaire quitte la page quand la validation réussit : la saisie (date, auteur) est
+  // conservée si le serveur répond par la liste des enseignants exclus, pour confirmer sans
+  // tout ressaisir.
+  const [state, surEnvoiValider, isPendingValider] = useActionConservee(
     validerRapport.bind(null, rapportId),
     etatInitial
   )
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <form action={formActionValider} className={classeFormulaire}>
+      <form method="post" onSubmit={surEnvoiValider} className={classeFormulaire}>
         <p className="text-foreground text-sm font-semibold">Valider le rapport</p>
         <label className="flex flex-col gap-1 text-sm">
           Date de validation
@@ -379,9 +383,36 @@ export function BlocValiderOuRejeter({ rapportId }: { rapportId: string }) {
           />
         </label>
         {state.message && <p className="text-destructive text-sm">{state.message}</p>}
-        <button type="submit" disabled={isPendingValider} className={classeBoutonPrimaire}>
-          {isPendingValider ? 'Validation...' : 'Valider'}
-        </button>
+        {state.exclusions && state.exclusions.length > 0 && (
+          <ul className="border-border bg-muted/30 flex flex-col gap-1 rounded-lg border p-3 text-sm">
+            {state.exclusions.map((exclusion) => (
+              <li key={exclusion.enseignantId}>
+                <strong>{exclusion.nom}</strong> ({exclusion.matricule}) — {exclusion.motif}
+              </li>
+            ))}
+          </ul>
+        )}
+        {state.peutConfirmer && state.exclusions && (
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-xs">
+              Les enseignants ci-dessus seront retirés de ce rapport ; les autres avanceront.
+            </p>
+            <button
+              type="submit"
+              name="exclusionsConfirmees"
+              value={state.exclusions.map((exclusion) => exclusion.enseignantId).join(',')}
+              disabled={isPendingValider}
+              className={classeBoutonPrimaire}
+            >
+              {isPendingValider ? 'Validation...' : 'Valider sans ces enseignants'}
+            </button>
+          </div>
+        )}
+        {!state.peutConfirmer && (
+          <button type="submit" disabled={isPendingValider} className={classeBoutonPrimaire}>
+            {isPendingValider ? 'Validation...' : 'Valider'}
+          </button>
+        )}
       </form>
 
       <form action={rejeterRapport.bind(null, rapportId)} className={classeFormulaire}>

@@ -340,6 +340,20 @@ formulaire « Mettre à jour » ne propose que des positions acceptées.
   (`rapportValideModifiable.ts`).
 - Toute écriture de `positionActuelleId` écrit `grade` dans la même requête.
 
+## Validation d'un rapport d'avancement
+
+Les sélections d'un rapport datent de sa création ; la validation peut venir des
+jours plus tard. À la validation, chaque enseignant est relu dans la même
+transaction (`src/domain/avancement/selectionsAValider.ts`) :
+
+- un enseignant devenu **retraité ou transféré**, ou dont la proposition **ne
+  dépasse plus sa position actuelle** (second rapport validé pour la même
+  période, fiche corrigée), est **signalé, jamais écarté en silence** ;
+- le formulaire affiche la liste et demande confirmation. Confirmer valide les
+  autres enseignants et retire les exclus du rapport, pour qu'il ne liste que
+  ceux qui ont réellement avancé. Rien n'est écrit avant la confirmation ;
+- si plus personne ne peut avancer, rien n'est validé.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

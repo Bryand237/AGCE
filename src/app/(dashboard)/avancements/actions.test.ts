@@ -24,7 +24,7 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
       create: vi.fn(),
       findFirst: vi.fn(),
     },
-    sessionConseil: { delete: tracer('rapport.delete'), update: vi.fn() },
+    sessionConseil: { delete: tracer('rapport.delete'), update: vi.fn(), findUnique: vi.fn() },
   }
   const prismaFactice = {
     sessionConseil: { findUnique: vi.fn(), update: vi.fn() },
@@ -412,35 +412,6 @@ describe('écritures de la position : le grade suit', () => {
     prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
   })
 
-  it('validerRapport écrit le grade de la position proposée avec la position', async () => {
-    prismaFactice.sessionConseil.findUnique.mockResolvedValue({
-      id: RAPPORT,
-      statut: 'BROUILLON',
-      periodeFin: PERIODE_FIN,
-      selections: [
-        {
-          enseignantId: 'ens-1',
-          positionProposeeId: A3.id,
-          positionProposee: A3,
-          enseignant: { positionActuelleId: A2.id, dateEffetEchelon: ANCIEN_EFFET },
-        },
-      ],
-    })
-
-    await expect(
-      validerRapport(
-        RAPPORT,
-        {},
-        donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
-      )
-    ).rejects.toThrow(`NEXT_REDIRECT /avancements/${RAPPORT}`)
-
-    expect(tx.enseignant.update).toHaveBeenCalledWith({
-      where: { id: 'ens-1' },
-      data: { positionActuelleId: A3.id, grade: 'ASSISTANT', dateEffetEchelon: PERIODE_FIN },
-    })
-  })
-
   it('retirerSelection (rapport validé) rétablit la position ET le grade d’avant', async () => {
     prismaFactice.sessionConseil.findUnique.mockResolvedValue({ id: RAPPORT, statut: 'VALIDE' })
     prismaFactice.selectionAvancement.findUnique.mockResolvedValue({ id: 'sel-1' })
@@ -485,5 +456,191 @@ describe('écritures de la position : le grade suit', () => {
       where: { id: 'ens-1' },
       data: { positionActuelleId: A2.id, grade: 'ASSISTANT', dateEffetEchelon: ANCIEN_EFFET },
     })
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// A4 : la validation relit les enseignants et ne laisse personne de côté en silence.
+
+/** Une sélection telle que la lit validerRapport : l'enseignant avec sa position actuelle. */
+function selectionAValider(
+  numero: number,
+  surcharge: {
+    statut?: string
+    actuelle?: ReturnType<typeof position>
+    proposee?: ReturnType<typeof position>
+  } = {}
+) {
+  const { statut = 'ACTIF', actuelle = A2, proposee = A3 } = surcharge
+  return {
+    id: `sel-${numero}`,
+    enseignantId: `ens-${numero}`,
+    positionProposeeId: proposee.id,
+    positionProposee: proposee,
+    enseignant: {
+      nom: `NOM${numero}`,
+      prenom: 'Alice',
+      matricule: `M-${numero}`,
+      statut,
+      positionActuelleId: actuelle.id,
+      positionActuelle: actuelle,
+      dateEffetEchelon: ANCIEN_EFFET,
+    },
+  }
+}
+
+describe('validerRapport : sélections périmées', () => {
+  const valider = (extra: Record<string, string> = {}) =>
+    validerRapport(
+      RAPPORT,
+      {},
+      donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur', ...extra })
+    )
+
+  function rapportAvec(selections: ReturnType<typeof selectionAValider>[], statut = 'BROUILLON') {
+    tx.sessionConseil.findUnique.mockResolvedValue({
+      id: RAPPORT,
+      statut,
+      periodeFin: PERIODE_FIN,
+      selections,
+    })
+  }
+
+  /** Rien n'a été écrit : ni avancement, ni fiche, ni retrait de sélection, ni validation. */
+  function rienNEstEcrit() {
+    expect(tx.historiqueAvancement.create).not.toHaveBeenCalled()
+    expect(tx.enseignant.update).not.toHaveBeenCalled()
+    expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
+    expect(tx.sessionConseil.update).not.toHaveBeenCalled()
+  }
+
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
+  })
+
+  it('valide tout le monde quand les sélections sont d’actualité, grade compris', async () => {
+    rapportAvec([selectionAValider(1), selectionAValider(2)])
+
+    await expect(valider()).rejects.toThrow(`NEXT_REDIRECT /avancements/${RAPPORT}`)
+
+    expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(2)
+    expect(tx.enseignant.update).toHaveBeenCalledWith({
+      where: { id: 'ens-1' },
+      data: { positionActuelleId: A3.id, grade: 'ASSISTANT', dateEffetEchelon: PERIODE_FIN },
+    })
+    expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
+    expect(tx.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: expect.objectContaining({ statut: 'VALIDE', auteurValidation: 'Le Recteur' }),
+    })
+  })
+
+  it('relit le rapport et les enseignants dans la transaction qui valide', async () => {
+    rapportAvec([selectionAValider(1)])
+
+    await expect(valider()).rejects.toThrow('NEXT_REDIRECT')
+
+    expect(prismaFactice.$transaction).toHaveBeenCalledTimes(1)
+    expect(tx.sessionConseil.findUnique).toHaveBeenCalledTimes(1)
+    expect(prismaFactice.sessionConseil.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('signale un enseignant devenu retraité, sans rien valider avant confirmation', async () => {
+    rapportAvec([selectionAValider(1), selectionAValider(2, { statut: 'RETRAITE' })])
+
+    const etat = await valider()
+
+    expect(etat.exclusions).toEqual([
+      {
+        enseignantId: 'ens-2',
+        nom: 'NOM2 Alice',
+        matricule: 'M-2',
+        motif: expect.stringMatching(/retraité/),
+      },
+    ])
+    expect(etat.peutConfirmer).toBe(true)
+    expect(etat.message).toMatch(/Rien n’a encore été validé/)
+    rienNEstEcrit()
+  })
+
+  it('signale une proposition qui ne dépasse plus la position actuelle (second rapport pour la même période)', async () => {
+    rapportAvec([selectionAValider(1), selectionAValider(2, { actuelle: A3, proposee: A3 })])
+
+    const etat = await valider()
+
+    expect(etat.exclusions?.map((e) => e.enseignantId)).toEqual(['ens-2'])
+    expect(etat.exclusions?.[0]?.motif).toMatch(/position a changé/)
+    rienNEstEcrit()
+  })
+
+  it('une fois confirmée, fait avancer les autres et retire les exclus du rapport', async () => {
+    rapportAvec([selectionAValider(1), selectionAValider(2, { statut: 'TRANSFERE' })])
+
+    await expect(valider({ exclusionsConfirmees: 'ens-2' })).rejects.toThrow(
+      `NEXT_REDIRECT /avancements/${RAPPORT}`
+    )
+
+    expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(1)
+    expect(tx.historiqueAvancement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ enseignantId: 'ens-1', nouvellePositionId: A3.id }),
+    })
+    expect(tx.enseignant.update).toHaveBeenCalledTimes(1)
+    expect(tx.selectionAvancement.delete).toHaveBeenCalledWith({ where: { id: 'sel-2' } })
+    expect(tx.sessionConseil.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuse une confirmation qui ne couvre pas tous les exclus d’aujourd’hui', async () => {
+    // Le second enseignant est devenu retraité après que l'utilisateur a confirmé la liste.
+    rapportAvec([
+      selectionAValider(1),
+      selectionAValider(2, { statut: 'RETRAITE' }),
+      selectionAValider(3, { statut: 'RETRAITE' }),
+    ])
+
+    const etat = await valider({ exclusionsConfirmees: 'ens-2' })
+
+    expect(etat.exclusions?.map((e) => e.enseignantId)).toEqual(['ens-2', 'ens-3'])
+    expect(etat.peutConfirmer).toBe(true)
+    rienNEstEcrit()
+  })
+
+  it('ne valide rien, même confirmé, quand plus aucun enseignant ne peut avancer', async () => {
+    rapportAvec([
+      selectionAValider(1, { statut: 'RETRAITE' }),
+      selectionAValider(2, { statut: 'TRANSFERE' }),
+    ])
+
+    const etat = await valider({ exclusionsConfirmees: 'ens-1,ens-2' })
+
+    expect(etat.message).toMatch(/Aucun enseignant de ce rapport ne peut plus avancer/)
+    expect(etat.exclusions).toHaveLength(2)
+    expect(etat.peutConfirmer).toBe(false)
+    rienNEstEcrit()
+  })
+
+  it('garde les refus existants : rapport introuvable, déjà validé, sans sélection', async () => {
+    tx.sessionConseil.findUnique.mockResolvedValue(null)
+    expect((await valider()).message).toBe('Rapport introuvable.')
+
+    rapportAvec([selectionAValider(1)], 'VALIDE')
+    expect((await valider()).message).toBe('Ce rapport est déjà validé.')
+
+    rapportAvec([])
+    expect((await valider()).message).toBe('Aucun enseignant sélectionné.')
+    rienNEstEcrit()
+  })
+
+  it('exige la date et l’auteur avant de lire quoi que ce soit', async () => {
+    const etat = await validerRapport(
+      RAPPORT,
+      {},
+      donnees({ dateValidation: '', auteurValidation: '' })
+    )
+
+    expect(etat.message).toBe('Date et auteur de la validation sont obligatoires.')
+    expect(prismaFactice.$transaction).not.toHaveBeenCalled()
   })
 })
