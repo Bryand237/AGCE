@@ -9,6 +9,7 @@ import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { erreurPositionProposee } from '@/domain/avancement/positionProposee'
 import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
 import { separerSelections } from '@/domain/avancement/selectionsAValider'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
 import {
   MetadonneesSessionSchema,
@@ -26,6 +27,8 @@ export type EtatFormulaire = {
   exclusions?: { enseignantId: string; nom: string; matricule: string; motif: string }[]
   /** Vrai quand l'utilisateur peut valider quand même, sans les enseignants de `exclusions`. */
   peutConfirmer?: boolean
+  /** Vrai quand `message` est un avertissement que l'utilisateur peut passer en confirmant. */
+  confirmationRequise?: boolean
 }
 
 async function chargerAvancementPourDecision(avancementId: string) {
@@ -65,6 +68,34 @@ export async function creerRapport(
   const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return erreursDeSaisie(parsed.error)
   const { numero, periodeDebut, periodeFin } = parsed.data
+
+  // Deux brouillons sur la même période proposent les mêmes enseignants : valider les deux
+  // ferait avancer deux fois les mêmes personnes. La seconde validation les signalerait (A4),
+  // mais mieux vaut prévenir dès la création. Un avertissement, pas un blocage : l'utilisateur
+  // peut confirmer (bouton « Créer quand même »).
+  if (formData.get('confirmerChevauchement') !== 'oui') {
+    const autres = await prisma.sessionConseil.findMany({
+      where: {
+        statut: 'BROUILLON',
+        periodeDebut: { lte: periodeFin },
+        periodeFin: { gte: periodeDebut },
+      },
+      select: { numero: true, periodeDebut: true, periodeFin: true },
+      orderBy: { periodeDebut: 'asc' },
+    })
+    if (autres.length > 0) {
+      const liste = autres
+        .map(
+          (a) =>
+            `« ${a.numero} » (du ${formaterDateCourte(a.periodeDebut)} au ${formaterDateCourte(a.periodeFin)})`
+        )
+        .join(', ')
+      return {
+        message: `Un autre rapport en brouillon couvre déjà cette période : ${liste}. Valider les deux ferait avancer les mêmes enseignants deux fois. Rien n’a été créé : changez la période, ou créez ce rapport quand même.`,
+        confirmationRequise: true,
+      }
+    }
+  }
 
   const [candidatsBruts, grille] = await Promise.all([
     prisma.enseignant.findMany({

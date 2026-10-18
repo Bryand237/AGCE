@@ -46,6 +46,19 @@ export default function NouveauRapport() {
           <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
             {isPending ? 'Génération...' : 'Générer la sélection'}
           </button>
+          {/* Après l'avertissement de chevauchement. « Générer la sélection » ci-dessus
+              revérifie la période (si elle a été modifiée) ; celui-ci passe outre. */}
+          {state.confirmationRequise && (
+            <button
+              type="submit"
+              name="confirmerChevauchement"
+              value="oui"
+              disabled={isPending}
+              className={classeBoutonPrimaire}
+            >
+              Créer quand même
+            </button>
+          )}
         </div>
       </form>
     </div>

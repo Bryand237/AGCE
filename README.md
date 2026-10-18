@@ -354,6 +354,12 @@ transaction (`src/domain/avancement/selectionsAValider.ts`) :
   ceux qui ont réellement avancé. Rien n'est écrit avant la confirmation ;
 - si plus personne ne peut avancer, rien n'est validé.
 
+Pour éviter d'en arriver là, la **création** d'un rapport prévient quand un autre
+rapport en brouillon couvre déjà une partie de la même période : deux brouillons
+proposent les mêmes enseignants, et valider les deux les ferait avancer deux
+fois. C'est un avertissement, pas un blocage : le bouton « Créer quand même »
+crée le rapport (`confirmerChevauchement=oui`).
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

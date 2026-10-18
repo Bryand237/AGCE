@@ -27,10 +27,15 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
     sessionConseil: { delete: tracer('rapport.delete'), update: vi.fn(), findUnique: vi.fn() },
   }
   const prismaFactice = {
-    sessionConseil: { findUnique: vi.fn(), update: vi.fn() },
+    sessionConseil: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
     selectionAvancement: { findUnique: vi.fn() },
-    echelonIndiciaire: { findUnique: vi.fn() },
-    enseignant: { findUnique: vi.fn() },
+    echelonIndiciaire: { findUnique: vi.fn(), findMany: vi.fn() },
+    enseignant: { findUnique: vi.fn(), findMany: vi.fn() },
     historiqueAvancement: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -642,5 +647,93 @@ describe('validerRapport : sélections périmées', () => {
 
     expect(etat.message).toBe('Date et auteur de la validation sont obligatoires.')
     expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// A4 (2/2) : avertir à la création quand un autre brouillon couvre la même période.
+
+describe('creerRapport : brouillon sur la même période', () => {
+  const PERIODE = { numero: '56ème', periodeDebut: '2026-01-01', periodeFin: '2026-06-30' }
+  const BROUILLON_EXISTANT = {
+    numero: '55ème',
+    periodeDebut: new Date('2026-03-01'),
+    periodeFin: new Date('2026-09-30'),
+  }
+
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([])
+    prismaFactice.sessionConseil.create.mockResolvedValue({ id: 'r-nouveau' })
+    prismaFactice.enseignant.findMany.mockResolvedValue([])
+    prismaFactice.echelonIndiciaire.findMany.mockResolvedValue([])
+  })
+
+  it('crée le rapport sans avertissement quand aucun brouillon ne chevauche la période', async () => {
+    await expect(creerRapport({}, donnees(PERIODE))).rejects.toThrow(
+      'NEXT_REDIRECT /avancements/r-nouveau'
+    )
+
+    expect(prismaFactice.sessionConseil.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('cherche les BROUILLONS dont la période recoupe celle du nouveau rapport', async () => {
+    await expect(creerRapport({}, donnees(PERIODE))).rejects.toThrow('NEXT_REDIRECT')
+
+    expect(prismaFactice.sessionConseil.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          statut: 'BROUILLON',
+          periodeDebut: { lte: new Date('2026-06-30') },
+          periodeFin: { gte: new Date('2026-01-01') },
+        },
+      })
+    )
+  })
+
+  it('avertit, en citant le brouillon et sa période, et ne crée encore rien', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([BROUILLON_EXISTANT])
+
+    const etat = await creerRapport({}, donnees(PERIODE))
+
+    expect(etat.confirmationRequise).toBe(true)
+    expect(etat.message).toContain('« 55ème » (du 01/03/2026 au 30/09/2026)')
+    expect(etat.message).toMatch(/Rien n’a été créé/)
+    expect(prismaFactice.sessionConseil.create).not.toHaveBeenCalled()
+    expect(prismaFactice.enseignant.findMany).not.toHaveBeenCalled()
+  })
+
+  it('cite tous les brouillons concernés', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([
+      BROUILLON_EXISTANT,
+      { ...BROUILLON_EXISTANT, numero: '54ème' },
+    ])
+
+    const etat = await creerRapport({}, donnees(PERIODE))
+
+    expect(etat.message).toContain('« 55ème »')
+    expect(etat.message).toContain('« 54ème »')
+  })
+
+  it('crée le rapport quand l’utilisateur confirme, sans même chercher les chevauchements', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([BROUILLON_EXISTANT])
+
+    await expect(
+      creerRapport({}, donnees({ ...PERIODE, confirmerChevauchement: 'oui' }))
+    ).rejects.toThrow('NEXT_REDIRECT /avancements/r-nouveau')
+
+    expect(prismaFactice.sessionConseil.findMany).not.toHaveBeenCalled()
+    expect(prismaFactice.sessionConseil.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('ne confirme rien pour une autre valeur que « oui »', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([BROUILLON_EXISTANT])
+
+    const etat = await creerRapport({}, donnees({ ...PERIODE, confirmerChevauchement: 'non' }))
+
+    expect(etat.confirmationRequise).toBe(true)
+    expect(prismaFactice.sessionConseil.create).not.toHaveBeenCalled()
   })
 })
