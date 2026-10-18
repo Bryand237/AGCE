@@ -22,6 +22,8 @@ import {
 } from '@/lib/ui-classes'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
+import { notesDecisionsDejaProduites } from '@/domain/avancement/decisionsDejaProduites'
+import { metadonneesManquantes } from '@/domain/avancement/metadonneesSessionCompletes'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -42,57 +44,47 @@ type MetadonneesSession = {
 export function FormulaireMetadonneesSession({
   rapportId,
   metadonnees,
-  lectureSeule,
+  decisions,
 }: {
   rapportId: string
   metadonnees: MetadonneesSession
-  lectureSeule?: boolean
+  /** Décisions déjà produites pour ce rapport : ce que la modification change pour elles. */
+  decisions: { enAttente: number; signees: number }
 }) {
-  const [state, formAction, isPending] = useActionState(
+  // La page reste affichée après l'enregistrement : le formulaire garde la saisie, qui est la
+  // valeur enregistrée, et ne revient pas à l'ancienne quand le serveur refuse une date.
+  const [state, surEnvoi, isPending] = useActionConservee(
     mettreAJourMetadonneesSession.bind(null, rapportId),
     etatInitial
   )
-
-  if (lectureSeule) {
-    return (
-      <div className={classeFormulaire}>
-        <p className="text-foreground text-sm font-semibold">Métadonnées du conseil</p>
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted-foreground">Loi de finances</dt>
-            <dd>{metadonnees.referenceLoiFinances ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Circulaire MINFI</dt>
-            <dd>{metadonnees.referenceCirculaire ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Session CU</dt>
-            <dd>{metadonnees.dateSessionCU?.toLocaleDateString('fr-FR') ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Session CA</dt>
-            <dd>{metadonnees.dateSessionCA?.toLocaleDateString('fr-FR') ?? '—'}</dd>
-          </div>
-        </dl>
-      </div>
-    )
-  }
+  const manquantes = metadonneesManquantes(metadonnees)
+  const notes = notesDecisionsDejaProduites(decisions)
 
   return (
-    <form action={formAction} className={classeFormulaire}>
+    <form method="post" onSubmit={surEnvoi} className={classeFormulaire}>
       <p className="text-foreground text-sm font-semibold">
         Métadonnées du conseil (pour les décisions individuelles)
       </p>
       <p className="text-muted-foreground text-xs">
         Ces champs alimentent les mentions « Vu la loi de finances », « Vu la circulaire » et les
-        dates de session CU/CA dans chaque décision DOCX.
+        dates de session CU/CA dans chaque décision DOCX. Ils peuvent être renseignés en plusieurs
+        fois et corrigés à tout moment, y compris après la validation du rapport.
       </p>
+      {manquantes.length > 0 && (
+        <p className="text-muted-foreground text-xs">
+          Il manque encore : {manquantes.join(', ')}. Tant qu’elles manquent, les mentions
+          correspondantes restent vides dans les décisions.
+        </p>
+      )}
+      {notes.map((note) => (
+        <p key={note} className="text-muted-foreground text-xs">
+          {note}
+        </p>
+      ))}
       <label className="flex flex-col gap-1 text-sm">
         Loi de finances
         <input
           name="referenceLoiFinances"
-          required
           defaultValue={metadonnees.referenceLoiFinances ?? ''}
           placeholder="Loi de Finances 2026"
           className={classeChamp}
@@ -105,7 +97,6 @@ export function FormulaireMetadonneesSession({
         Circulaire MINFI
         <input
           name="referenceCirculaire"
-          required
           defaultValue={metadonnees.referenceCirculaire ?? ''}
           className={classeChamp}
         />
@@ -119,7 +110,6 @@ export function FormulaireMetadonneesSession({
           <input
             type="date"
             name="dateSessionCU"
-            required
             defaultValue={formatDateInput(metadonnees.dateSessionCU)}
             className={classeChamp}
           />
@@ -132,7 +122,6 @@ export function FormulaireMetadonneesSession({
           <input
             type="date"
             name="dateSessionCA"
-            required
             defaultValue={formatDateInput(metadonnees.dateSessionCA)}
             className={classeChamp}
           />
@@ -149,11 +138,12 @@ export function FormulaireMetadonneesSession({
           defaultValue={formatDateInput(metadonnees.dateSignatureDecisions)}
           className={classeChamp}
         />
+        {state.errors?.dateSignatureDecisions && (
+          <p className="text-destructive text-sm">{state.errors.dateSignatureDecisions[0]}</p>
+        )}
       </label>
       {state.message && (
-        <p
-          className={`text-sm ${state.message.includes('enregistr') ? 'text-primary' : 'text-destructive'}`}
-        >
+        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
           {state.message}
         </p>
       )}

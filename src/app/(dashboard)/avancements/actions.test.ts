@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // La base est simulée : on vérifie ici ce que l'action demande à Prisma (quelles
 // suppressions, dans quel ordre, dans une transaction) et ce qu'elle répond à
 // l'écran. Le comportement réel des clés étrangères se contrôle sur la base.
-const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
+const { exigerUtilisateur, genererDecisionFactice, journal, prismaFactice, tx } = vi.hoisted(() => {
   const journal: string[] = []
   const tracer = (nom: string) =>
     vi.fn(async () => {
@@ -46,10 +46,16 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
     selectionAvancement: { findUnique: vi.fn() },
     echelonIndiciaire: { findUnique: vi.fn(), findMany: vi.fn() },
     enseignant: { findUnique: vi.fn(), findMany: vi.fn() },
-    historiqueAvancement: { findFirst: vi.fn() },
+    historiqueAvancement: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   }
-  return { exigerUtilisateur: vi.fn(), journal, prismaFactice, tx }
+  return {
+    exigerUtilisateur: vi.fn(),
+    genererDecisionFactice: vi.fn(),
+    journal,
+    prismaFactice,
+    tx,
+  }
 })
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
@@ -64,11 +70,13 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 vi.mock('@/lib/documents/genererDecisionAvancement', () => ({
-  genererDecisionAvancement: vi.fn(),
+  genererDecisionAvancement: genererDecisionFactice,
 }))
 
 const {
   creerRapport,
+  genererDecision,
+  mettreAJourMetadonneesSession,
   mettreAJourRapport,
   modifierSelection,
   retirerSelection,
@@ -1047,5 +1055,190 @@ describe('mettreAJourRapport : rapport validé', () => {
     expect(etat.message).not.toMatch(/transaction annulée/)
     expect(erreurConsole).toHaveBeenCalled()
     erreurConsole.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// Métadonnées du conseil : modifiables à tout moment, en plusieurs fois, y compris après la
+// validation ; un brouillon de décision se régénère, une décision signée jamais.
+
+describe('mettreAJourMetadonneesSession', () => {
+  const COMPLETES = {
+    referenceLoiFinances: 'Loi n° 2025/012 du 17 décembre 2025',
+    referenceCirculaire: 'Circulaire n° 00001877/C/MINFI',
+    dateSessionCU: '2025-12-22',
+    dateSessionCA: '2026-01-07',
+    dateSignatureDecisions: '',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.update.mockResolvedValue({})
+  })
+
+  it('enregistre des métadonnées complètes et annonce la réussite', async () => {
+    const etat = await mettreAJourMetadonneesSession(RAPPORT, {}, donnees(COMPLETES))
+
+    expect(etat).toEqual({ message: 'Métadonnées enregistrées.', succes: true })
+    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: {
+        referenceLoiFinances: 'Loi n° 2025/012 du 17 décembre 2025',
+        referenceCirculaire: 'Circulaire n° 00001877/C/MINFI',
+        dateSessionCU: new Date('2025-12-22'),
+        dateSessionCA: new Date('2026-01-07'),
+        dateSignatureDecisions: null,
+      },
+    })
+  })
+
+  it('enregistre des métadonnées incomplètes : ce qui n’est pas encore connu reste vide', async () => {
+    const etat = await mettreAJourMetadonneesSession(
+      RAPPORT,
+      {},
+      donnees({ ...COMPLETES, referenceCirculaire: '', dateSessionCA: '' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: expect.objectContaining({
+        referenceLoiFinances: 'Loi n° 2025/012 du 17 décembre 2025',
+        referenceCirculaire: null,
+        dateSessionCU: new Date('2025-12-22'),
+        dateSessionCA: null,
+      }),
+    })
+  })
+
+  it('permet de retirer une valeur : la base reçoit null, jamais undefined (ignoré par Prisma)', async () => {
+    await mettreAJourMetadonneesSession(
+      RAPPORT,
+      {},
+      donnees({
+        referenceLoiFinances: '',
+        referenceCirculaire: '',
+        dateSessionCU: '',
+        dateSessionCA: '',
+        dateSignatureDecisions: '',
+      })
+    )
+
+    const { data } = prismaFactice.sessionConseil.update.mock.calls[0]![0] as {
+      data: Record<string, unknown>
+    }
+    expect(data).toEqual({
+      referenceLoiFinances: null,
+      referenceCirculaire: null,
+      dateSessionCU: null,
+      dateSessionCA: null,
+      dateSignatureDecisions: null,
+    })
+  })
+
+  it('ne regarde pas le statut du rapport : un rapport validé se complète comme un brouillon', async () => {
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue({ id: RAPPORT, statut: 'VALIDE' })
+
+    const etat = await mettreAJourMetadonneesSession(RAPPORT, {}, donnees(COMPLETES))
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuse une date illisible, avec une erreur par champ et un message, sans rien écrire', async () => {
+    const etat = await mettreAJourMetadonneesSession(
+      RAPPORT,
+      {},
+      donnees({ ...COMPLETES, dateSessionCU: '22/12/2025' })
+    )
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.errors?.dateSessionCU).toBeDefined()
+    expect(etat.message).toMatch(/session du Conseil universitaire/)
+    expect(prismaFactice.sessionConseil.update).not.toHaveBeenCalled()
+  })
+
+  it('répond « introuvable » quand le rapport a disparu entre-temps', async () => {
+    prismaFactice.sessionConseil.update.mockRejectedValue(
+      Object.assign(new Error('introuvable'), { code: 'P2025' })
+    )
+
+    const etat = await mettreAJourMetadonneesSession(RAPPORT, {}, donnees(COMPLETES))
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).toBe('Rapport introuvable.')
+  })
+
+  it('traduit une autre erreur de la base en message lisible', async () => {
+    prismaFactice.sessionConseil.update.mockRejectedValue(new Error('connexion perdue'))
+    const erreurConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const etat = await mettreAJourMetadonneesSession(RAPPORT, {}, donnees(COMPLETES))
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).not.toMatch(/connexion perdue/)
+    expect(erreurConsole).toHaveBeenCalled()
+    erreurConsole.mockRestore()
+  })
+})
+
+describe('genererDecision : brouillon et décision signée', () => {
+  const AVANCEMENT = 'av-1'
+
+  function avancement(statutDecision: string | null) {
+    return {
+      id: AVANCEMENT,
+      sessionId: RAPPORT,
+      statutDecision,
+      enseignant: {},
+      anciennePosition: {},
+      nouvellePosition: {},
+      dateAncienEffet: new Date('2023-11-26'),
+      dateNouvelEffet: new Date('2025-11-26'),
+      session: { referenceLoiFinances: 'Loi' },
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    genererDecisionFactice.mockReturnValue(Buffer.from('docx'))
+    prismaFactice.historiqueAvancement.update.mockResolvedValue({})
+  })
+
+  it('génère le brouillon d’une décision qui n’existe pas encore', async () => {
+    prismaFactice.historiqueAvancement.findUnique.mockResolvedValue(avancement(null))
+
+    const etat = await genererDecision(AVANCEMENT, {})
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.historiqueAvancement.update).toHaveBeenCalledWith({
+      where: { id: AVANCEMENT },
+      data: expect.objectContaining({ statutDecision: 'EN_ATTENTE' }),
+    })
+  })
+
+  it('régénère un brouillon en attente, avec les métadonnées d’aujourd’hui', async () => {
+    prismaFactice.historiqueAvancement.findUnique.mockResolvedValue(avancement('EN_ATTENTE'))
+
+    const etat = await genererDecision(AVANCEMENT, {})
+
+    expect(etat.succes).toBe(true)
+    expect(genererDecisionFactice).toHaveBeenCalledWith(
+      expect.objectContaining({ numeroDecision: '', rapport: { referenceLoiFinances: 'Loi' } })
+    )
+    expect(prismaFactice.historiqueAvancement.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuse de régénérer une décision signée, qui ne revient pas « en attente »', async () => {
+    prismaFactice.historiqueAvancement.findUnique.mockResolvedValue(avancement('VALIDEE'))
+
+    const etat = await genererDecision(AVANCEMENT, {})
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).toMatch(/déjà signée/)
+    expect(genererDecisionFactice).not.toHaveBeenCalled()
+    expect(prismaFactice.historiqueAvancement.update).not.toHaveBeenCalled()
   })
 })

@@ -380,6 +380,22 @@ crée le rapport (`confirmerChevauchement=oui`).
 Un rapport validé ne peut pas être supprimé : sa période ne se corrige donc que par
 ce chemin, avant la génération des décisions.
 
+## Métadonnées du conseil
+
+Loi de finances, circulaire MINFI, dates des sessions du Conseil universitaire (CU) et
+du Conseil d'administration (CA), date de signature : ces informations alimentent les
+mentions « Vu… » et « session du… » des décisions individuelles.
+
+- **Toutes facultatives** : un texte pas encore publié ou une session pas encore tenue ne
+  bloque pas l'enregistrement. Ce qui est laissé vide vaut `null` (et non `undefined`, que
+  Prisma ignore : une valeur devenue caduque pourrait sinon ne plus être retirée). La page du
+  rapport liste ce qui manque encore (`metadonneesManquantes`) ;
+- **modifiables à tout moment, y compris après la validation** du rapport : elles ne sont pas
+  recopiées à la validation, mais lues à chaque génération de décision ;
+- un **brouillon** de décision est un document enregistré : il garde les anciennes valeurs tant
+  qu'on ne le régénère pas (bouton « Régénérer le brouillon »). Une décision **signée** n'est
+  jamais modifiée, ni régénérée.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

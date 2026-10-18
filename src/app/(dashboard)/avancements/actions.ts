@@ -34,6 +34,9 @@ export type EtatFormulaire = {
   confirmationRequise?: boolean
 }
 
+const RAPPORT_INTROUVABLE = 'Rapport introuvable.'
+const INFORMATIONS_MISES_A_JOUR = 'Informations du rapport mises à jour.'
+
 async function chargerAvancementPourDecision(avancementId: string) {
   return prisma.historiqueAvancement.findUnique({
     where: { id: avancementId },
@@ -48,19 +51,22 @@ export async function mettreAJourMetadonneesSession(
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
   const parsed = MetadonneesSessionSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return erreursDeSaisie(parsed.error)
+
+  // Valable pour un rapport de tout statut, validé compris : ces informations ne sont pas
+  // recopiées à la validation, mais lues à chaque génération de décision. Elles peuvent
+  // manquer à la création du rapport (A3 : texte ou session pas encore disponibles).
+  try {
+    await prisma.sessionConseil.update({ where: { id: rapportId }, data: parsed.data })
+  } catch (erreur) {
+    return {
+      message: messageErreur(erreur, 'mettreAJourMetadonneesSession', {
+        introuvable: RAPPORT_INTROUVABLE,
+      }),
+    }
   }
-
-  const rapport = await prisma.sessionConseil.findUnique({ where: { id: rapportId } })
-  if (!rapport) return { message: 'Rapport introuvable.' }
-
-  await prisma.sessionConseil.update({
-    where: { id: rapportId },
-    data: parsed.data,
-  })
   revalidatePath(`/avancements/${rapportId}`)
-  return { message: 'Métadonnées enregistrées.' }
+  return { message: 'Métadonnées enregistrées.', succes: true }
 }
 
 /** Rapports en brouillon dont la période recoupe celle donnée (hors `sauf`, le rapport modifié). */
@@ -185,9 +191,6 @@ export async function ajouterSelection(
   revalidatePath(`/avancements/${rapportId}`)
   return {}
 }
-
-const RAPPORT_INTROUVABLE = 'Rapport introuvable.'
-const INFORMATIONS_MISES_A_JOUR = 'Informations du rapport mises à jour.'
 
 /**
  * Brouillon : numéro et période se modifient librement (la sélection existante n'est pas
@@ -628,6 +631,11 @@ export async function genererDecision(
   await exigerUtilisateur()
   const avancement = await chargerAvancementPourDecision(avancementId)
   if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
+  // Une décision signée porte son numéro et sa date : un brouillon ne doit ni la remplacer
+  // ni la remettre « en attente ».
+  if (avancement.statutDecision === 'VALIDEE') {
+    return { message: 'Cette décision est déjà signée : elle ne peut plus être régénérée.' }
+  }
 
   const buffer = genererDecisionAvancement({
     enseignant: avancement.enseignant,
@@ -644,7 +652,7 @@ export async function genererDecision(
     data: { decisionGeneree: new Uint8Array(buffer), statutDecision: 'EN_ATTENTE' },
   })
   revalidatePath(`/avancements/${avancement.sessionId}/${avancementId}`)
-  return { message: 'Brouillon généré.' }
+  return { message: 'Brouillon généré.', succes: true }
 }
 
 export async function validerDecision(

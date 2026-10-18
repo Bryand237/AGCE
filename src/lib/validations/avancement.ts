@@ -1,18 +1,27 @@
 import { z } from 'zod'
 import { date, texteObligatoire } from './champs'
 
-// Une date de signature laissée vide reste « absente » (undefined) ; saisie, elle doit être lisible.
-const dateOptionnelle = z.preprocess(
-  (v) => (v === '' ? undefined : v),
-  date('La date de signature des décisions').optional()
-)
+// Les métadonnées du conseil peuvent manquer à la création d'un rapport et se compléter plus
+// tard : un champ laissé vide vaut `null`, et non `undefined`, car Prisma ignore `undefined` :
+// avec lui, une valeur devenue caduque ne pourrait plus être retirée.
+const texteOuNull = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v ? v : null))
+
+// Saisie, la date doit être lisible ; absente ou vide, elle vaut `null`.
+const dateOuNull = (libelle: string) =>
+  z
+    .preprocess((v) => (v === '' ? undefined : v), date(libelle).optional())
+    .transform((v) => v ?? null)
 
 export const MetadonneesSessionSchema = z.object({
-  referenceLoiFinances: texteObligatoire('La loi de finances est obligatoire'),
-  referenceCirculaire: texteObligatoire('La circulaire est obligatoire'),
-  dateSessionCU: date('La date de la session du Conseil universitaire'),
-  dateSessionCA: date("La date de la session du Conseil d'administration"),
-  dateSignatureDecisions: dateOptionnelle,
+  referenceLoiFinances: texteOuNull,
+  referenceCirculaire: texteOuNull,
+  dateSessionCU: dateOuNull('La date de la session du Conseil universitaire'),
+  dateSessionCA: dateOuNull("La date de la session du Conseil d'administration"),
+  dateSignatureDecisions: dateOuNull('La date de signature des décisions'),
 })
 
 /** Création et modification d'un rapport : édition (numéro de session) et période couverte. */

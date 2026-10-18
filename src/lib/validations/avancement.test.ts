@@ -61,35 +61,89 @@ describe('MetadonneesSessionSchema', () => {
     ...surcharge,
   })
 
-  it('accepte une date de signature vide (elle reste absente)', () => {
+  it('lit des métadonnées complètes', () => {
     const resultat = MetadonneesSessionSchema.safeParse(metadonnees())
+
     expect(resultat.success).toBe(true)
-    if (resultat.success) expect(resultat.data.dateSignatureDecisions).toBeUndefined()
+    if (resultat.success) {
+      expect(resultat.data).toEqual({
+        referenceLoiFinances: 'Loi n° 2025/017',
+        referenceCirculaire: 'Circulaire n° 01',
+        dateSessionCU: new Date('2026-01-15'),
+        dateSessionCA: new Date('2026-01-20'),
+        dateSignatureDecisions: null,
+      })
+    }
+  })
+
+  it('accepte des métadonnées incomplètes : ce qui est vide vaut null', () => {
+    const resultat = MetadonneesSessionSchema.safeParse(
+      metadonnees({ referenceCirculaire: '', dateSessionCU: '', dateSessionCA: '' })
+    )
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data.referenceLoiFinances).toBe('Loi n° 2025/017')
+      expect(resultat.data.referenceCirculaire).toBeNull()
+      expect(resultat.data.dateSessionCU).toBeNull()
+      expect(resultat.data.dateSessionCA).toBeNull()
+    }
+  })
+
+  it('accepte une saisie entièrement vide : tout vaut null, pour pouvoir tout retirer', () => {
+    const resultat = MetadonneesSessionSchema.safeParse({
+      referenceLoiFinances: '',
+      referenceCirculaire: '',
+      dateSessionCU: '',
+      dateSessionCA: '',
+      dateSignatureDecisions: '',
+    })
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(Object.values(resultat.data).every((v) => v === null)).toBe(true)
+    }
+  })
+
+  it('traite des champs absents de la requête comme vides, sans les inventer', () => {
+    const resultat = MetadonneesSessionSchema.safeParse({})
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(Object.values(resultat.data).every((v) => v === null)).toBe(true)
+    }
+  })
+
+  it('retire les espaces autour des références, et traite des espaces seuls comme vides', () => {
+    const resultat = MetadonneesSessionSchema.safeParse(
+      metadonnees({ referenceLoiFinances: '  Loi n° 2025/017  ', referenceCirculaire: '   ' })
+    )
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data.referenceLoiFinances).toBe('Loi n° 2025/017')
+      expect(resultat.data.referenceCirculaire).toBeNull()
+    }
   })
 
   it('lit une date de signature renseignée', () => {
     const resultat = MetadonneesSessionSchema.safeParse(
       metadonnees({ dateSignatureDecisions: '2026-02-01' })
     )
+
     expect(resultat.success).toBe(true)
     if (resultat.success)
       expect(resultat.data.dateSignatureDecisions).toEqual(new Date('2026-02-01'))
   })
 
-  it('refuse une date de signature illisible au lieu de la transmettre à la base', () => {
-    expect(
-      erreurs(MetadonneesSessionSchema, metadonnees({ dateSignatureDecisions: 'abc' }))
-        .dateSignatureDecisions
-    ).toBeDefined()
-  })
-
-  it('refuse des références réduites à des espaces', () => {
+  it('refuse une date illisible au lieu de la transmettre à la base', () => {
     const champs = erreurs(
       MetadonneesSessionSchema,
-      metadonnees({ referenceLoiFinances: '  ', referenceCirculaire: ' ' })
+      metadonnees({ dateSignatureDecisions: 'abc', dateSessionCU: '31/12/2025' })
     )
-    expect(champs.referenceLoiFinances).toEqual(['La loi de finances est obligatoire'])
-    expect(champs.referenceCirculaire).toEqual(['La circulaire est obligatoire'])
+
+    expect(champs.dateSignatureDecisions).toBeDefined()
+    expect(champs.dateSessionCU).toBeDefined()
   })
 })
 

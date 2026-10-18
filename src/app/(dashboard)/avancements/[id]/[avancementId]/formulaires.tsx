@@ -17,7 +17,7 @@ export function BlocDecision({
   statutDecision: string | null
   numeroDecision: string | null
 }) {
-  const [, formActionGenerer] = useActionState(
+  const [etatGeneration, formActionGenerer, enGeneration] = useActionState(
     genererDecision.bind(null, avancementId),
     etatInitial
   )
@@ -38,13 +38,33 @@ export function BlocDecision({
   if (statutDecision === 'EN_ATTENTE') {
     return (
       <div className="flex flex-col gap-4">
-        <a
-          href={`/avancements/${id}/${avancementId}/decision`}
-          download
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          Télécharger le brouillon
-        </a>
+        <div className="flex flex-wrap items-center gap-4">
+          <a
+            href={`/avancements/${id}/${avancementId}/decision`}
+            download
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Télécharger le brouillon
+          </a>
+          {/* Après une modification des métadonnées du conseil : le brouillon enregistré garde
+              les anciennes valeurs tant qu'il n'est pas régénéré. */}
+          <form action={formActionGenerer}>
+            <button
+              type="submit"
+              disabled={enGeneration}
+              className="text-sm font-medium text-primary hover:underline disabled:opacity-50"
+            >
+              {enGeneration ? 'Génération...' : 'Régénérer le brouillon'}
+            </button>
+          </form>
+          {etatGeneration.message && (
+            <p
+              className={`text-sm ${etatGeneration.succes ? 'text-muted-foreground' : 'text-destructive'}`}
+            >
+              {etatGeneration.message}
+            </p>
+          )}
+        </div>
         <form action={formActionValider} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Numéro de décision
