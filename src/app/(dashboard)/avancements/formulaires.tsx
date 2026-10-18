@@ -207,16 +207,21 @@ export function FormulaireAjouterEnseignant({
 
 export function FormulaireModifierRapport({
   rapport,
+  valide,
 }: {
   rapport: { id: string; numero: string; periodeDebut: string; periodeFin: string }
+  valide: boolean
 }) {
-  const [state, formAction, isPending] = useActionState(
+  // Le formulaire reste affiché après l'enregistrement : il garde la saisie (la valeur
+  // enregistrée) au lieu de revenir à l'ancienne, ce qui ferait renvoyer l'ancienne période
+  // par le bouton « Enregistrer quand même ».
+  const [state, surEnvoi, isPending] = useActionConservee(
     mettreAJourRapport.bind(null, rapport.id),
     etatInitial
   )
 
   return (
-    <form action={formAction} className={classeFormulaire}>
+    <form method="post" onSubmit={surEnvoi} className={classeFormulaire}>
       <p className="text-foreground text-sm font-semibold">Modifier le rapport</p>
       <label className="flex flex-col gap-1 text-sm">
         Numéro de session
@@ -244,14 +249,33 @@ export function FormulaireModifierRapport({
           />
         </label>
       </div>
+      <p className="text-muted-foreground text-sm">
+        {valide
+          ? 'La fin de période est la date d’effet des avancements de ce rapport. La modifier reporte la nouvelle date sur l’historique et sur les fiches des enseignants, tant qu’aucune décision n’a été générée et que chacun occupe encore la position issue du rapport.'
+          : 'Modifier la période ne recalcule pas la liste des enseignants déjà sélectionnés : vérifiez-la ensuite.'}
+      </p>
       {state.message && (
         <p className={`text-sm ${state.succes ? 'text-muted-foreground' : 'text-destructive'}`}>
           {state.message}
         </p>
       )}
-      <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
-        {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
+          {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+        </button>
+        {/* Après l'avertissement de chevauchement (brouillon seulement) : passe outre. */}
+        {state.confirmationRequise && (
+          <button
+            type="submit"
+            name="confirmerChevauchement"
+            value="oui"
+            disabled={isPending}
+            className={classeBoutonPrimaire}
+          >
+            Enregistrer quand même
+          </button>
+        )}
+      </div>
     </form>
   )
 }

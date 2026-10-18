@@ -46,14 +46,12 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
           </Link>
           <h1 className="text-foreground text-2xl font-bold">Rapport {rapport.numero}</h1>
         </div>
-        {rapport.statut === 'VALIDE' && (
-          <Link
-            href={`/avancements/${id}/modifier`}
-            className="border-border bg-card text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium shadow-sm"
-          >
-            Modifier le rapport
-          </Link>
-        )}
+        <Link
+          href={`/avancements/${id}/modifier`}
+          className="border-border bg-card text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium shadow-sm"
+        >
+          Modifier le rapport
+        </Link>
       </div>
       <p className="text-muted-foreground mt-1 text-sm">
         {rapport.periodeDebut.toLocaleDateString('fr-FR')} –{' '}

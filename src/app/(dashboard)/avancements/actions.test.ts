@@ -11,7 +11,11 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
     })
 
   const tx = {
-    enseignant: { update: tracer('enseignant.update'), findUnique: vi.fn() },
+    enseignant: {
+      update: tracer('enseignant.update'),
+      updateMany: tracer('enseignant.updateMany'),
+      findUnique: vi.fn(),
+    },
     selectionAvancement: {
       deleteMany: tracer('selection.deleteMany'),
       delete: vi.fn(),
@@ -21,10 +25,15 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
       deleteMany: tracer('historique.deleteMany'),
       delete: vi.fn(),
       update: vi.fn(),
+      updateMany: tracer('historique.updateMany'),
       create: vi.fn(),
       findFirst: vi.fn(),
     },
-    sessionConseil: { delete: tracer('rapport.delete'), update: vi.fn(), findUnique: vi.fn() },
+    sessionConseil: {
+      delete: tracer('rapport.delete'),
+      update: tracer('rapport.update'),
+      findUnique: vi.fn(),
+    },
   }
   const prismaFactice = {
     sessionConseil: {
@@ -32,6 +41,7 @@ const { exigerUtilisateur, journal, prismaFactice, tx } = vi.hoisted(() => {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     selectionAvancement: { findUnique: vi.fn() },
     echelonIndiciaire: { findUnique: vi.fn(), findMany: vi.fn() },
@@ -148,12 +158,20 @@ function donnees(valeurs: Record<string, string>) {
 
 describe('rapports : cohérence de la période', () => {
   const PERIODE = { numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2025-12-31' }
+  // Le brouillon enregistré : une période identique ne déclenche aucun contrôle de chevauchement.
+  const RAPPORT_EXISTANT = {
+    statut: 'BROUILLON',
+    periodeDebut: new Date('2025-01-01'),
+    periodeFin: new Date('2025-06-30'),
+  }
   const INVERSEE = { ...PERIODE, periodeDebut: '2025-12-31', periodeFin: '2025-07-01' }
 
   beforeEach(() => {
     vi.clearAllMocks()
     exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
-    prismaFactice.sessionConseil.update.mockResolvedValue({})
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue(RAPPORT_EXISTANT)
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([])
+    prismaFactice.sessionConseil.updateMany.mockResolvedValue({ count: 1 })
   })
 
   it('creerRapport refuse une période inversée : message et erreur par champ, sans toucher à la base', async () => {
@@ -174,15 +192,15 @@ describe('rapports : cohérence de la période', () => {
 
     expect(etat.message).toBe('La fin de période ne peut pas précéder son début.')
     expect(etat.succes).toBeUndefined()
-    expect(prismaFactice.sessionConseil.update).not.toHaveBeenCalled()
+    expect(prismaFactice.sessionConseil.updateMany).not.toHaveBeenCalled()
   })
 
   it('mettreAJourRapport enregistre une période cohérente et annonce la réussite', async () => {
     const etat = await mettreAJourRapport(RAPPORT, {}, donnees({ ...PERIODE, numero: ' 55ème ' }))
 
     expect(etat.succes).toBe(true)
-    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledWith({
-      where: { id: RAPPORT },
+    expect(prismaFactice.sessionConseil.updateMany).toHaveBeenCalledWith({
+      where: { id: RAPPORT, statut: { not: 'VALIDE' } },
       data: {
         numero: '55ème',
         periodeDebut: new Date('2025-07-01'),
@@ -735,5 +753,299 @@ describe('creerRapport : brouillon sur la même période', () => {
 
     expect(etat.confirmationRequise).toBe(true)
     expect(prismaFactice.sessionConseil.create).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// A3 : la période d'un rapport se modifie en brouillon ; en rapport validé, la nouvelle date de
+// fin est reportée partout où la validation l'a recopiée, ou refusée.
+
+describe('mettreAJourRapport : brouillon', () => {
+  const DEBUT = new Date('2025-07-01')
+  const FIN = new Date('2025-12-31')
+  const BROUILLON = { statut: 'BROUILLON', periodeDebut: DEBUT, periodeFin: FIN }
+  const SAISIE = { numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2025-12-31' }
+  const AUTRE_BROUILLON = {
+    numero: '54ème',
+    periodeDebut: new Date('2025-10-01'),
+    periodeFin: new Date('2026-03-31'),
+  }
+
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue(BROUILLON)
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([])
+    prismaFactice.sessionConseil.updateMany.mockResolvedValue({ count: 1 })
+  })
+
+  it('modifie le numéro et la période d’un brouillon', async () => {
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ numero: '56ème', periodeDebut: '2025-08-01', periodeFin: '2026-01-31' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.updateMany).toHaveBeenCalledWith({
+      where: { id: RAPPORT, statut: { not: 'VALIDE' } },
+      data: {
+        numero: '56ème',
+        periodeDebut: new Date('2025-08-01'),
+        periodeFin: new Date('2026-01-31'),
+      },
+    })
+    expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('répond « introuvable » pour un rapport qui n’existe pas, sans rien écrire', async () => {
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue(null)
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees(SAISIE))
+
+    expect(etat.message).toBe('Rapport introuvable.')
+    expect(prismaFactice.sessionConseil.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('avertit quand la nouvelle période chevauche un autre brouillon, sans rien enregistrer', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([AUTRE_BROUILLON])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-02-28' })
+    )
+
+    expect(etat.confirmationRequise).toBe(true)
+    expect(etat.message).toContain('« 54ème » (du 01/10/2025 au 31/03/2026)')
+    expect(etat.message).toMatch(/Rien n’a été enregistré/)
+    expect(prismaFactice.sessionConseil.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('ne compte pas le rapport modifié lui-même parmi les chevauchements', async () => {
+    await mettreAJourRapport(RAPPORT, {}, donnees({ ...SAISIE, periodeFin: '2026-02-28' }))
+
+    expect(prismaFactice.sessionConseil.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          statut: 'BROUILLON',
+          periodeDebut: { lte: new Date('2026-02-28') },
+          periodeFin: { gte: DEBUT },
+          id: { not: RAPPORT },
+        },
+      })
+    )
+  })
+
+  it('enregistre quand l’utilisateur confirme, sans refaire la recherche', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([AUTRE_BROUILLON])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-02-28', confirmerChevauchement: 'oui' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.findMany).not.toHaveBeenCalled()
+    expect(prismaFactice.sessionConseil.updateMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('ne cherche aucun chevauchement quand seul le numéro change', async () => {
+    prismaFactice.sessionConseil.findMany.mockResolvedValue([AUTRE_BROUILLON])
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees({ ...SAISIE, numero: '55ème bis' }))
+
+    expect(etat.succes).toBe(true)
+    expect(prismaFactice.sessionConseil.findMany).not.toHaveBeenCalled()
+  })
+
+  it('refuse sans rien changer si le rapport a été validé entre-temps', async () => {
+    prismaFactice.sessionConseil.updateMany.mockResolvedValue({ count: 0 })
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees(SAISIE))
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).toMatch(/vient d’être validé/)
+  })
+
+  it('traduit une erreur de la base en message lisible', async () => {
+    prismaFactice.sessionConseil.updateMany.mockRejectedValue(new Error('connexion perdue'))
+    const erreurConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees(SAISIE))
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).not.toMatch(/connexion perdue/)
+    expect(etat.message).toBeTruthy()
+    expect(erreurConsole).toHaveBeenCalled()
+    erreurConsole.mockRestore()
+  })
+})
+
+describe('mettreAJourRapport : rapport validé', () => {
+  const DEBUT = new Date('2025-07-01')
+  const FIN = new Date('2025-12-31')
+  const VALIDE = { statut: 'VALIDE', periodeDebut: DEBUT, periodeFin: FIN }
+  const SAISIE = { numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2025-12-31' }
+
+  /** Un avancement du rapport, tel que la transaction le relit : l'enseignant est resté dessus. */
+  function avancement(
+    n: number,
+    surcharge: Record<string, unknown> = {},
+    positionActuelleId = 'pos-3'
+  ) {
+    return {
+      enseignantId: `ens-${n}`,
+      nouvellePositionId: 'pos-3',
+      statutDecision: null,
+      enseignant: { nom: `NOM${n}`, prenom: 'Jean', positionActuelleId },
+      ...surcharge,
+    }
+  }
+
+  function rapportRelu(avancements: ReturnType<typeof avancement>[]) {
+    tx.sessionConseil.findUnique.mockResolvedValue({ periodeFin: FIN, avancements })
+  }
+
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.findUnique.mockResolvedValue(VALIDE)
+    prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
+    rapportRelu([avancement(1), avancement(2)])
+  })
+
+  it('reporte la nouvelle date de fin sur l’historique et sur les fiches, dans une seule transaction', async () => {
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-01-15' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(etat.message).toMatch(/reportée sur 2 avancements/)
+    expect(etat.message).toContain('15/01/2026')
+    expect(prismaFactice.$transaction).toHaveBeenCalledTimes(1)
+    expect(tx.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: {
+        numero: '55ème',
+        periodeDebut: DEBUT,
+        periodeFin: new Date('2026-01-15'),
+      },
+    })
+    expect(tx.historiqueAvancement.updateMany).toHaveBeenCalledWith({
+      where: { sessionId: RAPPORT },
+      data: { dateNouvelEffet: new Date('2026-01-15') },
+    })
+    expect(tx.enseignant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['ens-1', 'ens-2'] } },
+      data: { dateEffetEchelon: new Date('2026-01-15') },
+    })
+    expect(journal).toEqual(['rapport.update', 'historique.updateMany', 'enseignant.updateMany'])
+  })
+
+  it('n’utilise pas la base hors transaction pour écrire', async () => {
+    await mettreAJourRapport(RAPPORT, {}, donnees({ ...SAISIE, periodeFin: '2026-01-15' }))
+
+    expect(prismaFactice.sessionConseil.updateMany).not.toHaveBeenCalled()
+    expect(prismaFactice.sessionConseil.update).not.toHaveBeenCalled()
+  })
+
+  it('refuse le changement de fin quand une décision a été générée, sans rien écrire', async () => {
+    rapportRelu([avancement(1), avancement(2, { statutDecision: 'GENEREE' })])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-01-15' })
+    )
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).toContain('NOM2 Jean (une décision a déjà été générée)')
+    expect(etat.message).not.toContain('NOM1')
+    expect(journal).toEqual([])
+  })
+
+  it('refuse le changement de fin quand un enseignant a changé de position depuis', async () => {
+    rapportRelu([avancement(1), avancement(2, {}, 'pos-4')])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-01-15' })
+    )
+
+    expect(etat.message).toContain('NOM2 Jean (a changé de position depuis la validation)')
+    expect(journal).toEqual([])
+  })
+
+  it('modifie le numéro d’un rapport validé même si des décisions ont été générées', async () => {
+    rapportRelu([avancement(1, { statutDecision: 'GENEREE' }), avancement(2, {}, 'pos-4')])
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees({ ...SAISIE, numero: '55ème bis' }))
+
+    expect(etat.succes).toBe(true)
+    expect(etat.message).toBe('Informations du rapport mises à jour.')
+    expect(tx.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: { numero: '55ème bis', periodeDebut: DEBUT, periodeFin: FIN },
+    })
+    // Aucune date d'effet ne bouge : ni l'historique ni les fiches.
+    expect(journal).toEqual(['rapport.update'])
+  })
+
+  it('modifie le début de période sans toucher aux dates d’effet', async () => {
+    rapportRelu([avancement(1, { statutDecision: 'GENEREE' })])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeDebut: '2025-06-01' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(journal).toEqual(['rapport.update'])
+  })
+
+  it('met à jour un rapport validé sans avancement sans rien propager', async () => {
+    rapportRelu([])
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-01-15' })
+    )
+
+    expect(etat.succes).toBe(true)
+    expect(journal).toEqual(['rapport.update'])
+  })
+
+  it('ne recopie pas les dates quand la transaction relit un rapport disparu', async () => {
+    tx.sessionConseil.findUnique.mockResolvedValue(null)
+
+    const etat = await mettreAJourRapport(RAPPORT, {}, donnees(SAISIE))
+
+    expect(etat.message).toBe('Rapport introuvable.')
+    expect(journal).toEqual([])
+  })
+
+  it('traduit un échec de la transaction en message lisible : rien n’a été modifié', async () => {
+    prismaFactice.$transaction.mockRejectedValue(new Error('transaction annulée'))
+    const erreurConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const etat = await mettreAJourRapport(
+      RAPPORT,
+      {},
+      donnees({ ...SAISIE, periodeFin: '2026-01-15' })
+    )
+
+    expect(etat.succes).toBeUndefined()
+    expect(etat.message).not.toMatch(/transaction annulée/)
+    expect(erreurConsole).toHaveBeenCalled()
+    erreurConsole.mockRestore()
   })
 })

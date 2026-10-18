@@ -360,6 +360,26 @@ proposent les mêmes enseignants, et valider les deux les ferait avancer deux
 fois. C'est un avertissement, pas un blocage : le bouton « Créer quand même »
 crée le rapport (`confirmerChevauchement=oui`).
 
+## Période d'un rapport d'avancement
+
+« Modifier le rapport » est proposé pour tous les rapports :
+
+- **brouillon** : numéro, début et fin de période se modifient librement. La
+  sélection déjà établie n'est pas recalculée (le formulaire le rappelle). Si la
+  nouvelle période chevauche un autre brouillon, le même avertissement qu'à la
+  création s'affiche (« Enregistrer quand même ») ;
+- **rapport validé** : le numéro et le début de période se modifient. La **fin de
+  période** est la date d'effet de chaque avancement (historique) et de l'échelon
+  de chaque enseignant (fiche) : la changer reporte la nouvelle date aux deux
+  endroits, dans la même transaction (`periodeRapport.ts`). C'est refusé, avec les
+  noms en cause, tant qu'une décision a été générée pour un avancement du rapport
+  ou qu'un enseignant a changé de position depuis (mêmes conditions que la
+  modification d'une position, `rapportValideModifiable.ts`) : la date d'un
+  document déjà produit ou d'un avancement ultérieur ne correspondrait plus.
+
+Un rapport validé ne peut pas être supprimé : sa période ne se corrige donc que par
+ce chemin, avant la génération des décisions.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

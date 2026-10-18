@@ -6,10 +6,13 @@ import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
+import { avertissementChevauchement } from '@/domain/avancement/chevauchement'
+import { erreurChangementFinDePeriode, memeJour } from '@/domain/avancement/periodeRapport'
 import { erreurPositionProposee } from '@/domain/avancement/positionProposee'
 import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
 import { separerSelections } from '@/domain/avancement/selectionsAValider'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
+import { messageErreur } from '@/lib/erreurs'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
 import {
   MetadonneesSessionSchema,
@@ -60,6 +63,20 @@ export async function mettreAJourMetadonneesSession(
   return { message: 'Métadonnées enregistrées.' }
 }
 
+/** Rapports en brouillon dont la période recoupe celle donnée (hors `sauf`, le rapport modifié). */
+async function brouillonsChevauchants(periodeDebut: Date, periodeFin: Date, sauf?: string) {
+  return prisma.sessionConseil.findMany({
+    where: {
+      statut: 'BROUILLON',
+      periodeDebut: { lte: periodeFin },
+      periodeFin: { gte: periodeDebut },
+      ...(sauf ? { id: { not: sauf } } : {}),
+    },
+    select: { numero: true, periodeDebut: true, periodeFin: true },
+    orderBy: { periodeDebut: 'asc' },
+  })
+}
+
 export async function creerRapport(
   _prevState: EtatFormulaire,
   formData: FormData
@@ -74,24 +91,10 @@ export async function creerRapport(
   // mais mieux vaut prévenir dès la création. Un avertissement, pas un blocage : l'utilisateur
   // peut confirmer (bouton « Créer quand même »).
   if (formData.get('confirmerChevauchement') !== 'oui') {
-    const autres = await prisma.sessionConseil.findMany({
-      where: {
-        statut: 'BROUILLON',
-        periodeDebut: { lte: periodeFin },
-        periodeFin: { gte: periodeDebut },
-      },
-      select: { numero: true, periodeDebut: true, periodeFin: true },
-      orderBy: { periodeDebut: 'asc' },
-    })
+    const autres = await brouillonsChevauchants(periodeDebut, periodeFin)
     if (autres.length > 0) {
-      const liste = autres
-        .map(
-          (a) =>
-            `« ${a.numero} » (du ${formaterDateCourte(a.periodeDebut)} au ${formaterDateCourte(a.periodeFin)})`
-        )
-        .join(', ')
       return {
-        message: `Un autre rapport en brouillon couvre déjà cette période : ${liste}. Valider les deux ferait avancer les mêmes enseignants deux fois. Rien n’a été créé : changez la période, ou créez ce rapport quand même.`,
+        message: avertissementChevauchement(autres, 'creation'),
         confirmationRequise: true,
       }
     }
@@ -183,6 +186,14 @@ export async function ajouterSelection(
   return {}
 }
 
+const RAPPORT_INTROUVABLE = 'Rapport introuvable.'
+const INFORMATIONS_MISES_A_JOUR = 'Informations du rapport mises à jour.'
+
+/**
+ * Brouillon : numéro et période se modifient librement (la sélection existante n'est pas
+ * recalculée). Rapport validé : le numéro se modifie ; la fin de période n'est modifiable que
+ * si sa nouvelle date peut être reportée partout où la validation l'a recopiée (A3).
+ */
 export async function mettreAJourRapport(
   rapportId: string,
   _prevState: EtatFormulaire,
@@ -191,14 +202,129 @@ export async function mettreAJourRapport(
   await exigerUtilisateur()
   const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return erreursDeSaisie(parsed.error)
+  const { numero, periodeDebut, periodeFin } = parsed.data
 
-  await prisma.sessionConseil.update({
+  const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
-    data: parsed.data,
+    select: { statut: true, periodeDebut: true, periodeFin: true },
   })
+  if (!rapport) return { message: RAPPORT_INTROUVABLE }
 
+  if (rapport.statut === 'VALIDE') {
+    return modifierRapportValide(rapportId, { numero, periodeDebut, periodeFin })
+  }
+
+  // Changer la période d'un brouillon peut le faire chevaucher un autre brouillon : même
+  // avertissement qu'à la création, seulement si la période change (renommer ne suffit pas).
+  const periodeChangee =
+    !memeJour(rapport.periodeDebut, periodeDebut) || !memeJour(rapport.periodeFin, periodeFin)
+  if (periodeChangee && formData.get('confirmerChevauchement') !== 'oui') {
+    const autres = await brouillonsChevauchants(periodeDebut, periodeFin, rapportId)
+    if (autres.length > 0) {
+      return {
+        message: avertissementChevauchement(autres, 'modification'),
+        confirmationRequise: true,
+      }
+    }
+  }
+
+  try {
+    // Le statut est vérifié dans l'écriture : un rapport validé entre-temps (autre onglet)
+    // ne doit pas voir sa période changer sans la propagation de modifierRapportValide.
+    const { count } = await prisma.sessionConseil.updateMany({
+      where: { id: rapportId, statut: { not: 'VALIDE' } },
+      data: { numero, periodeDebut, periodeFin },
+    })
+    if (count === 0) {
+      return {
+        message:
+          'Ce rapport vient d’être validé : rien n’a été modifié. Rechargez la page pour voir son état actuel.',
+      }
+    }
+  } catch (erreur) {
+    return {
+      message: messageErreur(erreur, 'mettreAJourRapport', { introuvable: RAPPORT_INTROUVABLE }),
+    }
+  }
+
+  revalidatePath('/avancements')
   revalidatePath(`/avancements/${rapportId}`)
-  return { message: 'Informations du rapport mises à jour.', succes: true }
+  return { message: INFORMATIONS_MISES_A_JOUR, succes: true }
+}
+
+async function modifierRapportValide(
+  rapportId: string,
+  saisie: { numero: string; periodeDebut: Date; periodeFin: Date }
+): Promise<EtatFormulaire> {
+  let etat: EtatFormulaire
+  try {
+    // Tout se lit et s'écrit dans la même transaction : la vérification (décisions, positions)
+    // porte sur l'état exact que la propagation va modifier.
+    etat = await prisma.$transaction(async (tx) => {
+      const rapport = await tx.sessionConseil.findUnique({
+        where: { id: rapportId },
+        select: {
+          periodeFin: true,
+          avancements: {
+            select: {
+              enseignantId: true,
+              nouvellePositionId: true,
+              statutDecision: true,
+              enseignant: { select: { nom: true, prenom: true, positionActuelleId: true } },
+            },
+          },
+        },
+      })
+      if (!rapport) return { message: RAPPORT_INTROUVABLE }
+
+      const propager = !memeJour(rapport.periodeFin, saisie.periodeFin)
+      if (propager) {
+        const refus = erreurChangementFinDePeriode(
+          rapport.avancements.map((a) => ({
+            nom: a.enseignant.nom,
+            prenom: a.enseignant.prenom,
+            statutDecision: a.statutDecision,
+            positionActuelleId: a.enseignant.positionActuelleId,
+            nouvellePositionId: a.nouvellePositionId,
+          }))
+        )
+        if (refus) return { message: refus }
+      }
+
+      await tx.sessionConseil.update({ where: { id: rapportId }, data: saisie })
+
+      if (!propager || rapport.avancements.length === 0) {
+        return { message: INFORMATIONS_MISES_A_JOUR, succes: true }
+      }
+
+      // La date de fin est la date d'effet de chaque avancement et de l'échelon de chaque
+      // enseignant concerné (voir validerRapport) : les deux suivent, ou aucun.
+      await tx.historiqueAvancement.updateMany({
+        where: { sessionId: rapportId },
+        data: { dateNouvelEffet: saisie.periodeFin },
+      })
+      await tx.enseignant.updateMany({
+        where: { id: { in: rapport.avancements.map((a) => a.enseignantId) } },
+        data: { dateEffetEchelon: saisie.periodeFin },
+      })
+      const n = rapport.avancements.length
+      return {
+        message: `${INFORMATIONS_MISES_A_JOUR} La nouvelle date d’effet (${formaterDateCourte(saisie.periodeFin)}) a été reportée sur ${n} avancement${n > 1 ? 's' : ''}.`,
+        succes: true,
+      }
+    })
+  } catch (erreur) {
+    // La transaction est annulée en bloc : ni le rapport ni les dates n'ont changé.
+    return {
+      message: messageErreur(erreur, 'mettreAJourRapport', { introuvable: RAPPORT_INTROUVABLE }),
+    }
+  }
+
+  if (etat.succes) {
+    revalidatePath('/avancements')
+    revalidatePath(`/avancements/${rapportId}`)
+  }
+  return etat
 }
 
 export async function modifierSelection(

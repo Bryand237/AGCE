@@ -21,9 +21,11 @@ import type { FormEvent } from 'react'
  * (`method="post"` : si le formulaire est envoyé avant la fin du chargement de la page, les
  * champs ne se retrouvent pas dans l'adresse.)
  *
- * À réserver aux formulaires qui quittent la page quand ils réussissent (redirect). Un
- * formulaire qui reste affiché après un succès, comme l'ajout d'un département, a au
- * contraire besoin de la réinitialisation pour se vider : il garde <form action={...}>.
+ * À réserver aux formulaires qui quittent la page quand ils réussissent (redirect), ou qui
+ * restent affichés avec leur saisie après un succès (formulaire de modification : la saisie
+ * est alors la valeur enregistrée). Un formulaire qui doit se vider après un succès, comme
+ * l'ajout d'un département, a au contraire besoin de la réinitialisation : il garde
+ * <form action={...}>.
  */
 export function useActionConservee<Etat>(
   action: (etat: Awaited<Etat>, donnees: FormData) => Etat | Promise<Etat>,
