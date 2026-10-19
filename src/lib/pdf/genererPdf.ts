@@ -3,7 +3,11 @@ import { chromium } from 'playwright'
 
 type OptionsPdf = {
   paysage?: boolean
+  /** Modèle HTML de l'en-tête de chaque page (hors du corps du document). Vide par défaut. */
+  enTete?: string
   piedDePage?: string
+  /** Marges de la page, en notation CSS (« 14mm »). */
+  marges?: { haut: string; bas: string; gauche: string; droite: string }
 }
 
 const EXECUTABLE_CANDIDATS = [
@@ -55,13 +59,21 @@ export async function genererPdf(html: string, options: OptionsPdf = {}): Promis
       landscape: options.paysage ?? false,
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: '<span></span>', // vide : l'en-tête vit dans le HTML lui-même, pas ici
+      // Vide par défaut : l'en-tête vit alors dans le HTML lui-même.
+      headerTemplate: options.enTete ?? '<span></span>',
       footerTemplate:
         options.piedDePage ??
         `<div style="font-size:8px; width:100%; text-align:center; color:#000;">
            Page <span class="pageNumber"></span> / <span class="totalPages"></span>
          </div>`,
-      margin: { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' },
+      margin: options.marges
+        ? {
+            top: options.marges.haut,
+            bottom: options.marges.bas,
+            left: options.marges.gauche,
+            right: options.marges.droite,
+          }
+        : { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' },
     })
     return pdf
   } finally {

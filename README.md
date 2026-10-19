@@ -396,6 +396,29 @@ mentions « Vu… » et « session du… » des décisions individuelles.
   qu'on ne le régénère pas (bouton « Régénérer le brouillon »). Une décision **signée** n'est
   jamais modifiée, ni régénérée.
 
+## PDF du rapport d'avancement
+
+Le rapport imprimé (`/avancements/[id]/rapport-pdf`) reproduit le rapport papier du
+conseil : page de garde bilingue (logo, « 54ème CONSEIL DE L'UNIVERSITÉ… », période),
+puis **un tableau par établissement** (titre de l'établissement en première ligne,
+grades en sous-titres, numérotation continue, matricule « 0652 125K », dates
+« jj/mm/aaaa », positions « 2C/3E/870 »). La référence « UN/R/SG/DAAC/DEPE/SSPE » est
+en haut à droite et « page/total » en bas à droite de chaque page. Les colonnes
+« Observations » et « Avis CU/CA » se remplissent à la main (ou par la validation).
+
+- La mise en page est une fonction pure (`src/lib/pdf/rapportAvancementHtml.ts`) et le
+  choix des positions et des dates aussi (`lignesRapport.ts`) : on les teste sans Chromium.
+- Pour un rapport **validé**, la fiche de l'enseignant porte déjà la nouvelle position :
+  « dernier » et « nouvel » avancement se lisent dans l'historique, qui a gardé la
+  position et la date d'avant. Un brouillon se lit dans la fiche et la position proposée.
+- Police : Cambria, Times New Roman ou Liberation Serif. L'image Docker installe
+  Chromium avec ses dépendances, qui comprennent Liberation ; sur une machine sans
+  aucune de ces polices, Chromium prend sa police serif par défaut.
+- Le logo est lu dans `reference-docs/logo.jpeg` (non versionné) ; s'il manque, la page
+  de garde est produite sans logo.
+- Les en-têtes de colonnes ne sont pas répétés sur les pages de suite, comme sur le
+  rapport papier.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et
