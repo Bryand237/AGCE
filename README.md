@@ -419,6 +419,27 @@ en haut à droite et « page/total » en bas à droite de chaque page. Les colon
 - Les en-têtes de colonnes ne sont pas répétés sur les pages de suite, comme sur le
   rapport papier.
 
+## Documents Word (décisions et attestations)
+
+`src/lib/documents/` remplit les gabarits de `templates/` (docxtemplater). Pour que les
+documents ressemblent aux décisions originales :
+
+- **dates** : en toutes lettres, lues en UTC (`formaterDateLongue`) : « 14 avril 2026 »,
+  « **1er** juillet 2023 ». Sans fuseau explicite, un serveur réglé à l'ouest de l'UTC
+  affichait la veille ;
+- **noms** : en capitales (`nomCompletPourActe`), comme « AKOA OWONA PLACIDE » ;
+- **apostrophes** : l'apostrophe typographique (’) des gabarits, y compris dans les valeurs
+  saisies (`typographierValeurs`) ;
+- **positions** : « 2ème Classe 2ème Echelon » (`formaterPositionDecision`), sans la virgule
+  ni l'accent de l'écran ;
+- **département** : le nom enregistré est complet (« Département d'Histoire »), les gabarits
+  n'ajoutent plus « Département » devant ;
+- **police** : le paragraphe d'intitulé « Accordant un congé… » est en Times New Roman, comme
+  dans l'original ; le reste du document est en Arial Narrow.
+
+Pour modifier un gabarit, éditer le fichier `.docx` dans Word et le déposer dans `templates/`.
+Les balises `{nomComplet}`, `{dateDebut}`… doivent rester d'un seul tenant.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

@@ -4,17 +4,14 @@ import fs from 'fs'
 import path from 'path'
 import { titreResponsable } from '@/domain/etablissements/titreResponsable'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
+import { formaterDateLongue } from '@/domain/dates/formaterDateLongue'
+import { nomCompletPourActe } from '@/domain/documents/nomCompletPourActe'
+import { typographierValeurs } from '@/domain/documents/typographie'
 import type { Absence, Enseignant, Departement, Etablissement } from '@/generated/prisma/client'
 import {
   formaterDureeSemaines,
   calculerDureeSemaines,
 } from '@/domain/absences/formaterDureeSemaines'
-
-function formaterDateFr(date: Date | null | undefined): string {
-  return date
-    ? date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : ''
-}
 
 type Params = {
   absence: Pick<
@@ -44,22 +41,24 @@ export function genererAttestationAbsence(
   )
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
 
-  doc.render({
-    civilite: enseignant.sexe === 'F' ? 'Madame' : 'Monsieur',
-    nomComplet: `${enseignant.nom} ${enseignant.prenom}`,
-    matricule: enseignant.matricule,
-    gradeActuel: LIBELLES_GRADE[enseignant.grade] ?? enseignant.grade,
-    nomDepartement: departement.nom,
-    nomEtablissement: etablissement.nom,
-    titreResponsable: titreResponsable(etablissement.type),
-    dateDebut: formaterDateFr(absence.dateDebut),
-    dateFin: formaterDateFr(absence.dateFin),
-    dureeEnLettres: formaterDureeSemaines(
-      calculerDureeSemaines(absence.dateDebut, absence.dateFin)
-    ),
-    referenceCorrespondance: absence.referenceCorrespondance ?? '',
-    dateDemandeInteressee: formaterDateFr(absence.dateDemandeInteressee),
-  })
+  doc.render(
+    typographierValeurs({
+      civilite: enseignant.sexe === 'F' ? 'Madame' : 'Monsieur',
+      nomComplet: nomCompletPourActe(enseignant.nom, enseignant.prenom),
+      matricule: enseignant.matricule,
+      gradeActuel: LIBELLES_GRADE[enseignant.grade] ?? enseignant.grade,
+      nomDepartement: departement.nom,
+      nomEtablissement: etablissement.nom,
+      titreResponsable: titreResponsable(etablissement.type),
+      dateDebut: formaterDateLongue(absence.dateDebut),
+      dateFin: formaterDateLongue(absence.dateFin),
+      dureeEnLettres: formaterDureeSemaines(
+        calculerDureeSemaines(absence.dateDebut, absence.dateFin)
+      ),
+      referenceCorrespondance: absence.referenceCorrespondance ?? '',
+      dateDemandeInteressee: formaterDateLongue(absence.dateDemandeInteressee),
+    })
+  )
 
   return doc.toBuffer()
 }
