@@ -1,3 +1,4 @@
+import { ajouterAnnees } from '../dates/jourCivil'
 import { calculerProchainEchelon } from './calculerProchainEchelon'
 import type { PalierIndiciaire } from './calculerProchainEchelon'
 
@@ -5,12 +6,15 @@ import type { PalierIndiciaire } from './calculerProchainEchelon'
 // réglementaires exacts. Si la vraie règle distingue ancienneté / choix /
 // grand choix (l'enum TypeAvancement existe déjà dans le schéma pour ça),
 // seul le calcul interne devra changer — pas la forme de la fonction.
-const DUREE_AVANCEMENT_ANNEES = 2
+export const DUREE_AVANCEMENT_ANNEES = 2
+
+/** Date à laquelle un enseignant devient éligible à l'échelon suivant (calcul en UTC). */
+export function dateEligibiliteAvancement(dateEffetEchelon: Date): Date {
+  return ajouterAnnees(dateEffetEchelon, DUREE_AVANCEMENT_ANNEES)
+}
 
 export function estEligibleAvancement(dateEffetEchelon: Date, finPeriode: Date): boolean {
-  const dateEligibilite = new Date(dateEffetEchelon)
-  dateEligibilite.setFullYear(dateEligibilite.getFullYear() + DUREE_AVANCEMENT_ANNEES)
-  return dateEligibilite <= finPeriode
+  return dateEligibiliteAvancement(dateEffetEchelon) <= finPeriode
 }
 
 export type CandidatAvancement = {
