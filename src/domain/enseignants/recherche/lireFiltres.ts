@@ -1,7 +1,7 @@
 import { analyserDateIso } from '../../dates/jourCivil'
 import { GRADES, SEXES, STATUTS_ENSEIGNANT } from '../dossier'
-import { CLES_TRI, ORDRES, filtresVides } from './filtres'
-import type { CritereDate, FiltresEnseignants } from './filtres'
+import { CLES_TRI, ECHEANCES, ORDRES, filtresVides } from './filtres'
+import type { CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
 
 /** Forme des paramètres d'adresse que Next.js transmet à une page (searchParams). */
 export type ParametresUrl = Record<string, string | string[] | undefined>
@@ -89,6 +89,14 @@ function critereDate(parametres: ParametresUrl, prefixe: string): CritereDate {
   return critere
 }
 
+/** Lit « <prefixe>Echeance » (passee ou future), puis le critère de date habituel. */
+function critereEcheance(parametres: ParametresUrl, prefixe: string): CritereEcheance {
+  const critere: CritereEcheance = critereDate(parametres, prefixe)
+  const echeance = enumeration(parametres[`${prefixe}Echeance`], ECHEANCES)
+  if (echeance) critere.echeance = echeance
+  return critere
+}
+
 /**
  * Lit les filtres d'une adresse. Ne lève jamais d'erreur : une valeur absente, mal formée,
  * hors limites ou inconnue est simplement ignorée (une adresse enregistrée ou tapée à la main
@@ -132,6 +140,8 @@ export function lireFiltres(parametres: ParametresUrl): FiltresEnseignants {
 
   filtres.naissance = critereDate(parametres, 'naissance')
   filtres.priseService = critereDate(parametres, 'priseService')
+  filtres.retraite = critereEcheance(parametres, 'retraite')
+  filtres.avancement = critereEcheance(parametres, 'avancement')
 
   // « trier » : nom de paramètre déjà employé par l'ancienne liste (adresses enregistrées).
   filtres.tri = enumeration(parametres.trier, CLES_TRI) ?? filtres.tri

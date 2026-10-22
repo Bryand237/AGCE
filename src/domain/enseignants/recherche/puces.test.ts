@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { filtresVides } from './filtres'
 import { lireFiltres } from './lireFiltres'
-import { adresseSansPuce, decrirePuces, libelleCritereDate } from './puces'
+import { adresseSansPuce, decrirePuces, libelleCritereDate, libelleCritereEcheance } from './puces'
 import type { ReferentielsFiltres } from './puces'
 import { jour } from './dossiersDeTest'
 
@@ -118,5 +118,31 @@ describe('adresseSansPuce', () => {
   it('renvoie l’adresse nue quand la dernière puce est retirée', () => {
     const filtres = lireFiltres({ sexe: 'F' })
     expect(adresseSansPuce(filtres, decrirePuces(filtres, REF)[0]!)).toBe('/enseignants')
+  })
+})
+
+describe('puces — retraite et avancement', () => {
+  it('décrit l’échéance, avec l’année ou la plage quand il y en a', () => {
+    expect(libelleCritereEcheance({})).toBe('')
+    expect(libelleCritereEcheance({ echeance: 'passee' })).toBe('déjà passée')
+    expect(libelleCritereEcheance({ echeance: 'future', annee: 2028 })).toBe('à venir · 2028')
+    expect(libelleCritereEcheance({ annee: 2028 })).toBe('2028')
+  })
+
+  it('une puce par critère, qui retire tous ses paramètres et eux seuls', () => {
+    const filtres = lireFiltres({
+      retraiteEcheance: 'passee',
+      retraiteAnnee: '2025',
+      avancementEcheance: 'future',
+      sexe: 'F',
+    })
+    const puces = decrirePuces(filtres, REF)
+    expect(puces.map((p) => p.libelle)).toEqual([
+      'Genre : Féminin',
+      'Date de retraite : déjà passée · 2025',
+      'Date d’avancement : à venir',
+    ])
+    const retraite = puces.find((p) => p.libelle.startsWith('Date de retraite'))!
+    expect(adresseSansPuce(filtres, retraite)).toBe('/enseignants?sexe=F&avancementEcheance=future')
   })
 })

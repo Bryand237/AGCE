@@ -105,3 +105,41 @@ describe('trierLignes', () => {
     expect(noms(l)).toEqual(avant)
   })
 })
+
+describe('trierLignes — avancement', () => {
+  const l = () =>
+    lignes([
+      dossierDeTest({ nom: 'TARD', dateEffetEchelon: jour('2025-12-01') }),
+      dossierDeTest({ nom: 'TOT', dateEffetEchelon: jour('2023-01-15') }),
+      dossierDeTest({ nom: 'RETRAITE', statut: 'RETRAITE', dateFinService: jour('2025-01-01') }),
+      dossierDeTest({
+        nom: 'FINDEGRADE',
+        position: {
+          grade: 'PROFESSEUR',
+          ordre: 3,
+          classe: 2,
+          echelon: 3,
+          indice: 1050,
+          sousCategorie: null,
+        },
+      }),
+    ])
+
+  it('du plus proche au plus lointain, sans date à la fin', () => {
+    expect(noms(trierLignes(l(), 'avancement', 'asc'))).toEqual([
+      'TOT',
+      'TARD',
+      'FINDEGRADE',
+      'RETRAITE',
+    ])
+  })
+
+  it('sens inverse : sans date toujours à la fin', () => {
+    expect(noms(trierLignes(l(), 'avancement', 'desc'))).toEqual([
+      'TARD',
+      'TOT',
+      'FINDEGRADE',
+      'RETRAITE',
+    ])
+  })
+})

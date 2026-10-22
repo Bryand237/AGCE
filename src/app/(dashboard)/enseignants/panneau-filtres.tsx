@@ -12,7 +12,9 @@ import {
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { adresseListe } from '@/domain/enseignants/recherche/versParametres'
 import { lireFiltres, parametresDepuisUrl } from '@/domain/enseignants/recherche/lireFiltres'
+import { ECHEANCES } from '@/domain/enseignants/recherche/filtres'
 import type { CleTri } from '@/domain/enseignants/recherche/filtres'
+import { LIBELLES_ECHEANCE } from '@/domain/enseignants/recherche/puces'
 import type { ReferentielsFiltres } from '@/domain/enseignants/recherche/puces'
 import {
   classeBoutonPrimaire,
@@ -27,6 +29,7 @@ const OPTIONS_TRI: [CleTri, string][] = [
   ['statut', 'Trier par statut'],
   ['etablissement', 'Trier par établissement'],
   ['retraite', 'Trier par date de retraite'],
+  ['avancement', "Trier par date d'avancement"],
   ['priseService', 'Trier par date de prise de service'],
   ['naissance', 'Trier par date de naissance'],
 ]
@@ -161,6 +164,39 @@ function ChampsDate({
           />
         </Champ>
       </div>
+    </div>
+  )
+}
+
+/** Une date calculée : « déjà passée » ou « à venir », seule ou avec une année / une plage. */
+function ChampsEcheance({
+  prefixe,
+  titre,
+  valeurs,
+}: {
+  prefixe: string
+  titre: string
+  valeurs: Valeurs
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Champ id={`${prefixe}Echeance`} libelle={titre}>
+        <select
+          id={`${prefixe}Echeance`}
+          name={`${prefixe}Echeance`}
+          defaultValue={premiere(valeurs, `${prefixe}Echeance`)}
+          className={classeChamp}
+        >
+          <option value="">Indifférente</option>
+          {ECHEANCES.map((echeance) => (
+            <option key={echeance} value={echeance}>
+              {LIBELLES_ECHEANCE[echeance][0]?.toUpperCase()}
+              {LIBELLES_ECHEANCE[echeance].slice(1)}
+            </option>
+          ))}
+        </select>
+      </Champ>
+      <ChampsDate prefixe={prefixe} titre="Ou une année, une période" valeurs={valeurs} />
     </div>
   )
 }
@@ -451,6 +487,24 @@ export function PanneauFiltres({
             <ChampsDate prefixe="naissance" titre="Date de naissance" valeurs={valeurs} />
             <ChampsDate prefixe="priseService" titre="Date de prise de service" valeurs={valeurs} />
           </Groupe>
+
+          <div className="lg:col-span-2">
+            <Groupe titre="Retraite et avancement">
+              <p className="text-muted-foreground text-xs">
+                « Déjà passée » : la date est atteinte (aujourd&apos;hui compris), l&apos;enseignant
+                actif n&apos;a pas encore été régularisé. L&apos;année et la période comptent les
+                retraités comme les futurs retraités.
+              </p>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <ChampsEcheance prefixe="retraite" titre="Date de retraite" valeurs={valeurs} />
+                <ChampsEcheance
+                  prefixe="avancement"
+                  titre="Date d'avancement d'échelon"
+                  valeurs={valeurs}
+                />
+              </div>
+            </Groupe>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">

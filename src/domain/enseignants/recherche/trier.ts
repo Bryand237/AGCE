@@ -32,6 +32,12 @@ function comparerCle(tri: CleTri, a: LigneRecherche, b: LigneRecherche, sens: nu
       )
     case 'retraite':
       return comparerDates(a.situation.dateRetraite, b.situation.dateRetraite, sens)
+    case 'avancement':
+      return comparerDates(
+        a.situation.dateProchainAvancement,
+        b.situation.dateProchainAvancement,
+        sens
+      )
     case 'priseService':
       return comparerDates(a.dossier.datePriseService, b.dossier.datePriseService, sens)
     case 'naissance':

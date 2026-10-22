@@ -18,12 +18,27 @@ export function critereDateVide(critere: CritereDate): boolean {
   return critere.annee === undefined && critere.du === undefined && critere.au === undefined
 }
 
+/**
+ * Critère sur une date calculée (retraite, prochain avancement) : le critère de date habituel
+ * (année, plage), plus une échéance relative à AUJOURD'HUI — « déjà passée » ou « à venir ».
+ * Une date qui n'existe pas (transféré, dernier palier de la grille…) ne correspond à aucun
+ * critère renseigné.
+ */
+export const ECHEANCES = ['passee', 'future'] as const
+export type Echeance = (typeof ECHEANCES)[number]
+export type CritereEcheance = CritereDate & { echeance?: Echeance }
+
+export function critereEcheanceVide(critere: CritereEcheance): boolean {
+  return critereDateVide(critere) && critere.echeance === undefined
+}
+
 export const CLES_TRI = [
   'nom',
   'grade',
   'statut',
   'etablissement',
   'retraite',
+  'avancement',
   'priseService',
   'naissance',
 ] as const
@@ -51,6 +66,10 @@ export type FiltresEnseignants = {
   indiceMax?: number
   naissance: CritereDate
   priseService: CritereDate
+  /** Date de départ à la retraite (réelle pour un retraité, théorique pour un actif). */
+  retraite: CritereEcheance
+  /** Date à laquelle l'enseignant actif devient éligible à l'échelon suivant. */
+  avancement: CritereEcheance
   tri: CleTri
   ordre: Ordre
   page: number
@@ -66,6 +85,8 @@ export function filtresVides(): FiltresEnseignants {
     grades: [],
     naissance: {},
     priseService: {},
+    retraite: {},
+    avancement: {},
     tri: TRI_PAR_DEFAUT,
     ordre: ORDRE_PAR_DEFAUT,
     page: 1,

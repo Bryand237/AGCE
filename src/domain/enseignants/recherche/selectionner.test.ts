@@ -4,6 +4,8 @@ import { lireFiltres } from './lireFiltres'
 import { avecSituation, selectionnerDossiers } from './selectionner'
 import { GRILLE_DE_TEST, dossierDeTest, jour } from './dossiersDeTest'
 
+const AUJOURDHUI = jour('2026-10-20')
+
 describe('avecSituation', () => {
   it('calcule la situation de chaque dossier à partir de la grille', () => {
     const [ligne] = avecSituation(
@@ -23,7 +25,7 @@ describe('selectionnerDossiers', () => {
     dossierDeTest({ nom: 'DJOUKAM', grade: 'CHARGE_DE_COURS', sexe: 'M', statut: 'TRANSFERE' }),
   ]
   const noms = (filtres = filtresVides()) =>
-    selectionnerDossiers(dossiers, filtres, GRILLE_DE_TEST).map((l) => l.dossier.nom)
+    selectionnerDossiers(dossiers, filtres, GRILLE_DE_TEST, AUJOURDHUI).map((l) => l.dossier.nom)
 
   it('sans filtre : tous, triés par nom', () => {
     expect(noms()).toEqual(['ABEGA', 'BIYA', 'CHIROMA', 'DJOUKAM'])
@@ -47,7 +49,24 @@ describe('selectionnerDossiers', () => {
 
   it('ne modifie pas la liste de dossiers reçue', () => {
     const avant = dossiers.map((d) => d.nom)
-    selectionnerDossiers(dossiers, lireFiltres({ trier: 'grade', ordre: 'desc' }), GRILLE_DE_TEST)
+    selectionnerDossiers(
+      dossiers,
+      lireFiltres({ trier: 'grade', ordre: 'desc' }),
+      GRILLE_DE_TEST,
+      AUJOURDHUI
+    )
     expect(dossiers.map((d) => d.nom)).toEqual(avant)
+  })
+
+  it('« passée » et « à venir » suivent le jour donné, pas l’horloge', () => {
+    const unActif = [dossierDeTest({ nom: 'A', dateNaissance: jour('1962-05-10') })]
+    const filtres = lireFiltres({ retraiteEcheance: 'passee' })
+    // retraite le 10/05/2027
+    expect(selectionnerDossiers(unActif, filtres, GRILLE_DE_TEST, jour('2027-05-09'))).toHaveLength(
+      0
+    )
+    expect(selectionnerDossiers(unActif, filtres, GRILLE_DE_TEST, jour('2027-05-10'))).toHaveLength(
+      1
+    )
   })
 })

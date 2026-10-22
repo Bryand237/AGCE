@@ -60,3 +60,26 @@ describe('valeursDeFormulaire', () => {
     expect(valeursDeFormulaire(filtresVides())).toEqual({})
   })
 })
+
+describe('versParametres — retraite et avancement', () => {
+  it('écrit l’échéance puis l’année et les bornes, après la prise de service', () => {
+    const filtres = lireFiltres({
+      avancementAu: '2027-06-30',
+      retraiteAnnee: '2030',
+      retraiteEcheance: 'future',
+      priseServiceAnnee: '2000',
+      trier: 'retraite',
+    })
+    expect(versParametres(filtres).toString()).toBe(
+      'priseServiceAnnee=2000&retraiteEcheance=future&retraiteAnnee=2030&avancementAu=2027-06-30&trier=retraite'
+    )
+  })
+
+  it('met les critères dans le formulaire, nom par nom', () => {
+    const filtres = lireFiltres({ retraiteEcheance: 'passee', avancementAnnee: '2027' })
+    expect(valeursDeFormulaire(filtres)).toEqual({
+      retraiteEcheance: ['passee'],
+      avancementAnnee: ['2027'],
+    })
+  })
+})

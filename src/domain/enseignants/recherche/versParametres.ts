@@ -1,11 +1,20 @@
 import { formaterDateIso } from '../../dates/jourCivil'
 import { ORDRE_PAR_DEFAUT, TRI_PAR_DEFAUT } from './filtres'
-import type { CritereDate, FiltresEnseignants } from './filtres'
+import type { CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
 
 function ajouterCritereDate(sortie: URLSearchParams, prefixe: string, critere: CritereDate): void {
   if (critere.annee !== undefined) sortie.set(`${prefixe}Annee`, String(critere.annee))
   if (critere.du) sortie.set(`${prefixe}Du`, formaterDateIso(critere.du))
   if (critere.au) sortie.set(`${prefixe}Au`, formaterDateIso(critere.au))
+}
+
+function ajouterCritereEcheance(
+  sortie: URLSearchParams,
+  prefixe: string,
+  critere: CritereEcheance
+): void {
+  if (critere.echeance) sortie.set(`${prefixe}Echeance`, critere.echeance)
+  ajouterCritereDate(sortie, prefixe, critere)
 }
 
 const ouiNon = (valeur: boolean) => (valeur ? 'oui' : 'non')
@@ -40,6 +49,8 @@ export function versParametres(filtres: FiltresEnseignants): URLSearchParams {
   if (filtres.indiceMax !== undefined) sortie.set('indiceMax', String(filtres.indiceMax))
   ajouterCritereDate(sortie, 'naissance', filtres.naissance)
   ajouterCritereDate(sortie, 'priseService', filtres.priseService)
+  ajouterCritereEcheance(sortie, 'retraite', filtres.retraite)
+  ajouterCritereEcheance(sortie, 'avancement', filtres.avancement)
 
   if (filtres.tri !== TRI_PAR_DEFAUT) sortie.set('trier', filtres.tri)
   if (filtres.ordre !== ORDRE_PAR_DEFAUT) sortie.set('ordre', filtres.ordre)

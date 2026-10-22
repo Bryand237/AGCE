@@ -192,3 +192,43 @@ describe('lireFiltres ∘ versParametres', () => {
     expect(lireFiltres(parametresDepuisUrl(versParametres(filtres)))).toEqual(filtres)
   })
 })
+
+describe('lireFiltres — retraite et avancement', () => {
+  it('lit l’échéance, l’année et la plage de chaque critère', () => {
+    const filtres = lireFiltres({
+      retraiteEcheance: 'future',
+      retraiteAnnee: '2028',
+      retraiteDu: '2028-03-01',
+      avancementEcheance: 'passee',
+      avancementAu: '2026-12-31',
+    })
+    expect(filtres.retraite).toEqual({ echeance: 'future', annee: 2028, du: jour('2028-03-01') })
+    expect(filtres.avancement).toEqual({ echeance: 'passee', au: jour('2026-12-31') })
+  })
+
+  it('ignore une échéance inconnue ou une date invalide, sans lever d’erreur', () => {
+    const filtres = lireFiltres({
+      retraiteEcheance: 'demain',
+      retraiteAnnee: 'abc',
+      avancementDu: '2026-02-30',
+    })
+    expect(filtres.retraite).toEqual({})
+    expect(filtres.avancement).toEqual({})
+  })
+
+  it('accepte « avancement » comme clé de tri', () => {
+    expect(lireFiltres({ trier: 'avancement' }).tri).toBe('avancement')
+  })
+
+  it('relit exactement ce que versParametres écrit', () => {
+    const filtres = lireFiltres({
+      retraiteEcheance: 'passee',
+      retraiteAnnee: '2025',
+      avancementEcheance: 'future',
+      avancementDu: '2027-01-01',
+      avancementAu: '2027-12-31',
+      trier: 'avancement',
+    })
+    expect(lireFiltres(parametresDepuisUrl(versParametres(filtres)))).toEqual(filtres)
+  })
+})

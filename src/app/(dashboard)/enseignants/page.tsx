@@ -44,6 +44,7 @@ import {
 } from '@/lib/enseignants/chargerDossiers'
 import { TAILLE_PAGE } from '@/lib/constantes'
 import { PanneauFiltres } from './panneau-filtres'
+import { RaccourcisListe } from './raccourcis-liste'
 
 export default async function PageEnseignants({
   searchParams,
@@ -51,6 +52,8 @@ export default async function PageEnseignants({
   searchParams: Promise<ParametresUrl>
 }) {
   const filtres = lireFiltres(await searchParams)
+  // « Aujourd'hui » est lu une fois, ici : la sélection et l'affichage s'accordent sur le même jour.
+  const jourCourant = aujourdhui()
 
   const [
     dossiers,
@@ -75,14 +78,13 @@ export default async function PageEnseignants({
   // Tout est filtré, trié puis découpé en mémoire (voir chargerDossiers) : une page demandée
   // hors limites est ramenée à la dernière au lieu d'afficher un tableau vide.
   const resultat = paginer(
-    selectionnerDossiers(dossiers, filtres, grille),
+    selectionnerDossiers(dossiers, filtres, grille, jourCourant),
     filtres.page,
     TAILLE_PAGE
   )
   const filtresAffiches: FiltresEnseignants = { ...filtres, page: resultat.page }
   const puces = decrirePuces(filtres, referentiels)
   const nombreFiltresAvances = puces.filter((p) => !p.parametres.includes('recherche')).length
-  const jourCourant = aujourdhui()
 
   return (
     <div className="space-y-8">
@@ -199,6 +201,8 @@ export default async function PageEnseignants({
         </ChartCard>
       </div>
 
+      <RaccourcisListe filtres={filtres} jourCourant={jourCourant} />
+
       <PanneauFiltres
         cle={adresseListe({ ...filtres, page: 1 })}
         valeurs={valeursDeFormulaire(filtres)}
@@ -237,7 +241,7 @@ export default async function PageEnseignants({
         </p>
       )}
 
-      <div className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
+      <div className="border-border bg-card overflow-x-auto rounded-2xl border shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-border bg-muted/30 text-muted-foreground border-b text-left">
@@ -247,13 +251,14 @@ export default async function PageEnseignants({
               <EnTeteTri cle="etablissement" libelle="Établissement" filtres={filtresAffiches} />
               <EnTeteTri cle="statut" libelle="Statut" filtres={filtresAffiches} />
               <EnTeteTri cle="retraite" libelle="Retraite" filtres={filtresAffiches} />
+              <EnTeteTri cle="avancement" libelle="Avancement" filtres={filtresAffiches} />
               <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {resultat.elements.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10">
+                <td colSpan={8} className="px-4 py-10">
                   <EtatPage
                     icon={Users}
                     titre="Aucun enseignant trouvé"
@@ -341,6 +346,9 @@ function LigneEnseignant({ ligne, jourCourant }: { ligne: LigneRecherche; jourCo
   // la date est mise en évidence pour qu'on pense à régulariser son dossier.
   const retraiteDepassee =
     e.statut === 'ACTIF' && situation.dateRetraite !== null && situation.dateRetraite <= jourCourant
+  // Même mise en évidence pour un avancement d'échelon dont la date est atteinte.
+  const avancementEchu =
+    situation.dateProchainAvancement !== null && situation.dateProchainAvancement <= jourCourant
   return (
     <tr className="border-border hover:bg-muted/20 border-b last:border-0">
       <td className="text-foreground px-4 py-3 font-medium">
@@ -377,6 +385,20 @@ function LigneEnseignant({ ligne, jourCourant }: { ligne: LigneRecherche; jourCo
         }
       >
         {situation.dateRetraite ? formaterDateCourte(situation.dateRetraite) : '—'}
+      </td>
+      <td
+        className={`px-3 py-3 ${avancementEchu ? 'font-medium text-amber-700' : 'text-muted-foreground'}`}
+        title={
+          avancementEchu
+            ? 'Date d’avancement atteinte : l’échelon n’a pas encore été relevé'
+            : undefined
+        }
+      >
+        {situation.dateProchainAvancement
+          ? formaterDateCourte(situation.dateProchainAvancement)
+          : e.statut === 'ACTIF' && situation.finDeGrade
+            ? 'Fin de grade'
+            : '—'}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2">

@@ -2,7 +2,7 @@ import { formaterDateCourte } from '../../dates/formaterDateCourte'
 import { LIBELLES_GRADE } from '../grade'
 import { LIBELLES_SEXE, LIBELLES_STATUT_ENSEIGNANT } from '../dossier'
 import { versParametres } from './versParametres'
-import type { CritereDate, FiltresEnseignants } from './filtres'
+import type { CritereDate, CritereEcheance, Echeance, FiltresEnseignants } from './filtres'
 
 /** Noms lisibles des éléments désignés par un identifiant dans l'adresse. */
 export type ReferentielsFiltres = {
@@ -31,6 +31,20 @@ export function libelleCritereDate(critere: CritereDate): string {
   } else if (critere.au) {
     parties.push(`jusqu'au ${formaterDateCourte(critere.au)}`)
   }
+  return parties.join(' · ')
+}
+
+export const LIBELLES_ECHEANCE: Record<Echeance, string> = {
+  passee: 'déjà passée',
+  future: 'à venir',
+}
+
+/** « à venir », « déjà passée · 2024 », « à venir · du 01/06/2027 au 30/06/2027 »… */
+export function libelleCritereEcheance(critere: CritereEcheance): string {
+  const parties: string[] = []
+  if (critere.echeance) parties.push(LIBELLES_ECHEANCE[critere.echeance])
+  const dates = libelleCritereDate(critere)
+  if (dates !== '') parties.push(dates)
   return parties.join(' · ')
 }
 
@@ -99,6 +113,21 @@ export function decrirePuces(filtres: FiltresEnseignants, ref: ReferentielsFiltr
   }
   critereDate('Naissance', filtres.naissance, 'naissance')
   critereDate('Prise de service', filtres.priseService, 'priseService')
+
+  const critereEcheance = (nom: string, critere: CritereEcheance, prefixe: string) => {
+    const libelle = libelleCritereEcheance(critere)
+    if (libelle !== '') {
+      ajouter(
+        `${nom} : ${libelle}`,
+        `${prefixe}Echeance`,
+        `${prefixe}Annee`,
+        `${prefixe}Du`,
+        `${prefixe}Au`
+      )
+    }
+  }
+  critereEcheance('Date de retraite', filtres.retraite, 'retraite')
+  critereEcheance('Date d’avancement', filtres.avancement, 'avancement')
 
   return puces
 }

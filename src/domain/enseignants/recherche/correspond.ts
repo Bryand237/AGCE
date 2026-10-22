@@ -1,8 +1,10 @@
+import { debutDeJour } from '../../dates/jourCivil'
 import { dansPlage } from '../../dates/plage'
 import { motsNormalises, normaliserTexte } from '../../texte/normaliserTexte'
 import type { DossierEnseignant } from '../dossier'
-import { plageDe } from './filtres'
-import type { FiltresEnseignants } from './filtres'
+import { critereEcheanceVide, plageDe } from './filtres'
+import type { CritereEcheance, FiltresEnseignants } from './filtres'
+import type { LigneRecherche } from './trier'
 
 /** Textes dans lesquels la recherche libre cherche chaque mot, sous leur forme de comparaison. */
 function textesRecherchables(dossier: DossierEnseignant): { champs: string[]; matricule: string } {
@@ -81,4 +83,47 @@ export function correspondAuxFiltres(
   if (!dansPlage(dossier.datePriseService, plageDe(filtres.priseService))) return false
 
   return correspondALaRecherche(dossier, filtres.recherche)
+}
+
+/**
+ * Une date calculée satisfait-elle un critère d'échéance ? « Passée » : le jour est atteint
+ * (aujourd'hui compris, comme pour l'alerte d'éligibilité à la retraite) ; « à venir » : après
+ * aujourd'hui. L'année et la plage se combinent à l'échéance (le ET de tous les critères).
+ * Un critère non renseigné ne restreint rien ; une date absente ne correspond à aucun critère
+ * renseigné.
+ */
+function respecteEcheance(date: Date | null, critere: CritereEcheance, jour: Date): boolean {
+  if (critereEcheanceVide(critere)) return true
+  if (date === null) return false
+  const ecart = debutDeJour(date).getTime() - debutDeJour(jour).getTime()
+  if (critere.echeance === 'passee' && ecart > 0) return false
+  if (critere.echeance === 'future' && ecart <= 0) return false
+  return dansPlage(date, plageDe(critere))
+}
+
+/**
+ * Les critères qui portent sur la carrière calculée (date de retraite, prochain avancement).
+ * Séparés de correspondAuxFiltres() parce qu'ils ont besoin de la situation du dossier et du
+ * jour courant, que le dossier seul ne contient pas.
+ */
+export function correspondALaSituation(
+  ligne: LigneRecherche,
+  filtres: FiltresEnseignants,
+  jour: Date
+): boolean {
+  return (
+    respecteEcheance(ligne.situation.dateRetraite, filtres.retraite, jour) &&
+    respecteEcheance(ligne.situation.dateProchainAvancement, filtres.avancement, jour)
+  )
+}
+
+/** Tous les critères, ceux du dossier comme ceux de sa situation de carrière. */
+export function ligneCorrespond(
+  ligne: LigneRecherche,
+  filtres: FiltresEnseignants,
+  jour: Date
+): boolean {
+  return (
+    correspondAuxFiltres(ligne.dossier, filtres) && correspondALaSituation(ligne, filtres, jour)
+  )
 }
