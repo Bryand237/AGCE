@@ -98,8 +98,11 @@ describe('en-têtes de réponse', () => {
     expect(reponse.headers.get('Content-Disposition')).toBe(
       'attachment; filename="selection-enseignants-2026-10-23.csv"'
     )
-    const corps = await reponse.text()
-    expect(corps.charCodeAt(0)).toBe(0xfeff)
-    expect(corps).toContain('Matricule;Nom;Prénom')
+    // On lit les octets : `Response.text()` retire le BOM selon l'implémentation (Node, Bun), alors
+    // que c'est bien lui qu'Excel attend en tête du fichier pour reconnaître l'UTF-8.
+    const octets = new Uint8Array(await reponse.arrayBuffer())
+    expect(Array.from(octets.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf])
+    const texte = new TextDecoder('utf-8', { ignoreBOM: true }).decode(octets)
+    expect(texte.startsWith('﻿Matricule;Nom;Prénom')).toBe(true)
   })
 })
