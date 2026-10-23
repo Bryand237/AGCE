@@ -68,6 +68,8 @@ export type DossierEnseignant = {
   estResident: boolean
   contratCollaboration: boolean
   posteResponsabilite: string | null
+  telephone: string | null
+  email: string | null
   departement: { id: string; nom: string }
   etablissement: { id: string; nom: string; abreviation: string }
   departementOrigine: { id: string; nom: string } | null

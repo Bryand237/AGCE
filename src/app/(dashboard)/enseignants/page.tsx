@@ -7,6 +7,7 @@ import {
   UserX,
   Users,
   FileDown,
+  FileSpreadsheet,
   Plus,
   Pencil,
   X,
@@ -235,12 +236,33 @@ export default async function PageEnseignants({
         </div>
       )}
 
-      {puces.length > 0 && (
-        <p className="text-muted-foreground text-sm" role="status">
-          {resultat.total} enseignant{resultat.total > 1 ? 's' : ''} correspond
-          {resultat.total > 1 ? 'ent' : ''} à ces critères.
-        </p>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {puces.length > 0 && (
+          <p className="text-muted-foreground text-sm" role="status">
+            {resultat.total} enseignant{resultat.total > 1 ? 's' : ''} correspond
+            {resultat.total > 1 ? 'ent' : ''} à ces critères.
+          </p>
+        )}
+        <div className="ml-auto flex items-center gap-2" aria-label="Exporter cette sélection">
+          <span className="text-muted-foreground text-xs">Exporter cette sélection</span>
+          <a
+            href={adresseListe({ ...filtresAffiches, page: 1 }, '/enseignants/selection-pdf')}
+            download
+            className="border-border bg-card hover:bg-muted inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-medium shadow-sm"
+          >
+            <FileDown size={14} aria-hidden="true" />
+            PDF
+          </a>
+          <a
+            href={adresseListe({ ...filtresAffiches, page: 1 }, '/enseignants/selection-csv')}
+            download
+            className="border-border bg-card hover:bg-muted inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-medium shadow-sm"
+          >
+            <FileSpreadsheet size={14} aria-hidden="true" />
+            Excel (CSV)
+          </a>
+        </div>
+      </div>
 
       <div className="border-border bg-card overflow-x-auto rounded-2xl border shadow-sm">
         <table className="w-full text-sm">

@@ -2,6 +2,8 @@ import { anneeDe } from '@/domain/dates/jourCivil'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { calculerDateRetraitePrevue } from '@/domain/enseignants/retraite'
 import { LIBELLES_GRADE_PLURIEL, ORDRE_GRADE } from '@/domain/enseignants/grade'
+import type { DossierEnseignant } from '@/domain/enseignants/dossier'
+import type { LigneRecherche } from '@/domain/enseignants/recherche/trier'
 import { construireHtmlListe, type ColonneListe, type SectionListe } from './documentListe'
 
 /**
@@ -36,6 +38,8 @@ export type EtablissementPourFichier = {
 export type LigneFichier = {
   enseignant: EnseignantPourFichier
   nomDepartement: string
+  /** Année du départ à la retraite, déjà calculée (vide quand il n'y en a pas). */
+  anneeRetraite: string
 }
 
 const ouiNon = (valeur: boolean) => (valeur ? 'Oui' : 'Non')
@@ -72,10 +76,10 @@ export const COLONNES_FICHIER_ENSEIGNANTS: ColonneListe<LigneFichier>[] = [
   { entete: 'Sexe', largeur: 7, valeur: ({ enseignant: e }) => e.sexe },
   {
     entete: 'Domaine de Recherche',
-    largeur: 19.5,
+    largeur: 18.5,
     valeur: ({ enseignant: e }) => e.domaineRecherche ?? '',
   },
-  { entete: "Département d'attache", largeur: 17, valeur: ({ nomDepartement }) => nomDepartement },
+  { entete: "Département d'attache", largeur: 18, valeur: ({ nomDepartement }) => nomDepartement },
   {
     entete: 'Date de Prise de service',
     largeur: 14,
@@ -86,8 +90,7 @@ export const COLONNES_FICHIER_ENSEIGNANTS: ColonneListe<LigneFichier>[] = [
     entete: 'Année de retraite',
     largeur: 10,
     insecable: true,
-    valeur: ({ enseignant: e }) =>
-      String(anneeDe(calculerDateRetraitePrevue(e.dateNaissance, e.grade))),
+    valeur: ({ anneeRetraite }) => anneeRetraite,
   },
   {
     entete: 'Résident (Oui/Non)',
@@ -142,6 +145,9 @@ export function sectionsFichierEnseignants(
         departement.enseignants.map((enseignant) => ({
           enseignant,
           nomDepartement: departement.nom,
+          anneeRetraite: String(
+            anneeDe(calculerDateRetraitePrevue(enseignant.dateNaissance, enseignant.grade))
+          ),
         }))
       )
       .sort(
@@ -169,5 +175,79 @@ export function construireHtmlFichierEnseignants(
     colonnes: COLONNES_FICHIER_ENSEIGNANTS,
     sections: sectionsFichierEnseignants(etablissements),
     messageSiVide: 'Aucun enseignant à afficher.',
+  })
+}
+
+/** Un dossier de la recherche, sous la forme que la liste officielle attend. */
+function enseignantPourFichier(dossier: DossierEnseignant): EnseignantPourFichier {
+  return {
+    matricule: dossier.matricule,
+    nom: dossier.nom,
+    prenom: dossier.prenom,
+    dateNaissance: dossier.dateNaissance,
+    lieuNaissance: dossier.lieuNaissance,
+    sexe: dossier.sexe,
+    grade: dossier.grade,
+    domaineRecherche: dossier.domaineRecherche,
+    datePriseService: dossier.datePriseService,
+    estResident: dossier.estResident,
+    contratCollaboration: dossier.contratCollaboration,
+    posteResponsabilite: dossier.posteResponsabilite,
+    telephone: dossier.telephone,
+    email: dossier.email,
+    departementOrigine:
+      dossier.departementOrigine && dossier.regionOrigine
+        ? { nom: dossier.departementOrigine.nom, region: { nom: dossier.regionOrigine.nom } }
+        : null,
+  }
+}
+
+/**
+ * Une sélection de la recherche, mise en forme comme la liste officielle : un établissement par
+ * page (par ordre alphabétique), les enseignants regroupés par grade. À l'intérieur d'un grade,
+ * l'ordre est CELUI DE LA SÉLECTION (le tri choisi à l'écran : par nom, par date de retraite…) :
+ * on ne le recalcule pas. L'année de retraite est celle de la situation de carrière : la date
+ * réellement enregistrée pour un retraité, la date théorique pour un actif, vide pour un transféré.
+ */
+export function sectionsFichierSelection(
+  lignes: readonly LigneRecherche[],
+  sousTitre?: string
+): SectionListe<LigneFichier>[] {
+  const parEtablissement = new Map<string, { nom: string; lignes: LigneRecherche[] }>()
+  for (const ligne of lignes) {
+    const { id, nom } = ligne.dossier.etablissement
+    const entree = parEtablissement.get(id) ?? { nom, lignes: [] }
+    entree.lignes.push(ligne)
+    parEtablissement.set(id, entree)
+  }
+
+  return [...parEtablissement.values()]
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+    .map((etablissement) => ({
+      titre: etablissement.nom,
+      sousTitre,
+      groupes: ORDRE_GRADE.map((grade) => ({
+        titre: LIBELLES_GRADE_PLURIEL[grade],
+        lignes: etablissement.lignes
+          .filter((ligne) => ligne.dossier.grade === grade)
+          .map(({ dossier, situation }) => ({
+            enseignant: enseignantPourFichier(dossier),
+            nomDepartement: dossier.departement.nom,
+            anneeRetraite: situation.dateRetraite ? String(anneeDe(situation.dateRetraite)) : '',
+          })),
+      })),
+    }))
+}
+
+export function construireHtmlFichierSelection(
+  lignes: readonly LigneRecherche[],
+  sousTitre?: string
+): string {
+  return construireHtmlListe({
+    enteteGauche: "Fichier des enseignants de l'Université de Ngaoundéré",
+    enteteDroite: 'UN/R/VR-EPDTIC/SG/DAAC/DEPE/SSPE',
+    colonnes: COLONNES_FICHIER_ENSEIGNANTS,
+    sections: sectionsFichierSelection(lignes, sousTitre),
+    messageSiVide: 'Aucun enseignant ne correspond à la sélection.',
   })
 }

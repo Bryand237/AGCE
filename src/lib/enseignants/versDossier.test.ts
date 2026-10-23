@@ -21,6 +21,8 @@ const ligne = (surcharge: Partial<LigneEnseignant> = {}): LigneEnseignant => ({
   estResident: true,
   contratCollaboration: false,
   posteResponsabilite: null,
+  telephone: '699001122',
+  email: 'alice.mbarga@example.cm',
   departement: {
     id: 'd1',
     nom: 'Département de Géographie',
@@ -76,6 +78,8 @@ describe('versDossier', () => {
     }
     const dossier = versDossier(ligne({ absences: [absence], matricule: 'X1' }))
     expect(dossier.matricule).toBe('X1')
+    expect(dossier.telephone).toBe('699001122')
+    expect(dossier.email).toBe('alice.mbarga@example.cm')
     expect(dossier.absences).toEqual([absence])
   })
 })

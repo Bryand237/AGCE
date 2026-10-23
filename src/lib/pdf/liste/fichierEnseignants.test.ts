@@ -7,6 +7,10 @@ import {
   type EtablissementPourFichier,
 } from './fichierEnseignants'
 import { LARGEUR_NUMERO_MM, LARGEUR_UTILE_MM } from './documentListe'
+import { GRILLE_DE_TEST, dossierDeTest } from '@/domain/enseignants/recherche/dossiersDeTest'
+import { avecSituation } from '@/domain/enseignants/recherche/selectionner'
+import type { DossierEnseignant } from '@/domain/enseignants/dossier'
+import { construireHtmlFichierSelection, sectionsFichierSelection } from './fichierEnseignants'
 
 const jour = (iso: string) => new Date(`${iso}T00:00:00.000Z`)
 
@@ -213,5 +217,96 @@ describe('construireHtmlFichierEnseignants', () => {
       (html.match(/Fichier des enseignants de l&#39;Université de Ngaoundéré/g) ?? []).length
     ).toBe(2)
     expect((html.match(/UN\/R\/VR-EPDTIC\/SG\/DAAC\/DEPE\/SSPE/g) ?? []).length).toBe(2)
+  })
+})
+
+describe('sélection : sections et mise en page', () => {
+  const etab = (id: string, nom: string) => ({ id, nom, abreviation: id.toUpperCase() })
+  const lignes = (...dossiers: DossierEnseignant[]) => avecSituation(dossiers, GRILLE_DE_TEST)
+
+  it('un établissement par section, par ordre alphabétique, grades dans l’ordre officiel', () => {
+    const sections = sectionsFichierSelection(
+      lignes(
+        dossierDeTest({
+          nom: 'A',
+          etablissement: etab('fs', 'Faculté des Sciences'),
+          grade: 'ASSISTANT',
+        }),
+        dossierDeTest({
+          nom: 'B',
+          etablissement: etab('ensai', 'École Nationale'),
+          grade: 'PROFESSEUR',
+        }),
+        dossierDeTest({
+          nom: 'C',
+          etablissement: etab('fs', 'Faculté des Sciences'),
+          grade: 'PROFESSEUR',
+        })
+      )
+    )
+    expect(sections.map((s) => s.titre)).toEqual(['École Nationale', 'Faculté des Sciences'])
+    expect(sections[1]?.groupes.map((g) => g.titre)).toEqual([
+      'Professeurs',
+      'Maîtres de Conférences',
+      'Chargés de Cours',
+      'Assistants',
+    ])
+    expect(sections[1]?.groupes[0]?.lignes.map((l) => l.enseignant.nom)).toEqual(['C'])
+    expect(sections[1]?.groupes[3]?.lignes.map((l) => l.enseignant.nom)).toEqual(['A'])
+  })
+
+  it('garde l’ordre de la sélection à l’intérieur d’un grade (le tri choisi à l’écran)', () => {
+    const [section] = sectionsFichierSelection(
+      lignes(
+        dossierDeTest({ nom: 'ZED' }),
+        dossierDeTest({ nom: 'ABBA' }),
+        dossierDeTest({ nom: 'MOI' })
+      )
+    )
+    expect(section?.groupes[0]?.lignes.map((l) => l.enseignant.nom)).toEqual(['ZED', 'ABBA', 'MOI'])
+  })
+
+  it('l’année de retraite vient de la situation : réelle pour un retraité, vide pour un transféré', () => {
+    const [section] = sectionsFichierSelection(
+      lignes(
+        dossierDeTest({ nom: 'ACTIF', dateNaissance: new Date('1970-03-15T00:00:00Z') }),
+        dossierDeTest({
+          nom: 'RETRAITE',
+          statut: 'RETRAITE',
+          dateFinService: new Date('2026-03-01T00:00:00Z'),
+        }),
+        dossierDeTest({ nom: 'TRANSFERE', statut: 'TRANSFERE' })
+      )
+    )
+    const annees = Object.fromEntries(
+      (section?.groupes[0]?.lignes ?? []).map((l) => [l.enseignant.nom, l.anneeRetraite])
+    )
+    expect(annees).toEqual({ ACTIF: '2035', RETRAITE: '2026', TRANSFERE: '' })
+  })
+
+  it('transmet les téléphone, e-mail, région et département d’origine de la fiche', () => {
+    const [section] = sectionsFichierSelection(lignes(dossierDeTest()))
+    const e = section?.groupes[0]?.lignes[0]?.enseignant
+    expect(e?.telephone).toBe('699001122')
+    expect(e?.email).toBe('alice.mbarga@example.cm')
+    expect(e?.departementOrigine).toEqual({ nom: 'Bamboutos', region: { nom: 'Ouest' } })
+  })
+
+  it('imprime la description de la sélection sous le titre de chaque page', () => {
+    const html = construireHtmlFichierSelection(
+      lignes(
+        dossierDeTest({ etablissement: etab('a', 'A') }),
+        dossierDeTest({ etablissement: etab('b', 'B') })
+      ),
+      'Sélection au 23/10/2026 — Statut : Actif'
+    )
+    expect((html.match(/<p class="sous-titre-section">/g) ?? []).length).toBe(2)
+    expect(html).toContain('Sélection au 23/10/2026 — Statut : Actif')
+  })
+
+  it('une sélection vide annonce qu’aucun enseignant ne correspond', () => {
+    const html = construireHtmlFichierSelection([], 'Sélection')
+    expect(html).toContain('Aucun enseignant ne correspond à la sélection.')
+    expect(html).not.toContain('<table')
   })
 })

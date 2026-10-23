@@ -24,6 +24,8 @@ export type LigneEnseignant = {
   estResident: boolean
   contratCollaboration: boolean
   posteResponsabilite: string | null
+  telephone: string | null
+  email: string | null
   departement: {
     id: string
     nom: string

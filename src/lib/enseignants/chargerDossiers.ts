@@ -33,6 +33,8 @@ export async function chargerDossiers(): Promise<DossierEnseignant[]> {
       estResident: true,
       contratCollaboration: true,
       posteResponsabilite: true,
+      telephone: true,
+      email: true,
       departement: {
         select: {
           id: true,

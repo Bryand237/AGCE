@@ -29,6 +29,8 @@ export function dossierDeTest(surcharge: Partial<DossierEnseignant> = {}): Dossi
     estResident: true,
     contratCollaboration: false,
     posteResponsabilite: null,
+    telephone: '699001122',
+    email: 'alice.mbarga@example.cm',
     departement: { id: 'dep-geo', nom: 'Département de Géographie' },
     etablissement: {
       id: 'etab-falsh',
