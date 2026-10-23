@@ -28,6 +28,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { LIBELLES_STATUT_ENSEIGNANT } from '@/domain/enseignants/dossier'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
+import { absenceActuelle, LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { aujourdhui } from '@/domain/dates/jourCivil'
 import { lireFiltres } from '@/domain/enseignants/recherche/lireFiltres'
 import type { ParametresUrl } from '@/domain/enseignants/recherche/lireFiltres'
@@ -376,7 +377,10 @@ function LigneEnseignant({ ligne, jourCourant }: { ligne: LigneRecherche; jourCo
       <td className="text-muted-foreground px-3 py-3">{LIBELLES_GRADE[e.grade] ?? e.grade}</td>
       <td className="text-muted-foreground px-3 py-3">{e.etablissement.abreviation}</td>
       <td className="px-3 py-3">
-        <BadgeStatut statut={e.statut} />
+        <div className="flex flex-col items-start gap-1">
+          <BadgeStatut statut={e.statut} />
+          <BadgeAbsence absences={e.absences} jourCourant={jourCourant} />
+        </div>
       </td>
       <td
         className={`px-3 py-3 ${retraiteDepassee ? 'font-medium text-amber-700' : 'text-muted-foreground'}`}
@@ -434,6 +438,38 @@ function BadgeStatut({ statut }: { statut: keyof typeof LIBELLES_STATUT_ENSEIGNA
       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[statut]}`}
     >
       {LIBELLES_STATUT_ENSEIGNANT[statut]}
+    </span>
+  )
+}
+
+/**
+ * Pastille sous le statut quand l'enseignant est absent aujourd'hui (mission, congé), ou quand
+ * le retour d'une absence dont la fin est passée n'a pas été enregistré.
+ */
+function BadgeAbsence({
+  absences,
+  jourCourant,
+}: {
+  absences: LigneRecherche['dossier']['absences']
+  jourCourant: Date
+}) {
+  const actuelle = absenceActuelle(absences, jourCourant)
+  if (!actuelle) return null
+  const libelle = LIBELLES_TYPE_ABSENCE[actuelle.absence.type]
+  const dateFin = formaterDateCourte(actuelle.absence.dateFin)
+  return actuelle.etat === 'en-cours' ? (
+    <span
+      className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100 ring-inset"
+      title={`${libelle} jusqu'au ${dateFin}`}
+    >
+      Absent · {libelle}
+    </span>
+  ) : (
+    <span
+      className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-100 ring-inset"
+      title={`${libelle} : fin prévue le ${dateFin}, retour non enregistré`}
+    >
+      Retour attendu · {libelle}
     </span>
   )
 }

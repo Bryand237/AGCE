@@ -8,6 +8,7 @@ import {
   GRADES,
   STATUTS_ENSEIGNANT,
   LIBELLES_STATUT_ENSEIGNANT,
+  TYPES_ABSENCE,
 } from '@/domain/enseignants/dossier'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { adresseListe } from '@/domain/enseignants/recherche/versParametres'
@@ -15,6 +16,11 @@ import { lireFiltres, parametresDepuisUrl } from '@/domain/enseignants/recherche
 import { ECHEANCES } from '@/domain/enseignants/recherche/filtres'
 import type { CleTri } from '@/domain/enseignants/recherche/filtres'
 import { LIBELLES_ECHEANCE } from '@/domain/enseignants/recherche/puces'
+import {
+  ETATS_ABSENCE,
+  LIBELLES_ETAT_ABSENCE,
+  LIBELLES_TYPE_ABSENCE,
+} from '@/domain/absences/etatAbsence'
 import type { ReferentielsFiltres } from '@/domain/enseignants/recherche/puces'
 import {
   classeBoutonPrimaire,
@@ -487,6 +493,58 @@ export function PanneauFiltres({
             <ChampsDate prefixe="naissance" titre="Date de naissance" valeurs={valeurs} />
             <ChampsDate prefixe="priseService" titre="Date de prise de service" valeurs={valeurs} />
           </Groupe>
+
+          <div className="lg:col-span-2">
+            <Groupe titre="Absences (missions, congés)">
+              <p className="text-muted-foreground text-xs">
+                Tous les critères portent sur une même absence : « Mission » et « En cours »
+                cherchent une mission en cours. L&apos;état se calcule d&apos;après les dates, pas
+                d&apos;après le statut enregistré. « Dépassée » : la fin prévue est passée sans
+                retour enregistré.
+              </p>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="flex flex-col gap-3">
+                  <Champ id="absence" libelle="Enseignants avec / sans absence correspondante">
+                    <select
+                      id="absence"
+                      name="absence"
+                      defaultValue={premiere(valeurs, 'absence')}
+                      className={classeChamp}
+                    >
+                      <option value="">Indifférent (avec, si un critère est choisi)</option>
+                      <option value="oui">Avec une absence correspondante</option>
+                      <option value="non">Sans aucune absence correspondante</option>
+                    </select>
+                  </Champ>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs font-medium">État</span>
+                    <CasesACocher
+                      nom="absenceEtat"
+                      valeurs={valeurs}
+                      options={ETATS_ABSENCE.map((e) => [e, LIBELLES_ETAT_ABSENCE[e]])}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs font-medium">Type</span>
+                    <CasesACocher
+                      nom="absenceType"
+                      valeurs={valeurs}
+                      options={TYPES_ABSENCE.map((t) => [t, LIBELLES_TYPE_ABSENCE[t]])}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-4">
+                  <ChampsDate prefixe="absenceDebut" titre="Date de début" valeurs={valeurs} />
+                  <ChampsDate prefixe="absenceFin" titre="Date de fin prévue" valeurs={valeurs} />
+                  <ChampsDate
+                    prefixe="absencePendant"
+                    titre="Absent pendant la période"
+                    valeurs={valeurs}
+                  />
+                </div>
+              </div>
+            </Groupe>
+          </div>
 
           <div className="lg:col-span-2">
             <Groupe titre="Retraite et avancement">

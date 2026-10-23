@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { filtresVides } from './filtres'
 import { lireFiltres } from './lireFiltres'
-import { adresseSansPuce, decrirePuces, libelleCritereDate, libelleCritereEcheance } from './puces'
+import {
+  adresseSansPuce,
+  decrirePuces,
+  libelleCritereAbsence,
+  libelleCritereDate,
+  libelleCritereEcheance,
+} from './puces'
 import type { ReferentielsFiltres } from './puces'
 import { jour } from './dossiersDeTest'
 
@@ -144,5 +150,45 @@ describe('puces — retraite et avancement', () => {
     ])
     const retraite = puces.find((p) => p.libelle.startsWith('Date de retraite'))!
     expect(adresseSansPuce(filtres, retraite)).toBe('/enseignants?sexe=F&avancementEcheance=future')
+  })
+})
+
+describe('puces — absences', () => {
+  it('rien tant qu’aucun critère d’absence n’est renseigné', () => {
+    expect(libelleCritereAbsence(lireFiltres({}).absence)).toBe('')
+  })
+
+  it('décrit le sens puis chaque critère', () => {
+    expect(libelleCritereAbsence(lireFiltres({ absence: 'oui' }).absence)).toBe('oui')
+    expect(libelleCritereAbsence(lireFiltres({ absence: 'non' }).absence)).toBe('non')
+    expect(
+      libelleCritereAbsence(
+        lireFiltres({
+          absenceEtat: ['en-cours', 'a-venir'],
+          absenceType: ['MISSION', 'CONGE_MATERNITE'],
+          absenceDebutAnnee: '2026',
+          absencePendantDu: '2026-11-01',
+          absencePendantAu: '2026-11-30',
+        }).absence
+      )
+    ).toBe(
+      'oui · en cours, à venir · Mission, Congé de maternité · début 2026 · pendant du 01/11/2026 au 30/11/2026'
+    )
+  })
+
+  it('une seule puce pour tous les critères d’absence, qui les retire tous et eux seuls', () => {
+    const filtres = lireFiltres({
+      sexe: 'F',
+      absenceEtat: ['depassee'],
+      absenceType: ['MISSION'],
+      absenceFinAnnee: '2026',
+    })
+    const puces = decrirePuces(filtres, REF)
+    expect(puces.map((p) => p.libelle)).toEqual([
+      'Genre : Féminin',
+      'Absence : oui · dépassée · Mission · fin 2026',
+    ])
+    const absence = puces.find((p) => p.libelle.startsWith('Absence'))!
+    expect(adresseSansPuce(filtres, absence)).toBe('/enseignants?sexe=F')
   })
 })

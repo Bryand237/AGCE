@@ -83,3 +83,27 @@ describe('versParametres — retraite et avancement', () => {
     })
   })
 })
+
+describe('versParametres — absences', () => {
+  it('écrit le sens, les états, les types puis les dates, après la retraite et l’avancement', () => {
+    const filtres = lireFiltres({
+      absencePendantAu: '2026-11-30',
+      absenceType: ['MISSION'],
+      absenceEtat: ['a-venir', 'en-cours'],
+      absence: 'oui',
+      avancementEcheance: 'future',
+      absenceDebutAnnee: '2026',
+    })
+    expect(versParametres(filtres).toString()).toBe(
+      'avancementEcheance=future&absence=oui&absenceEtat=en-cours&absenceEtat=a-venir&absenceType=MISSION&absenceDebutAnnee=2026&absencePendantAu=2026-11-30'
+    )
+  })
+
+  it('met les critères dans le formulaire, nom par nom', () => {
+    const filtres = lireFiltres({ absenceEtat: ['en-cours', 'a-venir'], absenceType: 'MISSION' })
+    expect(valeursDeFormulaire(filtres)).toEqual({
+      absenceEtat: ['en-cours', 'a-venir'],
+      absenceType: ['MISSION'],
+    })
+  })
+})

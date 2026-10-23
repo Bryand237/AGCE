@@ -1,7 +1,8 @@
 import { analyserDateIso } from '../../dates/jourCivil'
-import { GRADES, SEXES, STATUTS_ENSEIGNANT } from '../dossier'
-import { CLES_TRI, ECHEANCES, ORDRES, filtresVides } from './filtres'
-import type { CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
+import { ETATS_ABSENCE } from '../../absences/etatAbsence'
+import { GRADES, SEXES, STATUTS_ENSEIGNANT, TYPES_ABSENCE } from '../dossier'
+import { CLES_TRI, ECHEANCES, ORDRES, critereAbsenceNeutre, filtresVides } from './filtres'
+import type { CritereAbsence, CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
 
 /** Forme des paramètres d'adresse que Next.js transmet à une page (searchParams). */
 export type ParametresUrl = Record<string, string | string[] | undefined>
@@ -97,6 +98,19 @@ function critereEcheance(parametres: ParametresUrl, prefixe: string): CritereEch
   return critere
 }
 
+/** Lit « absence » (oui / non), « absenceEtat », « absenceType » et les trois critères de date. */
+function critereAbsence(parametres: ParametresUrl): CritereAbsence {
+  const critere = critereAbsenceNeutre()
+  const presence = ouiNon(parametres.absence)
+  if (presence !== undefined) critere.presence = presence
+  critere.etats = listeEnumeree(parametres.absenceEtat, ETATS_ABSENCE)
+  critere.types = listeEnumeree(parametres.absenceType, TYPES_ABSENCE)
+  critere.debut = critereDate(parametres, 'absenceDebut')
+  critere.fin = critereDate(parametres, 'absenceFin')
+  critere.pendant = critereDate(parametres, 'absencePendant')
+  return critere
+}
+
 /**
  * Lit les filtres d'une adresse. Ne lève jamais d'erreur : une valeur absente, mal formée,
  * hors limites ou inconnue est simplement ignorée (une adresse enregistrée ou tapée à la main
@@ -142,6 +156,7 @@ export function lireFiltres(parametres: ParametresUrl): FiltresEnseignants {
   filtres.priseService = critereDate(parametres, 'priseService')
   filtres.retraite = critereEcheance(parametres, 'retraite')
   filtres.avancement = critereEcheance(parametres, 'avancement')
+  filtres.absence = critereAbsence(parametres)
 
   // « trier » : nom de paramètre déjà employé par l'ancienne liste (adresses enregistrées).
   filtres.tri = enumeration(parametres.trier, CLES_TRI) ?? filtres.tri

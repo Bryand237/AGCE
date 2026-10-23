@@ -1,6 +1,6 @@
 import { formaterDateIso } from '../../dates/jourCivil'
 import { ORDRE_PAR_DEFAUT, TRI_PAR_DEFAUT } from './filtres'
-import type { CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
+import type { CritereAbsence, CritereDate, CritereEcheance, FiltresEnseignants } from './filtres'
 
 function ajouterCritereDate(sortie: URLSearchParams, prefixe: string, critere: CritereDate): void {
   if (critere.annee !== undefined) sortie.set(`${prefixe}Annee`, String(critere.annee))
@@ -18,6 +18,15 @@ function ajouterCritereEcheance(
 }
 
 const ouiNon = (valeur: boolean) => (valeur ? 'oui' : 'non')
+
+function ajouterCritereAbsence(sortie: URLSearchParams, critere: CritereAbsence): void {
+  if (critere.presence !== undefined) sortie.set('absence', ouiNon(critere.presence))
+  for (const etat of critere.etats) sortie.append('absenceEtat', etat)
+  for (const type of critere.types) sortie.append('absenceType', type)
+  ajouterCritereDate(sortie, 'absenceDebut', critere.debut)
+  ajouterCritereDate(sortie, 'absenceFin', critere.fin)
+  ajouterCritereDate(sortie, 'absencePendant', critere.pendant)
+}
 
 /**
  * Paramètres d'adresse qui décrivent exactement ces filtres : seulement ce qui diffère de
@@ -51,6 +60,7 @@ export function versParametres(filtres: FiltresEnseignants): URLSearchParams {
   ajouterCritereDate(sortie, 'priseService', filtres.priseService)
   ajouterCritereEcheance(sortie, 'retraite', filtres.retraite)
   ajouterCritereEcheance(sortie, 'avancement', filtres.avancement)
+  ajouterCritereAbsence(sortie, filtres.absence)
 
   if (filtres.tri !== TRI_PAR_DEFAUT) sortie.set('trier', filtres.tri)
   if (filtres.ordre !== ORDRE_PAR_DEFAUT) sortie.set('ordre', filtres.ordre)

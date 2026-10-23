@@ -70,3 +70,35 @@ describe('selectionnerDossiers', () => {
     )
   })
 })
+
+describe('selectionnerDossiers — absences', () => {
+  const absent = dossierDeTest({
+    nom: 'ABSENT',
+    absences: [
+      {
+        id: 'a',
+        type: 'CONGE_MALADIE',
+        statut: 'EN_PERIODE',
+        dateDebut: jour('2026-10-10'),
+        dateFin: jour('2026-11-10'),
+        dateRetour: null,
+        motif: null,
+      },
+    ],
+  })
+  const present = dossierDeTest({ nom: 'PRESENT' })
+  const noms = (parametres: Record<string, string>) =>
+    selectionnerDossiers(
+      [absent, present],
+      lireFiltres(parametres),
+      GRILLE_DE_TEST,
+      AUJOURDHUI
+    ).map((l) => l.dossier.nom)
+
+  it('combine les critères d’absence avec les autres filtres', () => {
+    expect(noms({ absenceEtat: 'en-cours' })).toEqual(['ABSENT'])
+    expect(noms({ absence: 'non' })).toEqual(['PRESENT'])
+    expect(noms({ absenceEtat: 'en-cours', sexe: 'M' })).toEqual([])
+    expect(noms({ absenceType: 'CONGE_MALADIE', statut: 'ACTIF' })).toEqual(['ABSENT'])
+  })
+})

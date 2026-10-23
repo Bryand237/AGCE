@@ -1,5 +1,5 @@
 import { anneeDe } from '../../dates/jourCivil'
-import { filtresVides } from './filtres'
+import { critereAbsenceNeutre, filtresVides } from './filtres'
 import type { FiltresEnseignants } from './filtres'
 import { adresseListe, versParametres } from './versParametres'
 
@@ -14,7 +14,7 @@ export type Raccourci = {
   libelle: string
   /** Phrase d'aide affichée au survol. */
   description: string
-  groupe: 'retraite' | 'avancement' | 'statut'
+  groupe: 'retraite' | 'avancement' | 'absence' | 'statut'
   filtres: FiltresEnseignants
 }
 
@@ -86,6 +86,27 @@ export function raccourcisDisponibles(jour: Date): Raccourci[] {
       description: `Enseignants éligibles à l'échelon suivant en ${annee + 1}`,
       groupe: 'avancement',
       filtres: filtresRaccourci({ avancement: { annee: annee + 1 }, tri: 'avancement' }),
+    },
+    {
+      id: 'absents-en-cours',
+      libelle: 'Absents en ce moment',
+      description: 'Enseignants en mission ou en congé aujourd’hui',
+      groupe: 'absence',
+      filtres: filtresRaccourci({ absence: { ...critereAbsenceNeutre(), etats: ['en-cours'] } }),
+    },
+    {
+      id: 'absences-a-venir',
+      libelle: 'Absences à venir',
+      description: 'Enseignants dont une mission ou un congé commence bientôt',
+      groupe: 'absence',
+      filtres: filtresRaccourci({ absence: { ...critereAbsenceNeutre(), etats: ['a-venir'] } }),
+    },
+    {
+      id: 'retours-non-enregistres',
+      libelle: 'Retour non enregistré',
+      description: 'Absences dont la fin prévue est passée sans retour enregistré',
+      groupe: 'absence',
+      filtres: filtresRaccourci({ absence: { ...critereAbsenceNeutre(), etats: ['depassee'] } }),
     },
   ]
 }

@@ -4,6 +4,7 @@ import { motsNormalises, normaliserTexte } from '../../texte/normaliserTexte'
 import type { DossierEnseignant } from '../dossier'
 import { critereEcheanceVide, plageDe } from './filtres'
 import type { CritereEcheance, FiltresEnseignants } from './filtres'
+import { correspondAuxAbsences } from './correspondAbsences'
 import type { LigneRecherche } from './trier'
 
 /** Textes dans lesquels la recherche libre cherche chaque mot, sous leur forme de comparaison. */
@@ -117,13 +118,18 @@ export function correspondALaSituation(
   )
 }
 
-/** Tous les critères, ceux du dossier comme ceux de sa situation de carrière. */
+/**
+ * Tous les critères : ceux du dossier, ceux de sa situation de carrière, ceux de ses absences
+ * (qui dépendent eux aussi du jour courant).
+ */
 export function ligneCorrespond(
   ligne: LigneRecherche,
   filtres: FiltresEnseignants,
   jour: Date
 ): boolean {
   return (
-    correspondAuxFiltres(ligne.dossier, filtres) && correspondALaSituation(ligne, filtres, jour)
+    correspondAuxFiltres(ligne.dossier, filtres) &&
+    correspondALaSituation(ligne, filtres, jour) &&
+    correspondAuxAbsences(ligne.dossier, filtres.absence, jour)
   )
 }

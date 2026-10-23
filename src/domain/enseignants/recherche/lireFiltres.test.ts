@@ -232,3 +232,48 @@ describe('lireFiltres — retraite et avancement', () => {
     expect(lireFiltres(parametresDepuisUrl(versParametres(filtres)))).toEqual(filtres)
   })
 })
+
+describe('lireFiltres — absences', () => {
+  it('lit le sens, les états, les types et les trois critères de date', () => {
+    const { absence } = lireFiltres({
+      absence: 'non',
+      absenceEtat: ['en-cours', 'a-venir'],
+      absenceType: 'MISSION,CONGE_MATERNITE',
+      absenceDebutAnnee: '2026',
+      absenceFinAu: '2026-12-31',
+      absencePendantDu: '2026-11-01',
+      absencePendantAu: '2026-11-30',
+    })
+    expect(absence.presence).toBe(false)
+    expect(absence.etats).toEqual(['en-cours', 'a-venir'])
+    expect(absence.types).toEqual(['MISSION', 'CONGE_MATERNITE'])
+    expect(absence.debut).toEqual({ annee: 2026 })
+    expect(absence.fin).toEqual({ au: jour('2026-12-31') })
+    expect(absence.pendant).toEqual({ du: jour('2026-11-01'), au: jour('2026-11-30') })
+  })
+
+  it('range états et types dans l’ordre du référentiel, sans doublon ni valeur inconnue', () => {
+    const { absence } = lireFiltres({
+      absenceEtat: ['terminee', 'inconnu', 'en-cours', 'en-cours'],
+      absenceType: ['AUTRE', 'MISSION', 'VACANCES'],
+    })
+    expect(absence.etats).toEqual(['en-cours', 'terminee'])
+    expect(absence.types).toEqual(['MISSION', 'AUTRE'])
+  })
+
+  it('ignore ce qui est invalide sans lever d’erreur', () => {
+    const { absence } = lireFiltres({ absence: 'peut-être', absenceDebutDu: '2026-13-45' })
+    expect(absence).toEqual({ etats: [], types: [], debut: {}, fin: {}, pendant: {} })
+  })
+
+  it('relit exactement ce que versParametres écrit', () => {
+    const filtres = lireFiltres({
+      absence: 'oui',
+      absenceEtat: ['depassee'],
+      absenceType: ['CONGE_MALADIE'],
+      absenceFinAnnee: '2026',
+      absencePendantDu: '2026-11-01',
+    })
+    expect(lireFiltres(parametresDepuisUrl(versParametres(filtres)))).toEqual(filtres)
+  })
+})

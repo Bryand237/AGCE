@@ -1,6 +1,7 @@
 import { croiserPlages, plageDeLAnnee } from '../../dates/plage'
 import type { PlageDates } from '../../dates/plage'
-import type { Grade, Sexe, StatutEnseignant } from '../dossier'
+import type { EtatAbsence } from '../../absences/etatAbsence'
+import type { Grade, Sexe, StatutEnseignant, TypeAbsence } from '../dossier'
 
 /**
  * Critère de date : une année, une plage « du … au … », ou les deux (l'intersection). On garde
@@ -30,6 +31,43 @@ export type CritereEcheance = CritereDate & { echeance?: Echeance }
 
 export function critereEcheanceVide(critere: CritereEcheance): boolean {
   return critereDateVide(critere) && critere.echeance === undefined
+}
+
+/**
+ * Critère sur les absences d'un enseignant. Les critères se rapportent à UNE MÊME absence :
+ * « Mission » et « en cours » cherchent une absence qui est à la fois une mission et en cours,
+ * pas une mission d'un côté et un autre congé en cours de l'autre.
+ *
+ * `presence` choisit le sens : vrai (ou absent, dès qu'un critère est renseigné) : l'enseignant a
+ * au moins une absence qui répond à tout ; faux : il n'en a aucune qui y réponde. Sans autre
+ * critère, vrai = « a déjà eu une absence », faux = « n'en a jamais eu ».
+ *
+ * - `debut` / `fin` : année ou période où tombe le début / la fin PRÉVUE de l'absence ;
+ * - `pendant` : l'absence recoupe cette année ou cette période (au moins un jour en commun),
+ *   le retour réel remplaçant la fin prévue quand il est enregistré.
+ */
+export type CritereAbsence = {
+  presence?: boolean
+  etats: EtatAbsence[]
+  types: TypeAbsence[]
+  debut: CritereDate
+  fin: CritereDate
+  pendant: CritereDate
+}
+
+export function critereAbsenceVide(critere: CritereAbsence): boolean {
+  return (
+    critere.presence === undefined &&
+    critere.etats.length === 0 &&
+    critere.types.length === 0 &&
+    critereDateVide(critere.debut) &&
+    critereDateVide(critere.fin) &&
+    critereDateVide(critere.pendant)
+  )
+}
+
+export function critereAbsenceNeutre(): CritereAbsence {
+  return { etats: [], types: [], debut: {}, fin: {}, pendant: {} }
 }
 
 export const CLES_TRI = [
@@ -70,6 +108,8 @@ export type FiltresEnseignants = {
   retraite: CritereEcheance
   /** Date à laquelle l'enseignant actif devient éligible à l'échelon suivant. */
   avancement: CritereEcheance
+  /** Absences : missions, congés… (état, type, début, fin, période). */
+  absence: CritereAbsence
   tri: CleTri
   ordre: Ordre
   page: number
@@ -87,6 +127,7 @@ export function filtresVides(): FiltresEnseignants {
     priseService: {},
     retraite: {},
     avancement: {},
+    absence: critereAbsenceNeutre(),
     tri: TRI_PAR_DEFAUT,
     ordre: ORDRE_PAR_DEFAUT,
     page: 1,

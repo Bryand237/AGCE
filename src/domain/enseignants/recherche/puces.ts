@@ -2,7 +2,16 @@ import { formaterDateCourte } from '../../dates/formaterDateCourte'
 import { LIBELLES_GRADE } from '../grade'
 import { LIBELLES_SEXE, LIBELLES_STATUT_ENSEIGNANT } from '../dossier'
 import { versParametres } from './versParametres'
-import type { CritereDate, CritereEcheance, Echeance, FiltresEnseignants } from './filtres'
+import { LIBELLES_TYPE_ABSENCE } from '../../absences/etatAbsence'
+import type { EtatAbsence } from '../../absences/etatAbsence'
+import { critereAbsenceVide } from './filtres'
+import type {
+  CritereAbsence,
+  CritereDate,
+  CritereEcheance,
+  Echeance,
+  FiltresEnseignants,
+} from './filtres'
 
 /** Noms lisibles des éléments désignés par un identifiant dans l'adresse. */
 export type ReferentielsFiltres = {
@@ -45,6 +54,37 @@ export function libelleCritereEcheance(critere: CritereEcheance): string {
   if (critere.echeance) parties.push(LIBELLES_ECHEANCE[critere.echeance])
   const dates = libelleCritereDate(critere)
   if (dates !== '') parties.push(dates)
+  return parties.join(' · ')
+}
+
+const LIBELLES_ETAT_COURT: Record<EtatAbsence, string> = {
+  'en-cours': 'en cours',
+  'a-venir': 'à venir',
+  depassee: 'dépassée',
+  terminee: 'terminée',
+}
+
+/**
+ * « oui · en cours, à venir · Mission · début 2026 » : le sens (avec / sans absence qui
+ * répond), puis chaque critère renseigné. Vide quand rien n'est demandé.
+ */
+export function libelleCritereAbsence(critere: CritereAbsence): string {
+  if (critereAbsenceVide(critere)) return ''
+  const parties = [critere.presence === false ? 'non' : 'oui']
+  if (critere.etats.length > 0)
+    parties.push(critere.etats.map((e) => LIBELLES_ETAT_COURT[e]).join(', '))
+  if (critere.types.length > 0) {
+    parties.push(critere.types.map((t) => LIBELLES_TYPE_ABSENCE[t]).join(', '))
+  }
+  const dates: [string, CritereDate][] = [
+    ['début', critere.debut],
+    ['fin', critere.fin],
+    ['pendant', critere.pendant],
+  ]
+  for (const [nom, date] of dates) {
+    const libelle = libelleCritereDate(date)
+    if (libelle !== '') parties.push(`${nom} ${libelle}`)
+  }
   return parties.join(' · ')
 }
 
@@ -128,6 +168,21 @@ export function decrirePuces(filtres: FiltresEnseignants, ref: ReferentielsFiltr
   }
   critereEcheance('Date de retraite', filtres.retraite, 'retraite')
   critereEcheance('Date d’avancement', filtres.avancement, 'avancement')
+
+  const libelleAbsence = libelleCritereAbsence(filtres.absence)
+  if (libelleAbsence !== '') {
+    ajouter(
+      `Absence : ${libelleAbsence}`,
+      'absence',
+      'absenceEtat',
+      'absenceType',
+      ...['absenceDebut', 'absenceFin', 'absencePendant'].flatMap((prefixe) => [
+        `${prefixe}Annee`,
+        `${prefixe}Du`,
+        `${prefixe}Au`,
+      ])
+    )
+  }
 
   return puces
 }

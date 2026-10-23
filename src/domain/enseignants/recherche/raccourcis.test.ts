@@ -10,7 +10,7 @@ const raccourcis = raccourcisDisponibles(AUJOURDHUI)
 const raccourci = (id: string) => raccourcis.find((r) => r.id === id)!
 
 describe('raccourcisDisponibles', () => {
-  it('propose retraite, retraités et avancement, avec l’année du jour et la suivante', () => {
+  it('propose retraite, retraités, avancement et absences, avec l’année du jour et la suivante', () => {
     expect(raccourcis.map((r) => r.libelle)).toEqual([
       'Retraite dépassée',
       'Retraite 2026',
@@ -19,6 +19,9 @@ describe('raccourcisDisponibles', () => {
       'Avancement échu',
       'Avancement 2026',
       'Avancement 2027',
+      'Absents en ce moment',
+      'Absences à venir',
+      'Retour non enregistré',
     ])
   })
 
@@ -54,6 +57,55 @@ describe('raccourcisDisponibles', () => {
     expect(adresseRaccourci(raccourci('avancement-echu'))).toBe(
       '/enseignants?statut=ACTIF&avancementEcheance=passee&trier=avancement'
     )
+    expect(adresseRaccourci(raccourci('absents-en-cours'))).toBe(
+      '/enseignants?absenceEtat=en-cours'
+    )
+    expect(adresseRaccourci(raccourci('retours-non-enregistres'))).toBe(
+      '/enseignants?absenceEtat=depassee'
+    )
+  })
+})
+
+describe('raccourcis — absences', () => {
+  const absence = (
+    id: string,
+    dateDebut: string,
+    dateFin: string,
+    dateRetour: string | null = null
+  ) => ({
+    id,
+    type: 'MISSION' as const,
+    statut: dateRetour ? ('TERMINE' as const) : ('EN_PERIODE' as const),
+    dateDebut: jour(dateDebut),
+    dateFin: jour(dateFin),
+    dateRetour: dateRetour ? jour(dateRetour) : null,
+    motif: null,
+  })
+  const dossiers = [
+    dossierDeTest({ nom: 'PRESENT' }),
+    dossierDeTest({ nom: 'ABSENT', absences: [absence('1', '2026-10-01', '2026-10-31')] }),
+    dossierDeTest({ nom: 'BIENTOT', absences: [absence('2', '2026-11-15', '2026-12-15')] }),
+    dossierDeTest({ nom: 'OUBLIE', absences: [absence('3', '2026-08-01', '2026-09-01')] }),
+    dossierDeTest({
+      nom: 'REVENU',
+      absences: [absence('4', '2026-08-01', '2026-09-01', '2026-08-30')],
+    }),
+  ]
+  const noms = (id: string) =>
+    selectionnerDossiers(dossiers, raccourci(id).filtres, GRILLE_DE_TEST, AUJOURDHUI).map(
+      (l) => l.dossier.nom
+    )
+
+  it('Absents en ce moment', () => {
+    expect(noms('absents-en-cours')).toEqual(['ABSENT'])
+  })
+
+  it('Absences à venir', () => {
+    expect(noms('absences-a-venir')).toEqual(['BIENTOT'])
+  })
+
+  it('Retour non enregistré : fin passée sans retour', () => {
+    expect(noms('retours-non-enregistres')).toEqual(['OUBLIE'])
   })
 })
 
