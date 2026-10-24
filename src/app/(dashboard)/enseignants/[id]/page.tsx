@@ -8,6 +8,7 @@ import { formaterPosition } from '@/domain/avancement/formaterPosition'
 import { formaterPositionCompacte } from '@/domain/avancement/formaterPositionCompacte'
 import { calculerProchainAvancementTheorique } from '@/domain/avancement/calculerProchainAvancementTheorique'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
+import { dateDeFinAffichee } from '@/domain/enseignants/statut'
 import {
   calculerDateRetraitePrevue,
   estEligibleRetraite,
@@ -59,6 +60,10 @@ export default async function DetailEnseignant({
   )
 
   const ancienneteAnnees = calculerAncienneteAnnees(enseignant.datePriseService)
+
+  // La retraite prévue est un calcul pour un enseignant en activité ; pour un retraité ou un
+  // transféré, la fiche montre la date de fin de service enregistrée.
+  const dateDeFin = dateDeFinAffichee(enseignant.statut, retraitePrevue, enseignant.dateFinService)
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -184,7 +189,10 @@ export default async function DetailEnseignant({
               />
               <Item label="Prise de service" valeur={formatDate(enseignant.datePriseService)} />
               <Item label="Effet échelon" valeur={formatDate(enseignant.dateEffetEchelon)} />
-              <Item label="Retraite prévue" valeur={formatDate(retraitePrevue)} />
+              <Item
+                label={dateDeFin.libelle}
+                valeur={dateDeFin.date ? formatDate(dateDeFin.date) : '—'}
+              />
               <Item label="Résident" valeur={enseignant.estResident ? 'Oui' : 'Non'} />
               <Item
                 label="Contrat collaboration"

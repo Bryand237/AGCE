@@ -84,10 +84,8 @@ export type EnseignantInput = z.infer<typeof EnseignantSchema>
 export const TransfertSchema = z.object({
   dateFinService: date('La date de fin de service'),
   lieuTransfert: texteObligatoire('Le lieu de destination est obligatoire'),
-  observations: z.string().optional(),
 })
 
 export const RetraiteSchema = z.object({
   dateFinService: date('La date de fin de service'),
-  observations: z.string().optional(),
 })

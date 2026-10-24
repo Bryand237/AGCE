@@ -52,10 +52,6 @@ export function FormulaireTransfert({ enseignantId }: { enseignantId: string }) 
           <p className="text-destructive text-sm">{state.errors.lieuTransfert[0]}</p>
         )}
       </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Observations
-        <textarea name="observations" rows={2} className={classeChamp} />
-      </label>
       {state.message && (
         <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
           {state.message}
@@ -119,10 +115,6 @@ export function FormulaireRetraite({
         {state.errors?.dateFinService && (
           <p className="text-destructive text-sm">{state.errors.dateFinService[0]}</p>
         )}
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Observations
-        <textarea name="observations" rows={2} className={classeChamp} />
       </label>
       {state.message && (
         <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>

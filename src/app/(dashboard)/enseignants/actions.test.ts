@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // La base, le disque et Next.js sont simulés : on vérifie ce que chaque action répond à
 // l'écran selon la nature de l'erreur, pas le moteur de la base.
-const { exigerUtilisateur, fsFactice, prismaFactice } = vi.hoisted(() => ({
+const { exigerUtilisateur, fsFactice, prismaFactice, revalidatePath } = vi.hoisted(() => ({
   exigerUtilisateur: vi.fn(),
+  revalidatePath: vi.fn(),
   fsFactice: { mkdir: vi.fn(), writeFile: vi.fn(), unlink: vi.fn() },
   prismaFactice: {
     echelonIndiciaire: { findUnique: vi.fn() },
@@ -13,7 +14,7 @@ const { exigerUtilisateur, fsFactice, prismaFactice } = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
 vi.mock('@/lib/auth', () => ({ exigerUtilisateur }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath }))
 // Comme dans Next.js, redirect() interrompt l'exécution en levant une exception.
 vi.mock('next/navigation', () => ({
   redirect: vi.fn((url: string) => {
@@ -76,6 +77,7 @@ describe('actions enseignants : erreurs de la base', () => {
     prismaFactice.enseignant.findUnique.mockResolvedValue({
       id: 'ens-1',
       photoUrl: null,
+      statut: 'ACTIF',
       datePriseService: new Date('2018-09-01'),
     })
     prismaFactice.enseignant.update.mockResolvedValue({})
@@ -269,14 +271,30 @@ describe('actions enseignants : erreurs de la base', () => {
           formulaire({ dateFinService: '2026-09-01', lieuTransfert: 'Douala' })
         ),
       /transféré/,
+      'ACTIF',
     ],
     [
       'marquerRetraite',
       () => marquerRetraite('ens-1', {}, formulaire({ dateFinService: '2026-09-01' })),
       /retraité/,
+      'ACTIF',
     ],
-    ['reactiverEnseignant', () => reactiverEnseignant('ens-1', {}, formulaire({})), /réactivé/],
-  ])('%s', (_nom, lancer, succes) => {
+    [
+      'reactiverEnseignant',
+      () => reactiverEnseignant('ens-1', {}, formulaire({})),
+      /réactivé/,
+      'TRANSFERE',
+    ],
+  ])('%s', (_nom, lancer, succes, statutDeDepart) => {
+    beforeEach(() => {
+      prismaFactice.enseignant.findUnique.mockResolvedValue({
+        id: 'ens-1',
+        photoUrl: null,
+        statut: statutDeDepart,
+        datePriseService: new Date('2018-09-01'),
+      })
+    })
+
     it('annonce la réussite avec le drapeau « succes »', async () => {
       const etat = await lancer()
 
@@ -293,6 +311,16 @@ describe('actions enseignants : erreurs de la base', () => {
       expect(etat.succes).toBeUndefined()
     })
 
+    it('annonce un enseignant disparu quand sa fiche a déjà été supprimée', async () => {
+      prismaFactice.enseignant.findUnique.mockResolvedValue(null)
+
+      const etat = await lancer()
+
+      expect(etat.message).toMatch(/n'existe plus/)
+      expect(etat.succes).toBeUndefined()
+      expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
+    })
+
     it('répond par un message technique, sans lever d’exception, pour une erreur inattendue', async () => {
       prismaFactice.enseignant.update.mockRejectedValue(new Error('boum'))
 
@@ -307,6 +335,124 @@ describe('actions enseignants : erreurs de la base', () => {
 
       await expect(lancer()).rejects.toThrow('NEXT_REDIRECT /connexion')
       expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('changements de statut : le statut enregistré décide', () => {
+    const transferer = () =>
+      marquerTransfere(
+        'ens-1',
+        {},
+        formulaire({ dateFinService: '2026-09-01', lieuTransfert: 'Douala' })
+      )
+    const retraiter = () =>
+      marquerRetraite('ens-1', {}, formulaire({ dateFinService: '2026-09-01' }))
+    const reactiver = () => reactiverEnseignant('ens-1', {}, formulaire({}))
+
+    const avecStatut = (statut: string) =>
+      prismaFactice.enseignant.findUnique.mockResolvedValue({
+        id: 'ens-1',
+        photoUrl: null,
+        statut,
+        datePriseService: new Date('2018-09-01'),
+      })
+
+    it.each([
+      ['un retraité', 'RETRAITE', transferer, /retraité : il ne peut pas être marqué transféré/],
+      ['un transféré', 'TRANSFERE', transferer, /déjà transféré/],
+      ['un transféré', 'TRANSFERE', retraiter, /transféré : il ne peut pas être marqué retraité/],
+      ['un retraité', 'RETRAITE', retraiter, /déjà retraité/],
+      ['un enseignant actif', 'ACTIF', reactiver, /déjà actif/],
+    ])(
+      'refuse %s, sans rien écrire, et recharge la fiche',
+      async (_qui, statut, lancer, message) => {
+        avecStatut(statut)
+
+        const etat = await lancer()
+
+        expect(etat.message).toMatch(message)
+        expect(etat.succes).toBeUndefined()
+        expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
+        expect(revalidatePath).toHaveBeenCalledWith('/enseignants/ens-1')
+      }
+    )
+
+    it('relit le statut et la date de prise de service avant d’écrire', async () => {
+      avecStatut('ACTIF')
+
+      await transferer()
+
+      expect(prismaFactice.enseignant.findUnique).toHaveBeenCalledWith({
+        where: { id: 'ens-1' },
+        select: { statut: true, datePriseService: true },
+      })
+    })
+
+    it('refuse le changement de statut avant de juger la date : le statut prime', async () => {
+      avecStatut('RETRAITE')
+
+      const etat = await marquerTransfere(
+        'ens-1',
+        {},
+        formulaire({ dateFinService: '1900-01-01', lieuTransfert: 'Douala' })
+      )
+
+      expect(etat.errors).toBeUndefined()
+      expect(etat.message).toMatch(/retraité/)
+    })
+
+    it('un transfert écrit le lieu de destination', async () => {
+      avecStatut('ACTIF')
+
+      await transferer()
+
+      expect(prismaFactice.enseignant.update).toHaveBeenCalledWith({
+        where: { id: 'ens-1' },
+        data: {
+          statut: 'TRANSFERE',
+          dateFinService: new Date('2026-09-01'),
+          lieuTransfert: 'Douala',
+        },
+      })
+    })
+
+    it('une mise à la retraite efface tout lieu de transfert resté dans la fiche', async () => {
+      avecStatut('ACTIF')
+
+      await retraiter()
+
+      expect(prismaFactice.enseignant.update).toHaveBeenCalledWith({
+        where: { id: 'ens-1' },
+        data: { statut: 'RETRAITE', dateFinService: new Date('2026-09-01'), lieuTransfert: null },
+      })
+    })
+
+    it.each(['TRANSFERE', 'RETRAITE'])(
+      'la réactivation d’un enseignant %s efface la date de fin de service et le lieu de transfert',
+      async (statut) => {
+        avecStatut(statut)
+
+        const etat = await reactiver()
+
+        expect(etat.succes).toBe(true)
+        expect(prismaFactice.enseignant.update).toHaveBeenCalledWith({
+          where: { id: 'ens-1' },
+          data: { statut: 'ACTIF', dateFinService: null, lieuTransfert: null },
+        })
+      }
+    )
+
+    it('ignore un champ « observations » envoyé par un ancien formulaire : il n’est jamais écrit', async () => {
+      avecStatut('ACTIF')
+
+      await marquerRetraite(
+        'ens-1',
+        {},
+        formulaire({ dateFinService: '2026-09-01', observations: 'à retenir' })
+      )
+
+      const donnees = prismaFactice.enseignant.update.mock.calls[0]![0].data
+      expect(Object.keys(donnees).sort()).toEqual(['dateFinService', 'lieuTransfert', 'statut'])
     })
   })
 })

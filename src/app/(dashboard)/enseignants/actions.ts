@@ -7,6 +7,7 @@ import { exigerUtilisateur } from '@/lib/auth'
 import { messageErreur } from '@/lib/erreurs'
 import { EnseignantSchema, TransfertSchema, RetraiteSchema } from '@/lib/validations/enseignant'
 import { erreurFinDeService } from '@/domain/enseignants/finDeService'
+import { erreurChangementStatut, type ChangementStatut } from '@/domain/enseignants/statut'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -182,6 +183,32 @@ export async function modifierEnseignant(
   redirect(photoEnregistree ? `/enseignants/${id}` : `/enseignants/${id}?photo=echec`)
 }
 
+/**
+ * Refus d'un changement de statut : la fiche est rechargée, car le formulaire que l'utilisateur
+ * avait sous les yeux ne correspond plus à l'état réel de l'enseignant (modifié depuis dans un
+ * autre onglet, par exemple).
+ */
+function changementRefuse(id: string, message: string): EtatFormulaire {
+  revalidatePath('/enseignants')
+  revalidatePath(`/enseignants/${id}`)
+  return { message }
+}
+
+/**
+ * Relit l'enseignant et juge le changement demandé d'après son statut ENREGISTRÉ, jamais d'après
+ * ce que le formulaire affichait : `disparu` quand sa fiche n'existe plus, `refus` (le message à
+ * afficher) quand la transition n'est pas permise.
+ */
+async function lireStatut(id: string, changement: ChangementStatut) {
+  const enseignant = await prisma.enseignant.findUnique({
+    where: { id },
+    select: { statut: true, datePriseService: true },
+  })
+  if (!enseignant) return { disparu: true as const }
+  const refus = erreurChangementStatut(enseignant.statut, changement)
+  return { disparu: false as const, enseignant, refus }
+}
+
 export async function marquerTransfere(
   id: string,
   _prevState: EtatFormulaire,
@@ -194,11 +221,10 @@ export async function marquerTransfere(
   }
 
   try {
-    const enseignant = await prisma.enseignant.findUnique({
-      where: { id },
-      select: { datePriseService: true },
-    })
-    if (!enseignant) return { message: ENSEIGNANT_DISPARU }
+    const lecture = await lireStatut(id, 'transferer')
+    if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
+    if (lecture.refus) return changementRefuse(id, lecture.refus)
+    const { enseignant } = lecture
     const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
     if (incoherence) return { errors: { dateFinService: [incoherence] } }
 
@@ -233,17 +259,22 @@ export async function marquerRetraite(
   }
 
   try {
-    const enseignant = await prisma.enseignant.findUnique({
-      where: { id },
-      select: { datePriseService: true },
-    })
-    if (!enseignant) return { message: ENSEIGNANT_DISPARU }
+    const lecture = await lireStatut(id, 'retraiter')
+    if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
+    if (lecture.refus) return changementRefuse(id, lecture.refus)
+    const { enseignant } = lecture
     const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
     if (incoherence) return { errors: { dateFinService: [incoherence] } }
 
+    // Le lieu de transfert n'a de sens que pour un transféré : on l'efface ici, au cas où une
+    // réactivation d'avant ce correctif l'aurait laissé dans la fiche.
     await prisma.enseignant.update({
       where: { id },
-      data: { statut: 'RETRAITE', dateFinService: parsed.data.dateFinService },
+      data: {
+        statut: 'RETRAITE',
+        dateFinService: parsed.data.dateFinService,
+        lieuTransfert: null,
+      },
     })
   } catch (erreur) {
     return {
@@ -263,9 +294,15 @@ export async function reactiverEnseignant(
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
   try {
+    const lecture = await lireStatut(id, 'reactiver')
+    if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
+    if (lecture.refus) return changementRefuse(id, lecture.refus)
+
+    // Un enseignant réactivé n'est plus transféré : sans cela, la fiche garderait une
+    // destination qui ne correspond plus à rien (et la liste des transférés l'afficherait).
     await prisma.enseignant.update({
       where: { id },
-      data: { statut: 'ACTIF', dateFinService: null },
+      data: { statut: 'ACTIF', dateFinService: null, lieuTransfert: null },
     })
   } catch (erreur) {
     return {
