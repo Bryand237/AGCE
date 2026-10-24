@@ -4,11 +4,16 @@ import { ArrowLeft } from 'lucide-react'
 import { recupererAbsenceDetail } from '../../donnees'
 import { FormulaireModifierAbsence } from '../../formulaires'
 import { classeFormulaire } from '@/lib/ui-classes'
+import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 
 export default async function ModifierAbsencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const absence = await recupererAbsenceDetail(id)
   if (!absence) notFound()
+
+  // Même règle que le serveur : une adresse saisie à la main ne doit pas ouvrir un formulaire
+  // que l'enregistrement refuserait.
+  const refus = erreurEtapeAbsence('modifier', absence)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">
@@ -28,12 +33,18 @@ export default async function ModifierAbsencePage({ params }: { params: Promise<
       </div>
 
       <section className={classeFormulaire}>
-        <FormulaireModifierAbsence
-          absenceId={id}
-          dateDebut={absence.dateDebut.toISOString().slice(0, 10)}
-          dateFin={absence.dateFin.toISOString().slice(0, 10)}
-          motif={absence.motif}
-        />
+        {refus ? (
+          <p className="text-sm" role="alert">
+            {refus}
+          </p>
+        ) : (
+          <FormulaireModifierAbsence
+            absenceId={id}
+            dateDebut={absence.dateDebut.toISOString().slice(0, 10)}
+            dateFin={absence.dateFin.toISOString().slice(0, 10)}
+            motif={absence.motif}
+          />
+        )}
       </section>
     </div>
   )

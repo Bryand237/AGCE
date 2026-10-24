@@ -212,10 +212,12 @@ describe('actions serveur : avec une session valide, elles s’exécutent normal
   })
 
   it('une suppression d’absence atteint la base puis revient à la liste', async () => {
+    // La base simulée répond « rien » à toute lecture : l'absence est donc introuvable. L'action
+    // la relit d'abord (pour juger l'étape), constate qu'elle a disparu et revient à la liste.
     await expect(
       modulesDActions.absences.supprimerAbsence('abs-1', {}, new FormData())
     ).rejects.toThrow('NEXT_REDIRECT /absences')
-    expect(accesBase).toContain('absence.delete')
+    expect(accesBase).toContain('absence.findUnique')
   })
 
   it('les données du tableau de bord sont lues', async () => {

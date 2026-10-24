@@ -226,8 +226,16 @@ export function FormulaireSupprimerAbsence({ absenceId }: { absenceId: string })
     etatInitial
   )
 
+  // Une suppression est définitive : le brouillon d'attestation et l'historique de l'absence
+  // disparaissent avec elle.
+  function confirmer(e: React.FormEvent<HTMLFormElement>) {
+    if (!confirm('Supprimer définitivement cette absence ? Cette action est irréversible.')) {
+      e.preventDefault()
+    }
+  }
+
   return (
-    <form action={formAction} className="flex flex-col items-center gap-2">
+    <form action={formAction} onSubmit={confirmer} className="flex flex-col items-center gap-2">
       <button
         type="submit"
         disabled={isPending}

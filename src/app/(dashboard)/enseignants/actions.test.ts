@@ -363,19 +363,17 @@ describe('actions enseignants : erreurs de la base', () => {
       ['un transféré', 'TRANSFERE', retraiter, /transféré : il ne peut pas être marqué retraité/],
       ['un retraité', 'RETRAITE', retraiter, /déjà retraité/],
       ['un enseignant actif', 'ACTIF', reactiver, /déjà actif/],
-    ])(
-      'refuse %s, sans rien écrire, et recharge la fiche',
-      async (_qui, statut, lancer, message) => {
-        avecStatut(statut)
+    ])('refuse %s, sans rien écrire', async (_qui, statut, lancer, message) => {
+      avecStatut(statut)
 
-        const etat = await lancer()
+      const etat = await lancer()
 
-        expect(etat.message).toMatch(message)
-        expect(etat.succes).toBeUndefined()
-        expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
-        expect(revalidatePath).toHaveBeenCalledWith('/enseignants/ens-1')
-      }
-    )
+      expect(etat.message).toMatch(message)
+      expect(etat.succes).toBeUndefined()
+      expect(prismaFactice.enseignant.update).not.toHaveBeenCalled()
+      // Le message reste sous le formulaire : une fiche rechargée le ferait disparaître.
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
 
     it('relit le statut et la date de prise de service avant d’écrire', async () => {
       avecStatut('ACTIF')

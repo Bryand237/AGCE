@@ -9,6 +9,7 @@ import {
   BlocAttestationAbsence,
 } from '../formulaires'
 import { TYPES_AVEC_ATTESTATION } from '@/domain/absences/typesAvecAttestation'
+import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -64,6 +65,12 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
       : null
   const { enseignant } = absence
 
+  // Les boutons suivent les règles que le serveur impose de toute façon (etapesAbsence.ts) :
+  // on ne propose pas une étape qu'il refuserait, et on dit pourquoi.
+  const refusModification = erreurEtapeAbsence('modifier', absence)
+  const refusSuppression = erreurEtapeAbsence('supprimer', absence)
+  const raisonFigee = refusSuppression ?? refusModification
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <Link
@@ -100,15 +107,18 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               {LIBELLES_STATUT[absence.statut]}
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <Link
-                href={`/absences/${id}/modifier`}
-                className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
-              >
-                <Pencil size={14} />
-                Modifier
-              </Link>
-              <FormulaireSupprimerAbsence absenceId={id} />
+              {!refusModification && (
+                <Link
+                  href={`/absences/${id}/modifier`}
+                  className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
+                >
+                  <Pencil size={14} />
+                  Modifier
+                </Link>
+              )}
+              {!refusSuppression && <FormulaireSupprimerAbsence absenceId={id} />}
             </div>
+            {raisonFigee && <p className="text-muted-foreground text-xs">{raisonFigee}</p>}
           </div>
 
           <div className="border-border border-t pt-5">

@@ -440,6 +440,63 @@ documents ressemblent aux décisions originales :
 Pour modifier un gabarit, éditer le fichier `.docx` dans Word et le déposer dans `templates/`.
 Les balises `{nomComplet}`, `{dateDebut}`… doivent rester d'un seul tenant.
 
+## Changements de statut d'un enseignant
+
+Un enseignant **actif** peut être marqué **transféré** ou **retraité**. Un transféré
+ou un retraité ne revient en activité que par la **réactivation** ; il ne passe
+jamais directement de l'un à l'autre (une des deux saisies était alors une erreur,
+et sa date de fin de service serait écrasée sans que personne l'ait décidé).
+
+Les trois actions (`marquerTransfere`, `marquerRetraite`, `reactiverEnseignant`)
+relisent le statut **enregistré en base**, jamais celui que le formulaire
+affichait, et refusent toute autre transition avec un message qui dit quoi faire
+(`src/domain/enseignants/statut.ts`). Le refus s'affiche sous le formulaire ; il
+suffit de recharger la page pour voir l'état actuel de la fiche.
+
+| Action               | Statut      | Date de fin de service | Lieu de transfert |
+| -------------------- | ----------- | ---------------------- | ----------------- |
+| Transférer           | `TRANSFERE` | saisie                 | saisi             |
+| Mettre à la retraite | `RETRAITE`  | saisie                 | effacé            |
+| Réactiver            | `ACTIF`     | effacée                | effacé            |
+
+La relecture et l'écriture ne forment pas une transaction : deux personnes qui
+changeraient le statut de la même fiche à la même seconde pourraient encore se
+marcher dessus, ce qui ne se produit pas dans un usage local à un seul poste.
+
+Les formulaires de transfert et de retraite n'ont plus de champ « Observations » :
+la base n'a pas de colonne pour l'enregistrer (en ajouter une exigerait une
+migration), et la saisie était perdue sans avertissement. La fiche affiche la
+**retraite prévue** (calculée) pour un enseignant actif, et la **date de retraite**
+ou la **date de transfert** enregistrée pour un retraité ou un transféré.
+
+## Étapes d'une absence
+
+Une action serveur est une adresse HTTP appelable sans passer par la page : un onglet
+resté ouvert ou un double envoi pouvait re-valider une absence, rouvrir une absence
+terminée, changer les dates d'une absence dont l'attestation Word avait déjà été
+générée avec les anciennes, ou supprimer une absence dont l'attestation est signée.
+Chaque action relit désormais l'état **enregistré** de l'absence et juge l'étape
+demandée (`src/domain/absences/etapesAbsence.ts`) ; la page propose exactement les
+mêmes étapes.
+
+| Étape                          | Permise quand                                                         |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Valider l'absence              | elle est en attente                                                   |
+| Générer le brouillon           | congé en période ou dépassé, sans attestation                         |
+| Valider (signer) l'attestation | congé en période ou dépassé, avec un brouillon                        |
+| Terminer (retour)              | en période ou dépassée ; pour un congé, une fois l'attestation signée |
+| Modifier les dates             | ni terminée, ni attestation générée (brouillon ou signée)             |
+| Supprimer                      | toujours, sauf quand l'attestation est signée                         |
+
+- Un **brouillon d'attestation** garde les dates au moment de sa génération : pour les
+  corriger, on supprime l'absence et on la recrée. Une attestation **signée** est un acte
+  numéroté : l'absence ne se supprime ni ne se modifie plus.
+- Le bouton « Supprimer » demande une confirmation. Une absence déjà supprimée (autre
+  onglet, double clic) ramène simplement à la liste.
+- Un refus s'affiche sous le formulaire, sans recharger la page, avec le motif.
+- Comme pour les statuts d'enseignant, la relecture et l'écriture ne sont pas une
+  transaction : sans objet pour un usage local à un seul poste.
+
 ## Erreurs de la base dans les actions
 
 Une action qui écrit dans la base entoure cet appel d'un `try/catch` et

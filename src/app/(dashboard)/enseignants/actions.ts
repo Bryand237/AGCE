@@ -184,17 +184,6 @@ export async function modifierEnseignant(
 }
 
 /**
- * Refus d'un changement de statut : la fiche est rechargée, car le formulaire que l'utilisateur
- * avait sous les yeux ne correspond plus à l'état réel de l'enseignant (modifié depuis dans un
- * autre onglet, par exemple).
- */
-function changementRefuse(id: string, message: string): EtatFormulaire {
-  revalidatePath('/enseignants')
-  revalidatePath(`/enseignants/${id}`)
-  return { message }
-}
-
-/**
  * Relit l'enseignant et juge le changement demandé d'après son statut ENREGISTRÉ, jamais d'après
  * ce que le formulaire affichait : `disparu` quand sa fiche n'existe plus, `refus` (le message à
  * afficher) quand la transition n'est pas permise.
@@ -223,7 +212,7 @@ export async function marquerTransfere(
   try {
     const lecture = await lireStatut(id, 'transferer')
     if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
-    if (lecture.refus) return changementRefuse(id, lecture.refus)
+    if (lecture.refus) return { message: lecture.refus }
     const { enseignant } = lecture
     const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
     if (incoherence) return { errors: { dateFinService: [incoherence] } }
@@ -261,7 +250,7 @@ export async function marquerRetraite(
   try {
     const lecture = await lireStatut(id, 'retraiter')
     if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
-    if (lecture.refus) return changementRefuse(id, lecture.refus)
+    if (lecture.refus) return { message: lecture.refus }
     const { enseignant } = lecture
     const incoherence = erreurFinDeService(enseignant.datePriseService, parsed.data.dateFinService)
     if (incoherence) return { errors: { dateFinService: [incoherence] } }
@@ -296,7 +285,7 @@ export async function reactiverEnseignant(
   try {
     const lecture = await lireStatut(id, 'reactiver')
     if (lecture.disparu) return { message: ENSEIGNANT_DISPARU }
-    if (lecture.refus) return changementRefuse(id, lecture.refus)
+    if (lecture.refus) return { message: lecture.refus }
 
     // Un enseignant réactivé n'est plus transféré : sans cela, la fiche garderait une
     // destination qui ne correspond plus à rien (et la liste des transférés l'afficherait).

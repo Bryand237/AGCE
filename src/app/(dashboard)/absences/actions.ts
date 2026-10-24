@@ -13,6 +13,7 @@ import {
 import { erreursDeSaisie } from '@/lib/validations/champs'
 import { calculerFinCongeMaternite } from '@/domain/absences/calculerFinCongeMaternite'
 import { erreurDateRetour } from '@/domain/absences/retourAbsence'
+import { erreurEtapeAbsence, type EtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { genererAttestationAbsence } from '@/lib/documents/genererAttestationAbsence'
 
 export type EtatFormulaire = {
@@ -24,6 +25,20 @@ export type EtatFormulaire = {
 
 const ABSENCE_DISPARUE =
   "Cette absence n'existe plus (elle a peut-être été supprimée). Rechargez la liste des absences."
+
+/**
+ * Relit l'absence et juge l'étape demandée d'après son état ENREGISTRÉ, jamais d'après ce que
+ * la page affichait : `disparue` quand elle n'existe plus, `refus` (le message à afficher)
+ * quand l'étape n'est pas permise (voir `etapesAbsence.ts`).
+ */
+async function lireEtape(absenceId: string, etape: EtapeAbsence) {
+  const absence = await prisma.absence.findUnique({
+    where: { id: absenceId },
+    select: { statut: true, type: true, statutAttestation: true, dateDebut: true },
+  })
+  if (!absence) return { disparue: true as const }
+  return { disparue: false as const, absence, refus: erreurEtapeAbsence(etape, absence) }
+}
 
 export async function creerAbsence(
   _prevStat: EtatFormulaire,
@@ -96,6 +111,10 @@ export async function validerAbsence(
   }
 
   try {
+    const lecture = await lireEtape(absenceId, 'valider')
+    if (lecture.disparue) return { message: ABSENCE_DISPARUE }
+    if (lecture.refus) return { message: lecture.refus }
+
     await prisma.absence.update({
       where: { id: absenceId },
       data: {
@@ -130,12 +149,10 @@ export async function terminerAbsence(
   const { dateRetour } = parsed.data
 
   try {
-    const absence = await prisma.absence.findUnique({
-      where: { id: absenceId },
-      select: { dateDebut: true },
-    })
-    if (!absence) return { message: ABSENCE_DISPARUE }
-    const incoherence = erreurDateRetour(absence.dateDebut, dateRetour)
+    const lecture = await lireEtape(absenceId, 'terminer')
+    if (lecture.disparue) return { message: ABSENCE_DISPARUE }
+    if (lecture.refus) return { message: lecture.refus }
+    const incoherence = erreurDateRetour(lecture.absence.dateDebut, dateRetour)
     if (incoherence) return { message: incoherence }
 
     await prisma.absence.update({
@@ -160,6 +177,10 @@ export async function modifierAbsence(
   if (!parsed.success) return erreursDeSaisie(parsed.error)
 
   try {
+    const lecture = await lireEtape(absenceId, 'modifier')
+    if (lecture.disparue) return { message: ABSENCE_DISPARUE }
+    if (lecture.refus) return { message: lecture.refus }
+
     await prisma.absence.update({ where: { id: absenceId }, data: parsed.data })
   } catch (erreur) {
     return { message: messageErreur(erreur, 'modifierAbsence', { introuvable: ABSENCE_DISPARUE }) }
@@ -175,9 +196,14 @@ export async function supprimerAbsence(
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
   try {
-    await prisma.absence.delete({ where: { id: absenceId } })
-  } catch (erreur) {
+    const lecture = await lireEtape(absenceId, 'supprimer')
     // Absence déjà supprimée (autre onglet, double clic) : le résultat voulu est atteint.
+    if (!lecture.disparue) {
+      if (lecture.refus) return { message: lecture.refus }
+      await prisma.absence.delete({ where: { id: absenceId } })
+    }
+  } catch (erreur) {
+    // Supprimée entre la lecture et l'écriture : même résultat.
     if (analyserErreur(erreur).nature !== 'introuvable') {
       return { message: messageErreur(erreur, 'supprimerAbsence') }
     }
@@ -201,6 +227,8 @@ export async function genererAttestation(
     return { message: messageErreur(erreur, 'genererAttestation') }
   }
   if (!absence) return { message: 'Absence introuvable.' }
+  const refus = erreurEtapeAbsence('genererAttestation', absence)
+  if (refus) return { message: refus }
   if (!absence.enseignant.departement) {
     return {
       message:
@@ -248,6 +276,10 @@ export async function validerAttestation(
   }
 
   try {
+    const lecture = await lireEtape(absenceId, 'validerAttestation')
+    if (lecture.disparue) return { message: ABSENCE_DISPARUE }
+    if (lecture.refus) return { message: lecture.refus }
+
     await prisma.absence.update({
       where: { id: absenceId },
       data: {
@@ -262,6 +294,7 @@ export async function validerAttestation(
       message: messageErreur(erreur, 'validerAttestation', { introuvable: ABSENCE_DISPARUE }),
     }
   }
+  revalidatePath(`/absences/${absenceId}`)
   revalidatePath('/absences')
   return { message: 'Attestation validée.', succes: true }
 }
