@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest'
+import { construireCsvEdition } from './csvEdition'
+import type { DemandeEdition } from '@/domain/editions/editions'
+import { GRILLE_DE_TEST, dossierDeTest, jour } from '@/domain/enseignants/recherche/dossiersDeTest'
+import { avecSituation } from '@/domain/enseignants/recherche/selectionner'
+import type { DossierEnseignant } from '@/domain/enseignants/dossier'
+
+const DEMANDE: DemandeEdition = { cle: 'retraite', annee: 2027 }
+const etab = (id: string, nom: string) => ({ id, nom, abreviation: id.toUpperCase() })
+
+const csv = (...dossiers: DossierEnseignant[]) =>
+  construireCsvEdition(DEMANDE, avecSituation(dossiers, GRILLE_DE_TEST))
+
+const cellules = (texte: string) =>
+  texte
+    .slice(1)
+    .split('\r\n')
+    .filter((l) => l !== '')
+    .map((l) => l.split(';'))
+
+describe('construireCsvEdition', () => {
+  const retraitable = (surcharge: Partial<DossierEnseignant> = {}) =>
+    dossierDeTest({ grade: 'PROFESSEUR', dateNaissance: jour('1962-09-24'), ...surcharge })
+
+  it('commence par la marque UTF-8 et les en-têtes, établissement en tête', () => {
+    const texte = csv(retraitable())
+    expect(texte.charCodeAt(0)).toBe(0xfeff)
+    expect(cellules(texte)[0]).toEqual([
+      'Établissement',
+      'Nom et prénom',
+      'Date de Naissance',
+      'Lieu de Naissance',
+      'Matricule solde',
+      'Grade',
+      'Sexe',
+      'Domaine de recherche',
+      "Département d'attache",
+      'Date de prise de service',
+      'Date de retraite',
+      "Région d'origine",
+      "Département d'origine",
+    ])
+  })
+
+  it('écrit le grade et la région en toutes lettres et la date de retraite', () => {
+    const ligne = cellules(csv(retraitable({ nom: 'ABEGA', prenom: 'Paul' })))[1]!
+    expect(ligne[0]).toBe('Faculté des Arts, Lettres et Sciences Humaines')
+    expect(ligne[1]).toBe('ABEGA Paul')
+    expect(ligne[5]).toBe('Professeur')
+    expect(ligne[10]).toBe('24/09/2027')
+    expect(ligne[11]).toBe('Ouest')
+  })
+
+  it('regroupe par établissement dans l’ordre alphabétique, en gardant l’ordre de la sélection', () => {
+    const texte = csv(
+      retraitable({ nom: 'Z1', etablissement: etab('fs', 'Faculté des Sciences') }),
+      retraitable({ nom: 'A1', etablissement: etab('enspn', 'École Nationale') }),
+      retraitable({ nom: 'A2', etablissement: etab('fs', 'Faculté des Sciences') })
+    )
+    expect(
+      cellules(texte)
+        .slice(1)
+        .map((l) => `${l[0]}|${l[1]!.split(' ')[0]}`)
+    ).toEqual(['École Nationale|A1', 'Faculté des Sciences|Z1', 'Faculté des Sciences|A2'])
+  })
+
+  it('une liste vide donne les en-têtes seuls', () => {
+    expect(cellules(csv())).toHaveLength(1)
+  })
+
+  it('met entre guillemets une valeur qui contient le séparateur, et neutralise les formules', () => {
+    const texte = csv(
+      retraitable({ nom: '=CMD()', domaineRecherche: 'Chimie; physique', lieuNaissance: 'Bafia' })
+    )
+    expect(texte).toContain(";'=CMD() Alice;")
+    expect(texte).toContain('"Chimie; physique"')
+  })
+})

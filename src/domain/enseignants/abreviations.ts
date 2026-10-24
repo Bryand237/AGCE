@@ -1,4 +1,5 @@
 import { normaliserTexte } from '../texte/normaliserTexte'
+import { LIBELLES_GRADE, ORDRE_GRADE } from './grade'
 
 /**
  * Abréviations des listes imprimées (« PR », « OU »…). Elles vivent dans le code : la base ne
@@ -45,4 +46,35 @@ export function abreviationRegion(nomRegion: string): string {
 /** Nom complet associé à un code de région, pour la légende (ou undefined si inconnu). */
 export function nomRegionDepuisCode(code: string): string | undefined {
   return REGIONS.find((r) => r.code === code)?.nom
+}
+
+/**
+ * Légende imprimée sous une liste : elle n'explique QUE les abréviations qui y figurent (grades
+ * et régions d'origine réellement présents), pour que chaque sigle de la page soit expliqué sans
+ * encombrer la feuille de ceux qui n'y sont pas. Les grades suivent l'ordre officiel, les régions
+ * l'ordre alphabétique de leur nom. Une région inconnue (donc non abrégée à l'impression) n'y est
+ * pas. Texte vide quand il n'y a rien à expliquer.
+ */
+export function legendeAbreviations(
+  grades: Iterable<string>,
+  nomsRegions: Iterable<string>
+): string {
+  const gradesPresents = new Set(grades)
+  const partiesGrades = ORDRE_GRADE.filter((grade) => gradesPresents.has(grade)).map(
+    (grade) => `${abreviationGrade(grade)} = ${LIBELLES_GRADE[grade]}`
+  )
+
+  const codesPresents = new Set<string>()
+  for (const nom of nomsRegions) {
+    const code = CODE_PAR_REGION.get(normaliserTexte(nom))
+    if (code !== undefined) codesPresents.add(code)
+  }
+  const partiesRegions = REGIONS.filter((region) => codesPresents.has(region.code))
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+    .map((region) => `${region.code} = ${region.nom}`)
+
+  const morceaux: string[] = []
+  if (partiesGrades.length > 0) morceaux.push(`Grades : ${partiesGrades.join(' ; ')}.`)
+  if (partiesRegions.length > 0) morceaux.push(`Régions : ${partiesRegions.join(' ; ')}.`)
+  return morceaux.join(' ')
 }

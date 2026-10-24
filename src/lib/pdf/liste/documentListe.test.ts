@@ -171,6 +171,27 @@ describe('construireHtmlListe', () => {
     expect(html).toContain('<p class="sous-titre-section">Admis à la retraite en 2027</p>')
   })
 
+  it('imprime la légende sous le tableau, échappée, et rien quand elle est absente ou vide', () => {
+    const avec = construireHtmlListe(
+      document([
+        {
+          titre: 'F',
+          legende: 'Grades : PR = Professeur <b>',
+          groupes: [{ lignes: [{ nom: 'A' }] }],
+        },
+      ])
+    )
+    expect(avec).toContain('<p class="legende">Grades : PR = Professeur &lt;b&gt;</p>')
+    expect(avec.indexOf('</table>')).toBeLessThan(avec.indexOf('<p class="legende">'))
+
+    for (const legende of [undefined, '']) {
+      const sans = construireHtmlListe(
+        document([{ titre: 'F', legende, groupes: [{ lignes: [{ nom: 'A' }] }] }])
+      )
+      expect(sans).not.toContain('<p class="legende">')
+    }
+  })
+
   it('les colonnes insécables portent leur classe, les autres non', () => {
     const html = construireHtmlListe(
       document([{ titre: 'F', groupes: [{ lignes: [{ nom: 'A' }] }] }])

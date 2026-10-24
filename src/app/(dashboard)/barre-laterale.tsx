@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarOff,
   TrendingUp,
+  Printer,
   Search,
   LogOut,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const LIENS = [
   { href: '/enseignants', label: 'Enseignants', icone: Users },
   { href: '/absences', label: 'Absences', icone: CalendarOff },
   { href: '/avancements', label: 'Avancements', icone: TrendingUp },
+  { href: '/editions', label: 'Éditions', icone: Printer },
 ]
 
 const FIL_ARIANE: Record<string, string> = {
@@ -28,6 +30,7 @@ const FIL_ARIANE: Record<string, string> = {
   enseignants: 'Enseignants',
   absences: 'Absences',
   avancements: 'Avancements',
+  editions: 'Éditions',
   nouveau: 'Nouveau',
   modifier: 'Modifier',
 }

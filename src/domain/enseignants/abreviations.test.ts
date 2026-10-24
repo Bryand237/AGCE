@@ -3,6 +3,7 @@ import {
   ABREVIATIONS_GRADE,
   abreviationGrade,
   abreviationRegion,
+  legendeAbreviations,
   nomRegionDepuisCode,
 } from './abreviations'
 import { LIBELLES_GRADE } from './grade'
@@ -71,5 +72,38 @@ describe('nomRegionDepuisCode', () => {
   it('retrouve le nom d’une région depuis son code', () => {
     expect(nomRegionDepuisCode('OU')).toBe('Ouest')
     expect(nomRegionDepuisCode('XX')).toBeUndefined()
+  })
+})
+
+describe('legendeAbreviations', () => {
+  it("n'explique que les grades et les régions présents sur la liste", () => {
+    expect(legendeAbreviations(['PROFESSEUR', 'PROFESSEUR'], ['Ouest', 'Ouest'])).toBe(
+      'Grades : PR = Professeur. Régions : OU = Ouest.'
+    )
+  })
+
+  it("range les grades dans l'ordre officiel et les régions par nom", () => {
+    expect(
+      legendeAbreviations(
+        ['ASSISTANT', 'CHARGE_DE_COURS', 'PROFESSEUR'],
+        ['Sud-Ouest', 'Adamaoua', 'Centre']
+      )
+    ).toBe(
+      'Grades : PR = Professeur ; CC = Chargé de Cours ; ASS = Assistant. ' +
+        'Régions : AD = Adamaoua ; CE = Centre ; SW = Sud-Ouest.'
+    )
+  })
+
+  it('reconnaît une région écrite sans accent ni tiret', () => {
+    expect(legendeAbreviations([], ['extreme nord'])).toBe('Régions : EN = Extrême-Nord.')
+  })
+
+  it("ignore une région inconnue (elle s'imprime en toutes lettres, sans sigle à expliquer)", () => {
+    expect(legendeAbreviations(['PROFESSEUR'], ['Atlantide'])).toBe('Grades : PR = Professeur.')
+  })
+
+  it("est vide quand il n'y a rien à expliquer", () => {
+    expect(legendeAbreviations([], [])).toBe('')
+    expect(legendeAbreviations(['DOYEN'], ['Atlantide'])).toBe('')
   })
 })

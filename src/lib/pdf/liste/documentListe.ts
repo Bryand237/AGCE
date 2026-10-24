@@ -47,6 +47,11 @@ export type SectionListe<T> = {
   titre: string
   /** Précision sous le titre (par exemple « Admis à la retraite en 2027 »). */
   sousTitre?: string
+  /**
+   * Note imprimée sous le tableau (par exemple l'explication des sigles « PR », « OU »…). Absente
+   * ou vide : rien n'est imprimé.
+   */
+  legende?: string
   groupes: GroupeListe<T>[]
 }
 
@@ -125,6 +130,7 @@ const STYLE = `
     font-size: 7.7pt;
   }
   .section-liste + .section-liste { page-break-before: always; }
+  .legende { font-size: 7pt; margin: 6px 0 0; page-break-inside: avoid; }
   .message-vide { text-align: center; font-size: 11pt; margin-top: 40px; }
 `
 
@@ -205,11 +211,15 @@ export function construireHtmlListe<T>(document: DocumentListe<T>): string {
               section.sousTitre === undefined
                 ? ''
                 : `<p class="sous-titre-section">${echapperHtml(section.sousTitre)}</p>`
+            const legende = section.legende
+              ? `<p class="legende">${echapperHtml(section.legende)}</p>`
+              : ''
             return `<section class="section-liste">
       ${enTetePapier(document.enteteGauche, document.enteteDroite)}
       <p class="titre-section">${echapperHtml(section.titre)}</p>
       ${sousTitre}
       ${tableauSection(section, document.colonnes)}
+      ${legende}
     </section>`
           })
           .join('\n')
