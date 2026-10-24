@@ -92,6 +92,23 @@ export const DEFINITIONS_EDITION: Record<
   },
 }
 
+/**
+ * Liste demandée par le client mais impossible aujourd'hui : le dossier d'un enseignant ne dit
+ * pas qu'il est décédé (pas de statut « décédé », pas de date de décès), et la base ne se modifie
+ * pas sans l'accord de son propriétaire. Elle n'a donc ni clé, ni route, ni fichier : la page
+ * « Éditions » l'affiche désactivée, avec cette raison, pour que son absence soit expliquée et non
+ * un oubli. Elle se construira comme les autres dès que ces deux informations existeront.
+ */
+export const EDITION_INDISPONIBLE_DECES = {
+  titre: 'Enseignants décédés',
+  description: 'Les enseignants décédés, avec leur date de décès, établissement par établissement.',
+  raison:
+    "Cette liste n'est pas disponible : le dossier d'un enseignant n'a ni statut « décédé » ni " +
+    'date de décès, et la base de données ne peut pas être modifiée sans accord de son ' +
+    'propriétaire. Dès que ces deux informations pourront être enregistrées, la liste se ' +
+    'construira comme les autres.',
+} as const
+
 /** Bornes des années acceptées : large pour ne rien refuser de plausible, étroite pour une faute de frappe. */
 export const ANNEE_MIN = 1950
 export const ANNEE_MAX = 2100

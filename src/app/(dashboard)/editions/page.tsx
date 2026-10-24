@@ -6,6 +6,7 @@ import {
   Handshake,
   UserMinus,
   UserX,
+  Users,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { aujourdhui, anneeDe } from '@/domain/dates/jourCivil'
@@ -13,6 +14,7 @@ import {
   ANNEE_MAX,
   ANNEE_MIN,
   DEFINITIONS_EDITION,
+  EDITION_INDISPONIBLE_DECES,
   lireAnneeEdition,
   messageEditionVide,
   selectionnerEdition,
@@ -24,6 +26,7 @@ import { chargerDossiers, chargerGrille } from '@/lib/enseignants/chargerDossier
 import {
   BOUTON_EDITION,
   CarteEdition,
+  CarteEditionIndisponible,
   DecompteEtablissements,
   TelechargementsEdition,
 } from './carte-edition'
@@ -154,6 +157,13 @@ export default async function PageEditions({
           messageSiVide={messageEditionVide(demandeMissions)}
         />
       </CarteEdition>
+
+      <CarteEditionIndisponible
+        icone={Users}
+        titre={EDITION_INDISPONIBLE_DECES.titre}
+        description={EDITION_INDISPONIBLE_DECES.description}
+        raison={EDITION_INDISPONIBLE_DECES.raison}
+      />
     </div>
   )
 }

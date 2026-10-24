@@ -4,6 +4,7 @@ import {
   ANNEE_MIN,
   CLES_EDITION,
   DEFINITIONS_EDITION,
+  EDITION_INDISPONIBLE_DECES,
   lireAnneeEdition,
   lireCleEdition,
   lireDemandeEdition,
@@ -19,6 +20,18 @@ import type { AbsenceDossier } from '@/domain/enseignants/dossier'
 
 const RETRAITE_2027: DemandeEdition = { cle: 'retraite', annee: 2027 }
 const AUJOURDHUI = jour('2026-10-23')
+
+describe('liste des décédés', () => {
+  it('est annoncée comme indisponible, avec sa raison, et n’est pas une liste téléchargeable', () => {
+    expect(EDITION_INDISPONIBLE_DECES.titre).toBe('Enseignants décédés')
+    expect(EDITION_INDISPONIBLE_DECES.raison).toContain('date de décès')
+    expect(lireCleEdition('deces')).toBeUndefined()
+    expect(lireCleEdition('decedes')).toBeUndefined()
+    expect(lireDemandeEdition('deces', new URLSearchParams())).toEqual({
+      erreur: { code: 'EDITION_INCONNUE', message: 'Liste inconnue : « deces ».' },
+    })
+  })
+})
 
 describe('lireAnneeEdition', () => {
   it('accepte une année à quatre chiffres dans les bornes, avec ou sans espaces', () => {
