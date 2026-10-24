@@ -25,6 +25,14 @@ test.describe('Absences', () => {
     await page.getByLabel(/auteur de la validation/i).fill('Le Recteur')
     await page.getByRole('button', { name: /^valider$/i }).click()
 
+    // Un congé ne se termine qu'une fois son attestation signée : le serveur refuse la fin
+    // d'absence avant (voir « Étapes d'une absence » dans le README).
+    await page.getByRole('button', { name: /générer le brouillon d.attestation/i }).click()
+    await page.getByLabel(/numéro de décision/i).fill('12/26')
+    await page.getByLabel(/date de validation/i).fill('2026-04-25')
+    await page.getByLabel(/auteur de la validation/i).fill('Le Recteur')
+    await page.getByRole('button', { name: /marquer signée/i }).click()
+
     await page.getByLabel(/date de retour/i).fill('2026-07-22')
     await page.getByRole('button', { name: /marquer terminé/i }).click()
     await expect(page.getByText(/retour enregistré le/i)).toBeVisible()
