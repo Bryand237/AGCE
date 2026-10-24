@@ -64,6 +64,12 @@ describe('lireCleEdition', () => {
       expect(DEFINITIONS_EDITION[cle].description.length).toBeGreaterThan(0)
     }
   })
+
+  it('la liste de collaboration prévient que les dates du contrat ne sont pas en base', () => {
+    expect(DEFINITIONS_EDITION.collaboration.avertissement).toContain('ne sont pas enregistrées')
+    expect(DEFINITIONS_EDITION.retraite.avertissement).toBeUndefined()
+    expect(DEFINITIONS_EDITION.transferes.avertissement).toBeUndefined()
+  })
 })
 
 describe('lireDemandeEdition', () => {
@@ -91,6 +97,16 @@ describe('lireDemandeEdition', () => {
     }
   )
 
+  it.each(['transferes', 'collaboration'] as const)(
+    'lit la liste « %s » sans paramètre, et ignore ceux qu’on lui ajoute',
+    (cle) => {
+      expect(lireDemandeEdition(cle, parametres(''))).toEqual({ demande: { cle } })
+      expect(lireDemandeEdition(cle, parametres('annee=abc&page=3'))).toEqual({
+        demande: { cle },
+      })
+    }
+  )
+
   it('prend la première année quand le paramètre est répété', () => {
     expect(lireDemandeEdition('retraite', parametres('annee=2028&annee=2027'))).toEqual({
       demande: { cle: 'retraite', annee: 2028 },
@@ -102,6 +118,23 @@ describe('titres et noms de fichier', () => {
   it('titre et message de liste vide portent l’année', () => {
     expect(titreEdition(RETRAITE_2027)).toBe('Liste des enseignants à la retraite en 2027')
     expect(messageEditionVide(RETRAITE_2027)).toBe('Aucun enseignant à la retraite en 2027.')
+  })
+
+  it('titres, messages de liste vide et noms de fichier des listes sans année', () => {
+    const transferes: DemandeEdition = { cle: 'transferes' }
+    const collaboration: DemandeEdition = { cle: 'collaboration' }
+    expect(titreEdition(transferes)).toBe('Liste des enseignants transférés')
+    expect(titreEdition(collaboration)).toBe('Liste des enseignants sous contrat de collaboration')
+    expect(messageEditionVide(transferes)).toBe('Aucun enseignant transféré.')
+    expect(messageEditionVide(collaboration)).toBe(
+      'Aucun enseignant sous contrat de collaboration.'
+    )
+    expect(nomFichierEdition(transferes, AUJOURDHUI, 'pdf')).toBe(
+      'transferes_edition-2026-10-23.pdf'
+    )
+    expect(nomFichierEdition(collaboration, AUJOURDHUI, 'csv')).toBe(
+      'collaboration_edition-2026-10-23.csv'
+    )
   })
 
   it('le nom de fichier porte la liste, l’année et le jour d’édition', () => {
@@ -196,5 +229,62 @@ describe('selectionnerEdition — retraite', () => {
         (l) => l.dossier.nom
       )
     ).toEqual(['ABEGA', 'ZEBRE'])
+  })
+})
+
+describe('selectionnerEdition — transférés et contrats de collaboration', () => {
+  const dossiers = [
+    dossierDeTest({ nom: 'ACTIF', statut: 'ACTIF' }),
+    dossierDeTest({
+      nom: 'TRANSFERE_B',
+      statut: 'TRANSFERE',
+      dateFinService: jour('2024-09-01'),
+      lieuTransfert: 'Université de Bamenda',
+    }),
+    dossierDeTest({
+      nom: 'TRANSFERE_A',
+      statut: 'TRANSFERE',
+      dateFinService: jour('2025-01-15'),
+      lieuTransfert: 'Université de Douala',
+    }),
+    dossierDeTest({ nom: 'RETRAITE', statut: 'RETRAITE', dateFinService: jour('2025-06-30') }),
+    dossierDeTest({ nom: 'COLLAB_ACTIF', statut: 'ACTIF', contratCollaboration: true }),
+    dossierDeTest({
+      nom: 'COLLAB_RETRAITE',
+      statut: 'RETRAITE',
+      dateFinService: jour('2024-01-01'),
+      contratCollaboration: true,
+    }),
+    dossierDeTest({
+      nom: 'COLLAB_TRANSFERE',
+      statut: 'TRANSFERE',
+      dateFinService: jour('2024-02-01'),
+      contratCollaboration: true,
+    }),
+  ]
+
+  const noms = (demande: DemandeEdition) =>
+    selectionnerEdition(demande, dossiers, GRILLE_DE_TEST, AUJOURDHUI).map((l) => l.dossier.nom)
+
+  it('« transférés » : tous les transférés, rangés par nom, et eux seuls', () => {
+    expect(noms({ cle: 'transferes' })).toEqual(['COLLAB_TRANSFERE', 'TRANSFERE_A', 'TRANSFERE_B'])
+  })
+
+  it('« collaboration » : actifs et retraités sous contrat, jamais un transféré', () => {
+    expect(noms({ cle: 'collaboration' })).toEqual(['COLLAB_ACTIF', 'COLLAB_RETRAITE'])
+  })
+
+  it('ne dépendent pas du jour d’édition', () => {
+    for (const demande of [{ cle: 'transferes' }, { cle: 'collaboration' }] as const) {
+      const autre = selectionnerEdition(demande, dossiers, GRILLE_DE_TEST, jour('2030-01-01'))
+      expect(autre.map((l) => l.dossier.nom)).toEqual(noms(demande))
+    }
+  })
+
+  it('donnent une liste vide quand personne n’est concerné', () => {
+    const seul = [dossierDeTest({ nom: 'ACTIF' })]
+    for (const demande of [{ cle: 'transferes' }, { cle: 'collaboration' }] as const) {
+      expect(selectionnerEdition(demande, seul, GRILLE_DE_TEST, AUJOURDHUI)).toEqual([])
+    }
   })
 })

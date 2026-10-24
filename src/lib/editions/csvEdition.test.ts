@@ -76,3 +76,44 @@ describe('construireCsvEdition', () => {
     expect(texte).toContain('"Chimie; physique"')
   })
 })
+
+describe('construireCsvEdition — transférés et collaboration', () => {
+  const lire = (demande: DemandeEdition, ...dossiers: DossierEnseignant[]) =>
+    cellules(construireCsvEdition(demande, avecSituation(dossiers, GRILLE_DE_TEST)))
+
+  it('transférés : date et université d’accueil entre la prise de service et l’origine', () => {
+    const [entetes, ligne] = lire(
+      { cle: 'transferes' },
+      dossierDeTest({
+        statut: 'TRANSFERE',
+        dateFinService: jour('2025-01-15'),
+        lieuTransfert: 'Université de Douala',
+      })
+    )
+    expect(entetes!.slice(10, 14)).toEqual([
+      'Date de transfert',
+      "Université d'accueil",
+      "Région d'origine",
+      "Département d'origine",
+    ])
+    expect(ligne!.slice(10, 14)).toEqual([
+      '15/01/2025',
+      'Université de Douala',
+      'Ouest',
+      'Bamboutos',
+    ])
+  })
+
+  it('collaboration : les deux colonnes de dates existent et sont vides', () => {
+    const [entetes, ligne] = lire(
+      { cle: 'collaboration' },
+      dossierDeTest({ contratCollaboration: true })
+    )
+    expect(entetes).toContain('Date de début de la collaboration')
+    expect(entetes).toContain('Date de fin de la collaboration')
+    expect(ligne).toHaveLength(entetes!.length)
+    const debut = entetes!.indexOf('Date de début de la collaboration')
+    expect(ligne![debut]).toBe('')
+    expect(ligne![debut + 1]).toBe('')
+  })
+})

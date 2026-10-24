@@ -1,4 +1,4 @@
-import { FileDown, FileSpreadsheet, UserX } from 'lucide-react'
+import { FileDown, FileSpreadsheet, Handshake, UserMinus, UserX } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { aujourdhui, anneeDe } from '@/domain/dates/jourCivil'
 import {
@@ -6,19 +6,22 @@ import {
   ANNEE_MIN,
   DEFINITIONS_EDITION,
   lireAnneeEdition,
+  messageEditionVide,
   selectionnerEdition,
   titreEdition,
 } from '@/domain/editions/editions'
-import { regrouperParEtablissement } from '@/domain/editions/parEtablissement'
+import type { DemandeEdition } from '@/domain/editions/editions'
 import type { ParametresUrl } from '@/domain/enseignants/recherche/lireFiltres'
 import { chargerDossiers, chargerGrille } from '@/lib/enseignants/chargerDossiers'
-import { CarteEdition } from './carte-edition'
+import {
+  BOUTON_EDITION,
+  CarteEdition,
+  DecompteEtablissements,
+  TelechargementsEdition,
+} from './carte-edition'
 
 const premier = (valeur: string | string[] | undefined) =>
   Array.isArray(valeur) ? valeur[0] : valeur
-
-const BOUTON =
-  'border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium shadow-sm'
 
 export default async function PageEditions({
   searchParams,
@@ -33,9 +36,11 @@ export default async function PageEditions({
 
   const [dossiers, grille] = await Promise.all([chargerDossiers(), chargerGrille()])
   // Même sélection que les téléchargements : le décompte affiché est celui du PDF.
-  const demande = { cle: 'retraite', annee } as const
-  const retraites = selectionnerEdition(demande, dossiers, grille, jourCourant)
-  const parEtablissement = regrouperParEtablissement(retraites)
+  const demandeRetraite = { cle: 'retraite', annee } as const
+  const demandeTransferes: DemandeEdition = { cle: 'transferes' }
+  const demandeCollaboration: DemandeEdition = { cle: 'collaboration' }
+  const selection = (demande: DemandeEdition) =>
+    selectionnerEdition(demande, dossiers, grille, jourCourant)
 
   return (
     <div className="space-y-8">
@@ -66,44 +71,51 @@ export default async function PageEditions({
               className="border-border bg-background focus:border-primary focus:ring-primary/15 w-32 rounded-2xl border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
           </label>
-          <button type="submit" className={BOUTON}>
+          <button type="submit" className={BOUTON_EDITION}>
             Afficher le décompte
           </button>
-          <button type="submit" formAction="/editions/retraite/pdf" className={BOUTON}>
+          <button type="submit" formAction="/editions/retraite/pdf" className={BOUTON_EDITION}>
             <FileDown size={16} aria-hidden="true" />
             PDF
           </button>
-          <button type="submit" formAction="/editions/retraite/csv" className={BOUTON}>
+          <button type="submit" formAction="/editions/retraite/csv" className={BOUTON_EDITION}>
             <FileSpreadsheet size={16} aria-hidden="true" />
             Excel (CSV)
           </button>
         </form>
 
-        <div role="status" className="text-sm">
-          {retraites.length === 0 ? (
-            <p className="text-muted-foreground">Aucun enseignant à la retraite en {annee}.</p>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-foreground font-medium">
-                {titreEdition(demande)} : {retraites.length} enseignant
-                {retraites.length > 1 ? 's' : ''}
-              </p>
-              <ul className="text-muted-foreground divide-border border-border divide-y rounded-2xl border">
-                {parEtablissement.map((etablissement) => (
-                  <li
-                    key={etablissement.id}
-                    className="flex items-center justify-between gap-4 px-4 py-2"
-                  >
-                    <span>{etablissement.nom}</span>
-                    <span className="text-foreground font-medium tabular-nums">
-                      {etablissement.lignes.length}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <DecompteEtablissements
+          intitule={titreEdition(demandeRetraite)}
+          lignes={selection(demandeRetraite)}
+          messageSiVide={messageEditionVide(demandeRetraite)}
+        />
+      </CarteEdition>
+
+      <CarteEdition
+        icone={UserMinus}
+        titre={DEFINITIONS_EDITION.transferes.titre}
+        description={DEFINITIONS_EDITION.transferes.description}
+      >
+        <TelechargementsEdition cle="transferes" />
+        <DecompteEtablissements
+          intitule={titreEdition(demandeTransferes)}
+          lignes={selection(demandeTransferes)}
+          messageSiVide={messageEditionVide(demandeTransferes)}
+        />
+      </CarteEdition>
+
+      <CarteEdition
+        icone={Handshake}
+        titre={DEFINITIONS_EDITION.collaboration.titre}
+        description={DEFINITIONS_EDITION.collaboration.description}
+        avertissement={DEFINITIONS_EDITION.collaboration.avertissement}
+      >
+        <TelechargementsEdition cle="collaboration" />
+        <DecompteEtablissements
+          intitule={titreEdition(demandeCollaboration)}
+          lignes={selection(demandeCollaboration)}
+          messageSiVide={messageEditionVide(demandeCollaboration)}
+        />
       </CarteEdition>
     </div>
   )

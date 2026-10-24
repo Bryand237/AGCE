@@ -97,6 +97,38 @@ function colonnesPropres(demande: DemandeEdition): ColonneEdition[] {
           valeur: ({ situation }) => dateOuVide(situation.dateRetraite),
         },
       ]
+    case 'transferes':
+      return [
+        {
+          // La date de fin de service d'un transféré EST la date effective de son transfert.
+          entete: 'Date de transfert',
+          largeur: 17,
+          insecable: true,
+          valeur: ({ dossier }) => dateOuVide(dossier.dateFinService),
+        },
+        {
+          entete: "Université d'accueil",
+          largeur: 24,
+          valeur: ({ dossier }) => dossier.lieuTransfert ?? '',
+        },
+      ]
+    case 'collaboration':
+      // Le dossier ne dit que « oui » ou « non » : les dates du contrat n'existent pas en base.
+      // Les deux colonnes restent dans la liste (elles sont demandées) mais sortent vides.
+      return [
+        {
+          entete: 'Date de début de la collaboration',
+          largeur: 21,
+          insecable: true,
+          valeur: () => '',
+        },
+        {
+          entete: 'Date de fin de la collaboration',
+          largeur: 21,
+          insecable: true,
+          valeur: () => '',
+        },
+      ]
   }
 }
 

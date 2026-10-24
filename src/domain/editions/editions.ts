@@ -17,19 +17,45 @@ import type { LigneRecherche } from '../enseignants/recherche/trier'
  * manquent : chaque `switch` est exhaustif).
  */
 
-export const CLES_EDITION = ['retraite'] as const
+export const CLES_EDITION = ['retraite', 'transferes', 'collaboration'] as const
 export type CleEdition = (typeof CLES_EDITION)[number]
 
 /** Ce que l'utilisateur demande : une liste, avec ses paramètres déjà contrôlés. */
-export type DemandeEdition = { cle: 'retraite'; annee: number }
+export type DemandeEdition =
+  | { cle: 'retraite'; annee: number }
+  | { cle: 'transferes' }
+  | { cle: 'collaboration' }
 
-export const DEFINITIONS_EDITION: Record<CleEdition, { titre: string; description: string }> = {
+export const DEFINITIONS_EDITION: Record<
+  CleEdition,
+  {
+    titre: string
+    description: string
+    /** Avertissement affiché avec la liste quand elle ne peut pas être complète. */
+    avertissement?: string
+  }
+> = {
   retraite: {
     titre: 'Enseignants à la retraite',
     description:
       "Les enseignants dont le départ à la retraite tombe dans l'année choisie. Pour un enseignant " +
       'en activité, la date est calculée (naissance + âge de retraite de son grade) ; pour un ' +
       'retraité, c’est la date enregistrée dans son dossier.',
+  },
+  transferes: {
+    titre: 'Enseignants transférés',
+    description:
+      "Les enseignants transférés hors de l'université, avec la date de leur transfert et " +
+      "l'université d'accueil enregistrées dans leur dossier.",
+  },
+  collaboration: {
+    titre: 'Enseignants sous contrat de collaboration',
+    description:
+      'Les enseignants en activité ou retraités dont le dossier porte un contrat de collaboration. ' +
+      "Un enseignant transféré hors de l'université n'y figure pas.",
+    avertissement:
+      'Les dates de début et de fin du contrat ne sont pas enregistrées dans la base : ces deux ' +
+      'colonnes sortent vides, à compléter à la main ou dans Excel.',
   },
 }
 
@@ -82,6 +108,11 @@ export function lireDemandeEdition(
       }
       return { demande: { cle: 'retraite', annee } }
     }
+    // Ces listes n'ont aucun paramètre : ce que l'adresse contient d'autre est ignoré.
+    case 'transferes':
+      return { demande: { cle: 'transferes' } }
+    case 'collaboration':
+      return { demande: { cle: 'collaboration' } }
   }
 }
 
@@ -90,6 +121,10 @@ export function titreEdition(demande: DemandeEdition): string {
   switch (demande.cle) {
     case 'retraite':
       return `Liste des enseignants à la retraite en ${demande.annee}`
+    case 'transferes':
+      return 'Liste des enseignants transférés'
+    case 'collaboration':
+      return 'Liste des enseignants sous contrat de collaboration'
   }
 }
 
@@ -98,6 +133,10 @@ export function messageEditionVide(demande: DemandeEdition): string {
   switch (demande.cle) {
     case 'retraite':
       return `Aucun enseignant à la retraite en ${demande.annee}.`
+    case 'transferes':
+      return 'Aucun enseignant transféré.'
+    case 'collaboration':
+      return 'Aucun enseignant sous contrat de collaboration.'
   }
 }
 
@@ -127,6 +166,21 @@ export function selectionnerEdition(
         grille,
         jour
       )
+    case 'transferes':
+      return selectionnerDossiers(
+        dossiers,
+        { ...filtresVides(), statuts: ['TRANSFERE'] },
+        grille,
+        jour
+      )
+    case 'collaboration':
+      // Un transféré a quitté l'université : son contrat n'est plus un contrat de l'université.
+      return selectionnerDossiers(
+        dossiers,
+        { ...filtresVides(), collaboration: true, statuts: ['ACTIF', 'RETRAITE'] },
+        grille,
+        jour
+      )
   }
 }
 
@@ -134,6 +188,10 @@ function radicalFichier(demande: DemandeEdition): string {
   switch (demande.cle) {
     case 'retraite':
       return `retraites-${demande.annee}`
+    case 'transferes':
+      return 'transferes'
+    case 'collaboration':
+      return 'collaboration'
   }
 }
 

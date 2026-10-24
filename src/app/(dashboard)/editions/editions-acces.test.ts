@@ -87,10 +87,29 @@ describe.each(ROUTES)('liste officielle en %s', (_nom, format, route) => {
     expect(chargerEdition).toHaveBeenCalledWith({ cle: 'retraite', annee: 2027 })
   })
 
-  it('est contrôlée par le proxy (connexion exigée)', () => {
-    const source = config.matcher[0] as string
-    expect(new RegExp(`^${source}$`).test(`/editions/retraite/${format}`)).toBe(true)
-  })
+  it.each(['transferes', 'collaboration'] as const)(
+    'la liste « %s » se télécharge sans paramètre et ignore ceux qu’on lui ajoute',
+    async (cle) => {
+      for (const parametres of ['', 'annee=abc&page=3']) {
+        chargerEdition.mockClear()
+        const reponse = await appeler(route, cle, parametres)
+
+        expect(reponse.status).toBe(200)
+        expect(chargerEdition).toHaveBeenCalledWith({ cle })
+        expect(reponse.headers.get('Content-Disposition')).toBe(
+          `attachment; filename="${cle}_edition-2026-10-23.${format}"`
+        )
+      }
+    }
+  )
+
+  it.each(['retraite', 'transferes', 'collaboration'])(
+    'la liste « %s » est contrôlée par le proxy (connexion exigée)',
+    (cle) => {
+      const source = config.matcher[0] as string
+      expect(new RegExp(`^${source}$`).test(`/editions/${cle}/${format}`)).toBe(true)
+    }
+  )
 })
 
 describe('en-têtes de réponse', () => {

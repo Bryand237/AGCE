@@ -180,3 +180,95 @@ describe('construireHtmlEdition', () => {
     expect(html.indexOf('ZEBRE')).toBeLessThan(html.indexOf('ALPHA')) // mars avant novembre
   })
 })
+
+describe('colonnesEdition — transférés', () => {
+  const colonnes = colonnesEdition({ cle: 'transferes' })
+
+  it('place la date de transfert et l’université d’accueil avant l’origine', () => {
+    const entetes = colonnes.map((c) => c.entete)
+    expect(entetes.slice(8)).toEqual([
+      'Date de prise de service',
+      'Date de transfert',
+      "Université d'accueil",
+      "Région d'origine",
+      "Département d'origine",
+    ])
+  })
+
+  it('imprime la date de fin de service (= transfert) et le lieu enregistrés', () => {
+    const [ligne] = lignes(
+      dossierDeTest({
+        statut: 'TRANSFERE',
+        dateFinService: jour('2025-01-15'),
+        lieuTransfert: 'Université de Douala',
+      })
+    )
+    const valeur = (entete: string) => colonnes.find((c) => c.entete === entete)!.valeur(ligne!)
+    expect(valeur('Date de transfert')).toBe('15/01/2025')
+    expect(valeur("Université d'accueil")).toBe('Université de Douala')
+  })
+
+  it('laisse les cellules vides quand le dossier ne dit rien', () => {
+    const [ligne] = lignes(
+      dossierDeTest({ statut: 'TRANSFERE', dateFinService: null, lieuTransfert: null })
+    )
+    const valeur = (entete: string) => colonnes.find((c) => c.entete === entete)!.valeur(ligne!)
+    expect(valeur('Date de transfert')).toBe('')
+    expect(valeur("Université d'accueil")).toBe('')
+  })
+})
+
+describe('colonnesEdition — collaboration', () => {
+  const colonnes = colonnesEdition({ cle: 'collaboration' })
+
+  it('garde les deux colonnes de dates du contrat, demandées par le client', () => {
+    expect(colonnes.map((c) => c.entete).slice(8, 12)).toEqual([
+      'Date de prise de service',
+      'Date de début de la collaboration',
+      'Date de fin de la collaboration',
+      "Région d'origine",
+    ])
+  })
+
+  it('les laisse vides : la base ne connaît pas ces dates', () => {
+    const [ligne] = lignes(dossierDeTest({ contratCollaboration: true }))
+    for (const entete of ['Date de début de la collaboration', 'Date de fin de la collaboration']) {
+      expect(colonnes.find((c) => c.entete === entete)!.valeur(ligne!)).toBe('')
+    }
+  })
+})
+
+describe.each([
+  [{ cle: 'transferes' }, 'Liste des enseignants transférés'],
+  [{ cle: 'collaboration' }, 'Liste des enseignants sous contrat de collaboration'],
+] as const)('document %j', (demande, titre) => {
+  it('tient sur la feuille sans rétrécir les colonnes au point de couper les dates', () => {
+    const total = colonnesEdition(demande).reduce(
+      (somme, c) => somme + c.largeur,
+      LARGEUR_NUMERO_MM
+    )
+    expect(total / LARGEUR_UTILE_MM).toBeGreaterThan(0.85)
+    expect(total / LARGEUR_UTILE_MM).toBeLessThan(1.3)
+  })
+
+  it('imprime le titre de la liste et l’effectif de chaque établissement', () => {
+    const html = construireHtmlEdition(
+      demande,
+      lignes(
+        dossierDeTest({ etablissement: FS }),
+        dossierDeTest({ etablissement: FS }),
+        dossierDeTest({ etablissement: FALSH })
+      ),
+      AUJOURDHUI
+    )
+    expect(html).toContain(`${titre} — 2 enseignants`)
+    expect(html).toContain(`${titre} — 1 enseignant<`)
+    expect(compter(html, /<section class="section-liste">/g)).toBe(2)
+  })
+
+  it('annonce une liste vide', () => {
+    const html = construireHtmlEdition(demande, [], AUJOURDHUI)
+    expect(html).toContain('Aucun enseignant')
+    expect(html).not.toContain('<table>')
+  })
+})
