@@ -1,11 +1,14 @@
 import { aujourdhui } from '@/domain/dates/jourCivil'
-import { selectionnerEdition, type DemandeEdition } from '@/domain/editions/editions'
-import type { LigneRecherche } from '@/domain/enseignants/recherche/trier'
+import {
+  selectionnerEdition,
+  type DemandeEdition,
+  type LigneEdition,
+} from '@/domain/editions/editions'
 import { chargerDossiers, chargerGrille } from '@/lib/enseignants/chargerDossiers'
 
 export type EditionChargee = {
   /** Les enseignants de la liste, dans l'ordre d'impression à l'intérieur de chaque établissement. */
-  lignes: LigneRecherche[]
+  lignes: LigneEdition[]
   jour: Date
 }
 

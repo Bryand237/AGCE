@@ -1,7 +1,9 @@
 import type { PalierIndiciaire } from '../avancement/calculerProchainEchelon'
 import { formaterDateIso } from '../dates/jourCivil'
-import type { DossierEnseignant } from '../enseignants/dossier'
-import { filtresVides } from '../enseignants/recherche/filtres'
+import { absenceRepondAuCritere } from '../enseignants/recherche/correspondAbsences'
+import type { AbsenceDossier, DossierEnseignant, TypeAbsence } from '../enseignants/dossier'
+import { critereAbsenceNeutre, filtresVides } from '../enseignants/recherche/filtres'
+import type { CritereAbsence } from '../enseignants/recherche/filtres'
 import { selectionnerDossiers } from '../enseignants/recherche/selectionner'
 import type { LigneRecherche } from '../enseignants/recherche/trier'
 
@@ -17,7 +19,13 @@ import type { LigneRecherche } from '../enseignants/recherche/trier'
  * manquent : chaque `switch` est exhaustif).
  */
 
-export const CLES_EDITION = ['retraite', 'transferes', 'collaboration'] as const
+export const CLES_EDITION = [
+  'retraite',
+  'transferes',
+  'collaboration',
+  'conges',
+  'missions',
+] as const
 export type CleEdition = (typeof CLES_EDITION)[number]
 
 /** Ce que l'utilisateur demande : une liste, avec ses paramètres déjà contrôlés. */
@@ -25,6 +33,15 @@ export type DemandeEdition =
   | { cle: 'retraite'; annee: number }
   | { cle: 'transferes' }
   | { cle: 'collaboration' }
+  | { cle: 'conges' }
+  | { cle: 'missions' }
+
+/**
+ * Une ligne d'une liste : un enseignant et sa situation de carrière. Les listes d'absences y
+ * ajoutent l'absence qui l'y a fait figurer : un enseignant a autant de lignes que d'absences
+ * qui répondent à la liste (en général une).
+ */
+export type LigneEdition = LigneRecherche & { absence?: AbsenceDossier }
 
 export const DEFINITIONS_EDITION: Record<
   CleEdition,
@@ -56,6 +73,22 @@ export const DEFINITIONS_EDITION: Record<
     avertissement:
       'Les dates de début et de fin du contrat ne sont pas enregistrées dans la base : ces deux ' +
       'colonnes sortent vides, à compléter à la main ou dans Excel.',
+  },
+  conges: {
+    titre: 'Enseignants en congé de maternité ou de maladie',
+    description:
+      'Les enseignants en activité actuellement en congé de maternité ou de maladie, avec les dates ' +
+      "du congé, y compris ceux dont le retour n'est pas encore enregistré. Aucun motif n'est imprimé.",
+  },
+  missions: {
+    titre: 'Enseignants en mission',
+    description:
+      'Les enseignants en activité actuellement en mission, avec les dates de la mission, y ' +
+      "compris ceux dont le retour n'est pas encore enregistré.",
+    avertissement:
+      "La base n'indique ni le lieu d'accueil ni si la mission est à l'étranger : la liste " +
+      "reprend toutes les missions en cours, et la colonne « Lieu d'accueil / motif » reproduit " +
+      "le motif saisi à la création de l'absence.",
   },
 }
 
@@ -113,6 +146,10 @@ export function lireDemandeEdition(
       return { demande: { cle: 'transferes' } }
     case 'collaboration':
       return { demande: { cle: 'collaboration' } }
+    case 'conges':
+      return { demande: { cle: 'conges' } }
+    case 'missions':
+      return { demande: { cle: 'missions' } }
   }
 }
 
@@ -125,6 +162,10 @@ export function titreEdition(demande: DemandeEdition): string {
       return 'Liste des enseignants transférés'
     case 'collaboration':
       return 'Liste des enseignants sous contrat de collaboration'
+    case 'conges':
+      return 'Liste des enseignants en congé de maternité ou de maladie'
+    case 'missions':
+      return 'Liste des enseignants en mission'
   }
 }
 
@@ -137,6 +178,10 @@ export function messageEditionVide(demande: DemandeEdition): string {
       return 'Aucun enseignant transféré.'
     case 'collaboration':
       return 'Aucun enseignant sous contrat de collaboration.'
+    case 'conges':
+      return 'Aucun enseignant en congé de maternité ou de maladie.'
+    case 'missions':
+      return 'Aucun enseignant en mission.'
   }
 }
 
@@ -150,7 +195,7 @@ export function selectionnerEdition(
   dossiers: readonly DossierEnseignant[],
   grille: PalierIndiciaire[],
   jour: Date
-): LigneRecherche[] {
+): LigneEdition[] {
   switch (demande.cle) {
     case 'retraite':
       // Date de retraite dans l'année : réelle pour un retraité, calculée pour un actif ; un
@@ -181,7 +226,55 @@ export function selectionnerEdition(
         grille,
         jour
       )
+    case 'conges':
+      return absencesEnCours(['CONGE_MATERNITE', 'CONGE_MALADIE'], dossiers, grille, jour)
+    case 'missions':
+      return absencesEnCours(['MISSION'], dossiers, grille, jour)
   }
+}
+
+/**
+ * Les absences de ces types qui occupent un enseignant EN ACTIVITÉ aujourd'hui : celles en cours
+ * et celles dont la fin prévue est passée sans retour enregistré (il est donc toujours absent
+ * d'après le dossier ; les dates imprimées montrent l'anomalie). Les absences à venir ou
+ * terminées n'y sont pas ; un retraité ou un transféré n'est plus « en congé » ni « en mission »
+ * pour l'université, même si une ancienne absence est restée ouverte.
+ *
+ * Une ligne par absence, de la plus ancienne à la plus récente, puis par nom (le tri est stable
+ * et la sélection de départ est déjà rangée par nom).
+ */
+function absencesEnCours(
+  types: TypeAbsence[],
+  dossiers: readonly DossierEnseignant[],
+  grille: PalierIndiciaire[],
+  jour: Date
+): LigneEdition[] {
+  const critere: CritereAbsence = {
+    ...critereAbsenceNeutre(),
+    types,
+    etats: ['en-cours', 'depassee'],
+  }
+  const actifs = selectionnerDossiers(
+    dossiers,
+    { ...filtresVides(), statuts: ['ACTIF'] },
+    grille,
+    jour
+  )
+  return actifs
+    .flatMap((ligne) =>
+      ligne.dossier.absences
+        .filter((absence) => absenceRepondAuCritere(absence, critere, jour))
+        .map((absence) => ({ ...ligne, absence }))
+    )
+    .sort((a, b) => a.absence.dateDebut.getTime() - b.absence.dateDebut.getTime())
+}
+
+/**
+ * Combien d'enseignants une liste contient. Une liste d'absences a une ligne par absence : un
+ * enseignant qui aurait deux congés en cours y figure deux fois, mais ne compte qu'une fois.
+ */
+export function nombreEnseignants(lignes: readonly { dossier: { id: string } }[]): number {
+  return new Set(lignes.map(({ dossier }) => dossier.id)).size
 }
 
 function radicalFichier(demande: DemandeEdition): string {
@@ -192,6 +285,10 @@ function radicalFichier(demande: DemandeEdition): string {
       return 'transferes'
     case 'collaboration':
       return 'collaboration'
+    case 'conges':
+      return 'conges'
+    case 'missions':
+      return 'missions'
   }
 }
 

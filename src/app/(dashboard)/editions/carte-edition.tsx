@@ -1,7 +1,8 @@
 import { FileDown, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { nombreEnseignants } from '@/domain/editions/editions'
+import type { LigneEdition } from '@/domain/editions/editions'
 import { regrouperParEtablissement } from '@/domain/editions/parEtablissement'
-import type { LigneRecherche } from '@/domain/enseignants/recherche/trier'
 
 /** Style commun des boutons de la page. */
 export const BOUTON_EDITION =
@@ -60,7 +61,7 @@ export function DecompteEtablissements({
 }: {
   /** Titre de la liste (« Liste des enseignants transférés »). */
   intitule: string
-  lignes: readonly LigneRecherche[]
+  lignes: readonly LigneEdition[]
   messageSiVide: string
 }) {
   const parEtablissement = regrouperParEtablissement(lignes)
@@ -71,7 +72,8 @@ export function DecompteEtablissements({
       ) : (
         <div className="space-y-2">
           <p className="text-foreground font-medium">
-            {intitule} : {lignes.length} enseignant{lignes.length > 1 ? 's' : ''}
+            {intitule} : {nombreEnseignants(lignes)} enseignant
+            {nombreEnseignants(lignes) > 1 ? 's' : ''}
           </p>
           <ul className="text-muted-foreground divide-border border-border divide-y rounded-2xl border">
             {parEtablissement.map((etablissement) => (
@@ -81,7 +83,7 @@ export function DecompteEtablissements({
               >
                 <span>{etablissement.nom}</span>
                 <span className="text-foreground font-medium tabular-nums">
-                  {etablissement.lignes.length}
+                  {nombreEnseignants(etablissement.lignes)}
                 </span>
               </li>
             ))}

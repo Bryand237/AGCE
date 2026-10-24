@@ -8,12 +8,14 @@ import {
   lireCleEdition,
   lireDemandeEdition,
   messageEditionVide,
+  nombreEnseignants,
   nomFichierEdition,
   selectionnerEdition,
   titreEdition,
   type DemandeEdition,
 } from './editions'
 import { GRILLE_DE_TEST, dossierDeTest, jour } from '@/domain/enseignants/recherche/dossiersDeTest'
+import type { AbsenceDossier } from '@/domain/enseignants/dossier'
 
 const RETRAITE_2027: DemandeEdition = { cle: 'retraite', annee: 2027 }
 const AUJOURDHUI = jour('2026-10-23')
@@ -70,6 +72,11 @@ describe('lireCleEdition', () => {
     expect(DEFINITIONS_EDITION.retraite.avertissement).toBeUndefined()
     expect(DEFINITIONS_EDITION.transferes.avertissement).toBeUndefined()
   })
+
+  it('la liste des missions prévient que le lieu et le caractère « à l’étranger » ne sont pas en base', () => {
+    expect(DEFINITIONS_EDITION.missions.avertissement).toContain('toutes les missions en cours')
+    expect(DEFINITIONS_EDITION.conges.avertissement).toBeUndefined()
+  })
 })
 
 describe('lireDemandeEdition', () => {
@@ -97,7 +104,7 @@ describe('lireDemandeEdition', () => {
     }
   )
 
-  it.each(['transferes', 'collaboration'] as const)(
+  it.each(['transferes', 'collaboration', 'conges', 'missions'] as const)(
     'lit la liste « %s » sans paramètre, et ignore ceux qu’on lui ajoute',
     (cle) => {
       expect(lireDemandeEdition(cle, parametres(''))).toEqual({ demande: { cle } })
@@ -135,6 +142,17 @@ describe('titres et noms de fichier', () => {
     expect(nomFichierEdition(collaboration, AUJOURDHUI, 'csv')).toBe(
       'collaboration_edition-2026-10-23.csv'
     )
+  })
+
+  it('titres, messages de liste vide et noms de fichier des listes d’absences', () => {
+    const conges: DemandeEdition = { cle: 'conges' }
+    const missions: DemandeEdition = { cle: 'missions' }
+    expect(titreEdition(conges)).toBe('Liste des enseignants en congé de maternité ou de maladie')
+    expect(titreEdition(missions)).toBe('Liste des enseignants en mission')
+    expect(messageEditionVide(conges)).toBe('Aucun enseignant en congé de maternité ou de maladie.')
+    expect(messageEditionVide(missions)).toBe('Aucun enseignant en mission.')
+    expect(nomFichierEdition(conges, AUJOURDHUI, 'pdf')).toBe('conges_edition-2026-10-23.pdf')
+    expect(nomFichierEdition(missions, AUJOURDHUI, 'csv')).toBe('missions_edition-2026-10-23.csv')
   })
 
   it('le nom de fichier porte la liste, l’année et le jour d’édition', () => {
@@ -286,5 +304,155 @@ describe('selectionnerEdition — transférés et contrats de collaboration', ()
     for (const demande of [{ cle: 'transferes' }, { cle: 'collaboration' }] as const) {
       expect(selectionnerEdition(demande, seul, GRILLE_DE_TEST, AUJOURDHUI)).toEqual([])
     }
+  })
+})
+
+describe('selectionnerEdition — congés et missions', () => {
+  let compteur = 0
+  const absence = (surcharge: Partial<AbsenceDossier> = {}): AbsenceDossier => {
+    compteur += 1
+    return {
+      id: `abs-${compteur}`,
+      type: 'CONGE_MALADIE',
+      statut: 'EN_PERIODE',
+      dateDebut: jour('2026-10-01'),
+      dateFin: jour('2026-11-30'),
+      dateRetour: null,
+      motif: null,
+      ...surcharge,
+    }
+  }
+
+  // Aujourd'hui : 23/10/2026.
+  const dossiers = [
+    dossierDeTest({
+      nom: 'MATERNITE',
+      sexe: 'F',
+      absences: [
+        absence({
+          type: 'CONGE_MATERNITE',
+          dateDebut: jour('2026-09-01'),
+          dateFin: jour('2026-12-08'),
+        }),
+      ],
+    }),
+    dossierDeTest({
+      nom: 'MALADIE_DEPASSEE',
+      absences: [absence({ dateDebut: jour('2026-08-01'), dateFin: jour('2026-10-01') })],
+    }),
+    dossierDeTest({
+      nom: 'MALADIE_A_VENIR',
+      absences: [absence({ dateDebut: jour('2027-01-01'), dateFin: jour('2027-02-01') })],
+    }),
+    dossierDeTest({
+      nom: 'MALADIE_TERMINEE',
+      absences: [absence({ dateRetour: jour('2026-10-10'), statut: 'TERMINE' })],
+    }),
+    dossierDeTest({
+      nom: 'ADMINISTRATIF',
+      absences: [absence({ type: 'CONGE_ADMINISTRATIF' })],
+    }),
+    dossierDeTest({
+      nom: 'MISSION_A',
+      absences: [absence({ type: 'MISSION', dateDebut: jour('2026-10-15'), motif: 'Paris' })],
+    }),
+    dossierDeTest({
+      nom: 'MISSION_B',
+      absences: [absence({ type: 'MISSION', dateDebut: jour('2026-09-20') })],
+    }),
+    dossierDeTest({
+      nom: 'RETRAITE',
+      statut: 'RETRAITE',
+      dateFinService: jour('2026-01-01'),
+      absences: [absence({ type: 'MISSION' }), absence()],
+    }),
+    dossierDeTest({
+      nom: 'TRANSFERE',
+      statut: 'TRANSFERE',
+      dateFinService: jour('2026-01-01'),
+      absences: [absence({ type: 'MISSION' }), absence()],
+    }),
+    dossierDeTest({ nom: 'PRESENT', absences: [] }),
+  ]
+
+  const lignes = (demande: DemandeEdition, jourEdition = AUJOURDHUI) =>
+    selectionnerEdition(demande, dossiers, GRILLE_DE_TEST, jourEdition)
+  const noms = (demande: DemandeEdition, jourEdition = AUJOURDHUI) =>
+    lignes(demande, jourEdition).map((l) => l.dossier.nom)
+
+  it('congés : maternité et maladie en cours ou au retour non enregistré, rien d’autre', () => {
+    expect(noms({ cle: 'conges' })).toEqual(['MALADIE_DEPASSEE', 'MATERNITE'])
+  })
+
+  it('missions : les missions en cours, de la plus ancienne à la plus récente', () => {
+    expect(noms({ cle: 'missions' })).toEqual(['MISSION_B', 'MISSION_A'])
+  })
+
+  it('exclut les absences à venir, terminées, d’un autre type, et les non-actifs', () => {
+    const tous = [...noms({ cle: 'conges' }), ...noms({ cle: 'missions' })]
+    for (const exclu of [
+      'MALADIE_A_VENIR',
+      'MALADIE_TERMINEE',
+      'ADMINISTRATIF',
+      'RETRAITE',
+      'TRANSFERE',
+      'PRESENT',
+    ]) {
+      expect(tous).not.toContain(exclu)
+    }
+  })
+
+  it('joint à chaque ligne l’absence qui l’a fait figurer', () => {
+    const [ligne] = lignes({ cle: 'missions' }).filter((l) => l.dossier.nom === 'MISSION_A')
+    expect(ligne!.absence!.motif).toBe('Paris')
+    expect(ligne!.absence!.type).toBe('MISSION')
+  })
+
+  it('suit le jour d’édition : le jour du début et le jour de la fin comptent encore', () => {
+    expect(noms({ cle: 'missions' }, jour('2026-09-19'))).toEqual([])
+    expect(noms({ cle: 'missions' }, jour('2026-09-20'))).toEqual(['MISSION_B'])
+    // Fin prévue le 30/11/2026 : encore en cours ce jour-là, « retour non enregistré » le lendemain.
+    expect(noms({ cle: 'missions' }, jour('2026-11-30'))).toEqual(['MISSION_B', 'MISSION_A'])
+    expect(noms({ cle: 'missions' }, jour('2026-12-01'))).toEqual(['MISSION_B', 'MISSION_A'])
+  })
+
+  it('une ligne par absence : deux congés en cours donnent deux lignes pour un seul enseignant', () => {
+    const double = [
+      dossierDeTest({
+        nom: 'DOUBLE',
+        absences: [
+          absence({ type: 'CONGE_MATERNITE', dateDebut: jour('2026-09-01') }),
+          absence({ type: 'CONGE_MALADIE', dateDebut: jour('2026-10-01') }),
+        ],
+      }),
+    ]
+    const resultat = selectionnerEdition({ cle: 'conges' }, double, GRILLE_DE_TEST, AUJOURDHUI)
+    expect(resultat).toHaveLength(2)
+    expect(nombreEnseignants(resultat)).toBe(1)
+  })
+
+  it('à date de début égale, range par nom', () => {
+    const memeJour = [
+      dossierDeTest({ nom: 'ZEBRE', absences: [absence({ type: 'MISSION' })] }),
+      dossierDeTest({ nom: 'ABEGA', absences: [absence({ type: 'MISSION' })] }),
+    ]
+    expect(
+      selectionnerEdition({ cle: 'missions' }, memeJour, GRILLE_DE_TEST, AUJOURDHUI).map(
+        (l) => l.dossier.nom
+      )
+    ).toEqual(['ABEGA', 'ZEBRE'])
+  })
+})
+
+describe('nombreEnseignants', () => {
+  it('compte les enseignants, pas les lignes', () => {
+    expect(nombreEnseignants([])).toBe(0)
+    expect(
+      nombreEnseignants([
+        { dossier: { id: 'a' } },
+        { dossier: { id: 'a' } },
+        { dossier: { id: 'b' } },
+      ])
+    ).toBe(2)
   })
 })

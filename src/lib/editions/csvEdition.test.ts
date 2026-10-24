@@ -3,7 +3,7 @@ import { construireCsvEdition } from './csvEdition'
 import type { DemandeEdition } from '@/domain/editions/editions'
 import { GRILLE_DE_TEST, dossierDeTest, jour } from '@/domain/enseignants/recherche/dossiersDeTest'
 import { avecSituation } from '@/domain/enseignants/recherche/selectionner'
-import type { DossierEnseignant } from '@/domain/enseignants/dossier'
+import type { AbsenceDossier, DossierEnseignant } from '@/domain/enseignants/dossier'
 
 const DEMANDE: DemandeEdition = { cle: 'retraite', annee: 2027 }
 const etab = (id: string, nom: string) => ({ id, nom, abreviation: id.toUpperCase() })
@@ -115,5 +115,56 @@ describe('construireCsvEdition — transférés et collaboration', () => {
     const debut = entetes!.indexOf('Date de début de la collaboration')
     expect(ligne![debut]).toBe('')
     expect(ligne![debut + 1]).toBe('')
+  })
+})
+
+describe('construireCsvEdition — congés et missions', () => {
+  const absence = (type: AbsenceDossier['type'], motif: string | null = null): AbsenceDossier => ({
+    id: 'a1',
+    type,
+    statut: 'EN_PERIODE',
+    dateDebut: jour('2026-09-01'),
+    dateFin: jour('2026-12-08'),
+    dateRetour: null,
+    motif,
+  })
+  const ligne = (a: AbsenceDossier) => ({
+    ...avecSituation([dossierDeTest()], GRILLE_DE_TEST)[0]!,
+    absence: a,
+  })
+
+  it('congés : le type du congé est une colonne, les dates suivent', () => {
+    const [entetes, donnees] = cellules(
+      construireCsvEdition({ cle: 'conges' }, [ligne(absence('CONGE_MATERNITE'))])
+    )
+    const debut = entetes!.indexOf('Date de début du congé')
+    expect(entetes![debut - 1]).toBe('Type de congé')
+    expect(donnees!.slice(debut - 1, debut + 2)).toEqual([
+      'Congé de maternité',
+      '01/09/2026',
+      '08/12/2026',
+    ])
+  })
+
+  it('congés : aucune colonne de motif, même quand l’absence en a un', () => {
+    const texte = construireCsvEdition({ cle: 'conges' }, [
+      ligne(absence('CONGE_MALADIE', 'Secret médical')),
+    ])
+    expect(texte).not.toContain('Secret médical')
+    expect(cellules(texte)[0]).not.toContain('Motif')
+  })
+
+  it('missions : le motif est dans la colonne « Lieu d’accueil / motif »', () => {
+    const [entetes, donnees] = cellules(
+      construireCsvEdition({ cle: 'missions' }, [ligne(absence('MISSION', 'Paris'))])
+    )
+    expect(donnees![entetes!.indexOf("Lieu d'accueil / motif")]).toBe('Paris')
+  })
+
+  it('missions : un motif avec « ; » ou un retour à la ligne reste dans sa cellule', () => {
+    const texte = construireCsvEdition({ cle: 'missions' }, [
+      ligne(absence('MISSION', 'Colloque; atelier\nParis')),
+    ])
+    expect(texte).toContain('"Colloque; atelier Paris"')
   })
 })

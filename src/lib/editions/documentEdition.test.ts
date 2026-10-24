@@ -6,7 +6,7 @@ import { selectionnerEdition } from '@/domain/editions/editions'
 import { LARGEUR_NUMERO_MM, LARGEUR_UTILE_MM } from '@/lib/pdf/liste/documentListe'
 import { GRILLE_DE_TEST, dossierDeTest, jour } from '@/domain/enseignants/recherche/dossiersDeTest'
 import { avecSituation } from '@/domain/enseignants/recherche/selectionner'
-import type { DossierEnseignant } from '@/domain/enseignants/dossier'
+import type { AbsenceDossier, DossierEnseignant } from '@/domain/enseignants/dossier'
 
 const DEMANDE: DemandeEdition = { cle: 'retraite', annee: 2027 }
 const AUJOURDHUI = jour('2026-10-23')
@@ -270,5 +270,170 @@ describe.each([
     const html = construireHtmlEdition(demande, [], AUJOURDHUI)
     expect(html).toContain('Aucun enseignant')
     expect(html).not.toContain('<table>')
+  })
+})
+
+describe('listes d’absences — congés', () => {
+  const absence = (surcharge: Partial<AbsenceDossier> = {}): AbsenceDossier => ({
+    id: 'a1',
+    type: 'CONGE_MATERNITE',
+    statut: 'EN_PERIODE',
+    dateDebut: jour('2026-09-01'),
+    dateFin: jour('2026-12-08'),
+    dateRetour: null,
+    motif: null,
+    ...surcharge,
+  })
+  const ligneAbsence = (dossier: DossierEnseignant, a: AbsenceDossier) => ({
+    ...avecSituation([dossier], GRILLE_DE_TEST)[0]!,
+    absence: a,
+  })
+  const conges = { cle: 'conges' } as const
+
+  it('suit les colonnes du client : début et fin du congé avant l’origine, sans colonne de type', () => {
+    expect(
+      colonnesEdition(conges)
+        .map((c) => c.entete)
+        .slice(8)
+    ).toEqual([
+      'Date de prise de service',
+      'Date de début du congé',
+      'Date de fin du congé',
+      "Région d'origine",
+      "Département d'origine",
+    ])
+  })
+
+  it('le tableur ajoute la colonne « Type de congé », que le PDF dit par un bandeau', () => {
+    const entetes = colonnesEdition(conges, 'csv').map((c) => c.entete)
+    expect(entetes).toContain('Type de congé')
+    expect(entetes.indexOf('Type de congé')).toBe(entetes.indexOf('Date de début du congé') - 1)
+    expect(colonnesEdition(conges, 'pdf').map((c) => c.entete)).not.toContain('Type de congé')
+  })
+
+  it('imprime les dates du congé au format jj/mm/aaaa', () => {
+    const ligne = ligneAbsence(dossierDeTest(), absence())
+    const valeur = (entete: string) =>
+      colonnesEdition(conges)
+        .find((c) => c.entete === entete)!
+        .valeur(ligne)
+    expect(valeur('Date de début du congé')).toBe('01/09/2026')
+    expect(valeur('Date de fin du congé')).toBe('08/12/2026')
+  })
+
+  it('sépare maternité et maladie par un bandeau, la numérotation continuant d’un bandeau à l’autre', () => {
+    const html = construireHtmlEdition(
+      conges,
+      [
+        ligneAbsence(dossierDeTest({ nom: 'A' }), absence()),
+        ligneAbsence(dossierDeTest({ nom: 'B' }), absence({ type: 'CONGE_MALADIE' })),
+        ligneAbsence(dossierDeTest({ nom: 'C' }), absence({ type: 'CONGE_MALADIE' })),
+      ],
+      AUJOURDHUI
+    )
+    expect(html.indexOf('Congé de maternité')).toBeLessThan(html.indexOf('Congé de maladie'))
+    expect(compter(html, /<tr class="ligne-groupe">/g)).toBe(2)
+    expect(compter(html, /<tr><td>3<\/td>/g)).toBe(1)
+  })
+
+  it('n’imprime pas le bandeau d’un type sans congé', () => {
+    const html = construireHtmlEdition(
+      conges,
+      [ligneAbsence(dossierDeTest(), absence({ type: 'CONGE_MALADIE' }))],
+      AUJOURDHUI
+    )
+    expect(html).toContain('Congé de maladie')
+    expect(html).not.toContain('Congé de maternité')
+  })
+
+  it('n’imprime jamais le motif d’un congé', () => {
+    const html = construireHtmlEdition(
+      conges,
+      [
+        ligneAbsence(
+          dossierDeTest(),
+          absence({ type: 'CONGE_MALADIE', motif: 'Diagnostic confidentiel' })
+        ),
+      ],
+      AUJOURDHUI
+    )
+    expect(html).not.toContain('Diagnostic confidentiel')
+  })
+
+  it('compte les enseignants, pas les lignes, dans le sous-titre', () => {
+    const dossier = dossierDeTest()
+    const html = construireHtmlEdition(
+      conges,
+      [
+        ligneAbsence(dossier, absence()),
+        ligneAbsence(dossier, absence({ type: 'CONGE_MALADIE', id: 'a2' })),
+      ],
+      AUJOURDHUI
+    )
+    expect(html).toContain('maladie — 1 enseignant<')
+    expect(compter(html, /<tr><td>\d+<\/td>/g)).toBe(2)
+  })
+})
+
+describe('listes d’absences — missions', () => {
+  const missions = { cle: 'missions' } as const
+  const ligneMission = (motif: string | null) => ({
+    ...avecSituation([dossierDeTest()], GRILLE_DE_TEST)[0]!,
+    absence: {
+      id: 'm1',
+      type: 'MISSION' as const,
+      statut: 'EN_PERIODE' as const,
+      dateDebut: jour('2026-10-15'),
+      dateFin: jour('2026-11-15'),
+      dateRetour: null,
+      motif,
+    },
+  })
+  const valeur = (entete: string, ligne: ReturnType<typeof ligneMission>) =>
+    colonnesEdition(missions)
+      .find((c) => c.entete === entete)!
+      .valeur(ligne)
+
+  it('suit les colonnes du client : début, fin et lieu d’accueil avant l’origine', () => {
+    expect(
+      colonnesEdition(missions)
+        .map((c) => c.entete)
+        .slice(8)
+    ).toEqual([
+      'Date de prise de service',
+      'Date de début de la mission',
+      'Date de fin de la mission',
+      "Lieu d'accueil / motif",
+      "Région d'origine",
+      "Département d'origine",
+    ])
+  })
+
+  it('imprime les dates et reprend le motif de la mission sur une seule ligne', () => {
+    const ligne = ligneMission('  Colloque\n international   à Paris ')
+    expect(valeur('Date de début de la mission', ligne)).toBe('15/10/2026')
+    expect(valeur('Date de fin de la mission', ligne)).toBe('15/11/2026')
+    expect(valeur("Lieu d'accueil / motif", ligne)).toBe('Colloque international à Paris')
+  })
+
+  it('laisse la cellule vide quand la mission n’a pas de motif', () => {
+    expect(valeur("Lieu d'accueil / motif", ligneMission(null))).toBe('')
+  })
+
+  it('échappe le motif dans le PDF', () => {
+    const html = construireHtmlEdition(missions, [ligneMission('<b>Paris</b> & Rome')], AUJOURDHUI)
+    expect(html).not.toContain('<b>Paris</b>')
+    expect(html).toContain('&lt;b&gt;Paris&lt;/b&gt; &amp; Rome')
+  })
+
+  it('tient sur la feuille', () => {
+    for (const demande of [missions, { cle: 'conges' }] as const) {
+      const total = colonnesEdition(demande).reduce(
+        (somme, c) => somme + c.largeur,
+        LARGEUR_NUMERO_MM
+      )
+      expect(total / LARGEUR_UTILE_MM).toBeGreaterThan(0.85)
+      expect(total / LARGEUR_UTILE_MM).toBeLessThan(1.3)
+    }
   })
 })

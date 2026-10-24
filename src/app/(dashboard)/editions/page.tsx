@@ -1,4 +1,12 @@
-import { FileDown, FileSpreadsheet, Handshake, UserMinus, UserX } from 'lucide-react'
+import {
+  Briefcase,
+  CalendarOff,
+  FileDown,
+  FileSpreadsheet,
+  Handshake,
+  UserMinus,
+  UserX,
+} from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { aujourdhui, anneeDe } from '@/domain/dates/jourCivil'
 import {
@@ -39,6 +47,8 @@ export default async function PageEditions({
   const demandeRetraite = { cle: 'retraite', annee } as const
   const demandeTransferes: DemandeEdition = { cle: 'transferes' }
   const demandeCollaboration: DemandeEdition = { cle: 'collaboration' }
+  const demandeConges: DemandeEdition = { cle: 'conges' }
+  const demandeMissions: DemandeEdition = { cle: 'missions' }
   const selection = (demande: DemandeEdition) =>
     selectionnerEdition(demande, dossiers, grille, jourCourant)
 
@@ -115,6 +125,33 @@ export default async function PageEditions({
           intitule={titreEdition(demandeCollaboration)}
           lignes={selection(demandeCollaboration)}
           messageSiVide={messageEditionVide(demandeCollaboration)}
+        />
+      </CarteEdition>
+
+      <CarteEdition
+        icone={CalendarOff}
+        titre={DEFINITIONS_EDITION.conges.titre}
+        description={DEFINITIONS_EDITION.conges.description}
+      >
+        <TelechargementsEdition cle="conges" />
+        <DecompteEtablissements
+          intitule={titreEdition(demandeConges)}
+          lignes={selection(demandeConges)}
+          messageSiVide={messageEditionVide(demandeConges)}
+        />
+      </CarteEdition>
+
+      <CarteEdition
+        icone={Briefcase}
+        titre={DEFINITIONS_EDITION.missions.titre}
+        description={DEFINITIONS_EDITION.missions.description}
+        avertissement={DEFINITIONS_EDITION.missions.avertissement}
+      >
+        <TelechargementsEdition cle="missions" />
+        <DecompteEtablissements
+          intitule={titreEdition(demandeMissions)}
+          lignes={selection(demandeMissions)}
+          messageSiVide={messageEditionVide(demandeMissions)}
         />
       </CarteEdition>
     </div>

@@ -1,6 +1,5 @@
-import type { DemandeEdition } from '@/domain/editions/editions'
+import type { DemandeEdition, LigneEdition } from '@/domain/editions/editions'
 import { regrouperParEtablissement } from '@/domain/editions/parEtablissement'
-import type { LigneRecherche } from '@/domain/enseignants/recherche/trier'
 import { construireCsv } from '@/lib/export/csv'
 import { colonnesEdition } from './colonnes'
 
@@ -11,9 +10,9 @@ import { colonnesEdition } from './colonnes'
  */
 export function construireCsvEdition(
   demande: DemandeEdition,
-  lignes: readonly LigneRecherche[]
+  lignes: readonly LigneEdition[]
 ): string {
-  const colonnes = colonnesEdition(demande)
+  const colonnes = colonnesEdition(demande, 'csv')
   const entetes = ['Établissement', ...colonnes.map((colonne) => colonne.entete)]
   const donnees = regrouperParEtablissement(lignes).flatMap((etablissement) =>
     etablissement.lignes.map((ligne) => [

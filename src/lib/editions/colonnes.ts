@@ -1,8 +1,9 @@
-import type { DemandeEdition } from '@/domain/editions/editions'
+import type { DemandeEdition, LigneEdition } from '@/domain/editions/editions'
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import type { AbsenceDossier } from '@/domain/enseignants/dossier'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { abreviationGrade, abreviationRegion } from '@/domain/enseignants/abreviations'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
-import type { LigneRecherche } from '@/domain/enseignants/recherche/trier'
 import type { ColonneListe } from '@/lib/pdf/liste/documentListe'
 
 /**
@@ -14,12 +15,26 @@ import type { ColonneListe } from '@/lib/pdf/liste/documentListe'
  * en bas de page explique les sigles. Dans le tableur, il n'y a pas de contrainte de largeur : les
  * mêmes colonnes donnent le nom complet, plus facile à filtrer et à trier (`valeurCsv`).
  */
-export type ColonneEdition = ColonneListe<LigneRecherche> & {
+export type ColonneEdition = ColonneListe<LigneEdition> & {
   /** Valeur dans le tableur, quand elle diffère de celle du PDF (nom complet au lieu du sigle). */
-  valeurCsv?: (ligne: LigneRecherche) => string
+  valeurCsv?: (ligne: LigneEdition) => string
+  /**
+   * Colonne réservée au tableur : le PDF dit la même chose autrement (un bandeau de groupe, par
+   * exemple), mais un tableur n'a pas de bandeau.
+   */
+  support?: 'csv'
 }
 
 const dateOuVide = (date: Date | null): string => (date === null ? '' : formaterDateCourte(date))
+
+const dateAbsence = (
+  absence: AbsenceDossier | undefined,
+  champ: 'dateDebut' | 'dateFin'
+): string => (absence === undefined ? '' : formaterDateCourte(absence[champ]))
+
+/** Texte libre sur une seule ligne : les retours à la ligne et les espaces multiples disparaissent. */
+const surUneLigne = (texte: string | null | undefined): string =>
+  (texte ?? '').replace(/\s+/g, ' ').trim()
 
 /**
  * Les largeurs (en mm) sont ramenées à la largeur de la feuille par le cadre commun : seules leurs
@@ -129,9 +144,58 @@ function colonnesPropres(demande: DemandeEdition): ColonneEdition[] {
           valeur: () => '',
         },
       ]
+    case 'conges':
+      // Aucun motif : un congé de maladie relève du secret médical, la liste n'en dit pas plus.
+      return [
+        {
+          entete: 'Type de congé',
+          largeur: 0,
+          support: 'csv',
+          valeur: ({ absence }) => (absence ? LIBELLES_TYPE_ABSENCE[absence.type] : ''),
+        },
+        {
+          entete: 'Date de début du congé',
+          largeur: 18,
+          insecable: true,
+          valeur: ({ absence }) => dateAbsence(absence, 'dateDebut'),
+        },
+        {
+          entete: 'Date de fin du congé',
+          largeur: 18,
+          insecable: true,
+          valeur: ({ absence }) => dateAbsence(absence, 'dateFin'),
+        },
+      ]
+    case 'missions':
+      // Le dossier n'a pas de lieu d'accueil : seul le motif libre de l'absence peut le contenir.
+      return [
+        {
+          entete: 'Date de début de la mission',
+          largeur: 20,
+          insecable: true,
+          valeur: ({ absence }) => dateAbsence(absence, 'dateDebut'),
+        },
+        {
+          entete: 'Date de fin de la mission',
+          largeur: 20,
+          insecable: true,
+          valeur: ({ absence }) => dateAbsence(absence, 'dateFin'),
+        },
+        {
+          entete: "Lieu d'accueil / motif",
+          largeur: 26,
+          valeur: ({ absence }) => surUneLigne(absence?.motif),
+        },
+      ]
   }
 }
 
-export function colonnesEdition(demande: DemandeEdition): ColonneEdition[] {
-  return [...COLONNES_IDENTITE, ...colonnesPropres(demande), ...COLONNES_ORIGINE]
+/** Les colonnes d'une liste, pour le PDF (par défaut) ou pour le tableur. */
+export function colonnesEdition(
+  demande: DemandeEdition,
+  support: 'pdf' | 'csv' = 'pdf'
+): ColonneEdition[] {
+  return [...COLONNES_IDENTITE, ...colonnesPropres(demande), ...COLONNES_ORIGINE].filter(
+    (colonne) => colonne.support === undefined || colonne.support === support
+  )
 }
