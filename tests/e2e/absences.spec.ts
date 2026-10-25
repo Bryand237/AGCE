@@ -35,7 +35,14 @@ test.describe('Absences', () => {
 
     await page.getByLabel(/date de retour/i).fill('2026-07-22')
     await page.getByRole('button', { name: /marquer terminé/i }).click()
-    await expect(page.getByText(/retour enregistré le/i)).toBeVisible()
+    // Le retour est affiché deux fois sur la fiche (résumé du haut et bandeau du bas).
+    await expect(page.getByText(/retour enregistré le/i).first()).toBeVisible()
+
+    // L'attestation signée reste téléchargeable une fois l'absence terminée.
+    const lien = page.getByRole('link', { name: /télécharger l.attestation n°12\/26/i })
+    await expect(lien).toBeVisible()
+    const reponse = await page.request.get((await lien.getAttribute('href')) ?? '')
+    expect(reponse.status()).toBe(200)
   })
 
   test('refuse une deuxième absence pour un enseignant déjà en cours', async ({ page }) => {
