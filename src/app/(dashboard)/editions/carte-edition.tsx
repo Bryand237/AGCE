@@ -66,10 +66,7 @@ export function CarteEditionIndisponible({
   raison: string
 }) {
   return (
-    <section
-      className="border-border bg-muted/40 rounded-2xl border border-dashed p-6"
-      aria-disabled="true"
-    >
+    <section className="border-border bg-muted/40 rounded-2xl border border-dashed p-6">
       <div className="flex items-start gap-4">
         <div className="bg-muted text-muted-foreground flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
           <Icone size={20} aria-hidden="true" />
