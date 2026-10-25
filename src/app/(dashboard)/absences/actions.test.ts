@@ -68,9 +68,15 @@ const ABSENCE_COMPLETE = {
 const CONGE_AVEC_BROUILLON = { type: 'CONGE_MATERNITE', statutAttestation: 'EN_ATTENTE' }
 const CONGE_SIGNE = { type: 'CONGE_MATERNITE', statutAttestation: 'VALIDEE' }
 
-/** Fait lire aux actions une absence dans l'état voulu : le serveur juge sur l'état enregistré. */
-const absenceEn = (etat: Record<string, unknown> = {}) =>
+/**
+ * Fait lire aux actions une absence dans l'état voulu : le serveur juge sur l'état enregistré.
+ * Ne renvoie rien, exprès : `beforeEach(() => absenceEn(...))` renverrait la fonction simulée, que
+ * Vitest prend pour une fonction de nettoyage et rappelle après le test (avec la promesse rejetée
+ * d'un test d'échec de lecture, il le ferait échouer).
+ */
+const absenceEn = (etat: Record<string, unknown> = {}): void => {
   prismaFactice.absence.findUnique.mockResolvedValue({ ...ABSENCE_COMPLETE, ...etat })
+}
 
 describe('actions absences : erreurs de la base', () => {
   let erreurConsole: ReturnType<typeof vi.spyOn>
