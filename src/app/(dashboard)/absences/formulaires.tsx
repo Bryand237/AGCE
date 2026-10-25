@@ -142,14 +142,28 @@ export function FormulaireModifierAbsence({
   )
 }
 
+const classeLienTelechargement = 'text-primary text-sm font-medium hover:underline'
+const classeNoteAttestation = 'text-muted-foreground text-xs'
+
+/**
+ * L'attestation d'une absence. En `consultationSeule` (absence terminée), aucune étape n'est
+ * proposée, mais le document enregistré reste téléchargeable : `signature` (« Signée le … ») et
+ * `raisonBrouillon` (pourquoi un brouillon ne peut plus être signé) sont des textes déjà prêts.
+ */
 export function BlocAttestationAbsence({
   absenceId,
   statutAttestation,
   numeroDecision,
+  consultationSeule = false,
+  signature = null,
+  raisonBrouillon = null,
 }: {
   absenceId: string
   statutAttestation: string | null
   numeroDecision: string | null
+  consultationSeule?: boolean
+  signature?: string | null
+  raisonBrouillon?: string | null
 }) {
   const [etatGenerer, formActionGenerer, isPendingGenerer] = useActionState(
     genererAttestation.bind(null, absenceId),
@@ -161,6 +175,7 @@ export function BlocAttestationAbsence({
   )
 
   if (!statutAttestation) {
+    if (consultationSeule) return null
     return (
       <form action={formActionGenerer} className="flex flex-col gap-2">
         {etatGenerer.message && (
@@ -175,15 +190,22 @@ export function BlocAttestationAbsence({
     )
   }
   if (statutAttestation === 'EN_ATTENTE') {
+    const lienBrouillon = (
+      <a href={`/absences/${absenceId}/attestation`} download className={classeLienTelechargement}>
+        Télécharger le brouillon
+      </a>
+    )
+    if (consultationSeule) {
+      return (
+        <div className="flex flex-col gap-1">
+          {lienBrouillon}
+          {raisonBrouillon && <p className={classeNoteAttestation}>{raisonBrouillon}</p>}
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col gap-4">
-        <a
-          href={`/absences/${absenceId}/attestation`}
-          download
-          className="text-primary text-sm font-medium hover:underline"
-        >
-          Télécharger le brouillon
-        </a>
+        {lienBrouillon}
         <form action={formActionValider} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Numéro de décision
@@ -210,13 +232,12 @@ export function BlocAttestationAbsence({
     )
   }
   return (
-    <a
-      href={`/absences/${absenceId}/attestation`}
-      download
-      className="text-primary text-sm font-medium hover:underline"
-    >
-      Télécharger l&apos;attestation n°{numeroDecision}
-    </a>
+    <div className="flex flex-col gap-1">
+      <a href={`/absences/${absenceId}/attestation`} download className={classeLienTelechargement}>
+        Télécharger l&apos;attestation n°{numeroDecision}
+      </a>
+      {signature && <p className={classeNoteAttestation}>{signature}</p>}
+    </div>
   )
 }
 

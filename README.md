@@ -491,6 +491,10 @@ mêmes étapes.
 - Un **brouillon d'attestation** garde les dates au moment de sa génération : pour les
   corriger, on supprime l'absence et on la recrée. Une attestation **signée** est un acte
   numéroté : l'absence ne se supprime ni ne se modifie plus.
+- Une attestation enregistrée (brouillon ou signée) **reste téléchargeable à tout moment**,
+  y compris une fois l'absence terminée : la fiche garde alors le bloc « Attestation » en
+  simple consultation (lien de téléchargement, date et auteur de la signature), sans
+  aucune étape. La règle est dans `src/domain/absences/presentationAttestation.ts`.
 - Le bouton « Supprimer » demande une confirmation. Une absence déjà supprimée (autre
   onglet, double clic) ramène simplement à la liste.
 - Un refus s'affiche sous le formulaire, sans recharger la page, avec le motif.

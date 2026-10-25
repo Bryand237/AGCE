@@ -10,6 +10,7 @@ import {
 } from '../formulaires'
 import { TYPES_AVEC_ATTESTATION } from '@/domain/absences/typesAvecAttestation'
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
+import { presentationAttestation } from '@/domain/absences/presentationAttestation'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -24,6 +25,11 @@ const LIBELLES_STATUT: Record<string, string> = {
   EN_PERIODE: 'En période',
   DEPASSE: 'Dépassé',
   TERMINE: 'Terminé',
+}
+
+const LIBELLES_ATTESTATION: Record<string, string> = {
+  EN_ATTENTE: 'Brouillon, non signée',
+  VALIDEE: 'Signée',
 }
 
 const STYLES_STATUT: Record<string, string> = {
@@ -70,6 +76,13 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   const refusModification = erreurEtapeAbsence('modifier', absence)
   const refusSuppression = erreurEtapeAbsence('supprimer', absence)
   const raisonFigee = refusSuppression ?? refusModification
+
+  // Une attestation enregistrée reste téléchargeable à tout moment, absence terminée comprise.
+  const presentation = presentationAttestation(absence)
+  const signature =
+    absence.statutAttestation === 'VALIDEE' && absence.dateValidationAttestation
+      ? `Signée le ${formatDate(absence.dateValidationAttestation)}${absence.auteurValidationAttestation ? ` (${absence.auteurValidationAttestation})` : ''}`
+      : null
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -226,7 +239,12 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
                 <Item label="N° décision" valeur={absence.numeroDecision} />
               )}
               {absence.statutAttestation && (
-                <Item label="Attestation" valeur={absence.statutAttestation} />
+                <Item
+                  label="Attestation"
+                  valeur={
+                    LIBELLES_ATTESTATION[absence.statutAttestation] ?? absence.statutAttestation
+                  }
+                />
               )}
             </dl>
           </section>
@@ -238,17 +256,19 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             />
           )}
 
-          {TYPES_AVEC_ATTESTATION.includes(absence.type) &&
-            (absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') && (
-              <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
-                <h2 className="text-foreground mb-4 text-sm font-bold">Attestation</h2>
-                <BlocAttestationAbsence
-                  absenceId={id}
-                  statutAttestation={absence.statutAttestation}
-                  numeroDecision={absence.numeroDecision}
-                />
-              </div>
-            )}
+          {presentation !== 'aucune' && (
+            <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+              <h2 className="text-foreground mb-4 text-sm font-bold">Attestation</h2>
+              <BlocAttestationAbsence
+                absenceId={id}
+                statutAttestation={absence.statutAttestation}
+                numeroDecision={absence.numeroDecision}
+                consultationSeule={presentation === 'consultation'}
+                signature={signature}
+                raisonBrouillon={erreurEtapeAbsence('validerAttestation', absence) ?? null}
+              />
+            </div>
+          )}
 
           {(absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') &&
             (!TYPES_AVEC_ATTESTATION.includes(absence.type) ||
