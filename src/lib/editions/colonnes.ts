@@ -1,5 +1,6 @@
 import type { DemandeEdition, LigneEdition } from '@/domain/editions/editions'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { motifMissionSurUneLigne } from '@/domain/absences/motifMission'
 import type { AbsenceDossier } from '@/domain/enseignants/dossier'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { abreviationGrade, abreviationRegion } from '@/domain/enseignants/abreviations'
@@ -31,10 +32,6 @@ const dateAbsence = (
   absence: AbsenceDossier | undefined,
   champ: 'dateDebut' | 'dateFin'
 ): string => (absence === undefined ? '' : formaterDateCourte(absence[champ]))
-
-/** Texte libre sur une seule ligne : les retours à la ligne et les espaces multiples disparaissent. */
-const surUneLigne = (texte: string | null | undefined): string =>
-  (texte ?? '').replace(/\s+/g, ' ').trim()
 
 /**
  * Les largeurs (en mm) sont ramenées à la largeur de la feuille par le cadre commun : seules leurs
@@ -167,7 +164,8 @@ function colonnesPropres(demande: DemandeEdition): ColonneEdition[] {
         },
       ]
     case 'missions':
-      // Le dossier n'a pas de lieu d'accueil : seul le motif libre de l'absence peut le contenir.
+      // Le dossier n'a pas de colonne « lieu d'accueil » : il est enregistré avec l'objet dans le
+      // motif de l'absence (motifMission.ts), et la cellule les reprend ensemble sur une ligne.
       return [
         {
           entete: 'Date de début de la mission',
@@ -184,7 +182,7 @@ function colonnesPropres(demande: DemandeEdition): ColonneEdition[] {
         {
           entete: "Lieu d'accueil / motif",
           largeur: 26,
-          valeur: ({ absence }) => surUneLigne(absence?.motif),
+          valeur: ({ absence }) => motifMissionSurUneLigne(absence?.motif),
         },
       ]
   }

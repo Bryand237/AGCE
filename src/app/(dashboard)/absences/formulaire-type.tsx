@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { creerAbsence, type EtatFormulaire } from './actions'
 import { useActionConservee } from '@/lib/action-conservee'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
+import { ChampsMission } from './champs-mission'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -57,12 +58,7 @@ export function FormulaireAbsence({
           Date de fin calculée automatiquement (14 semaines), modifiable ensuite.
         </p>
       )}
-      {type === 'MISSION' && (
-        <label className="flex flex-col gap-1 text-sm">
-          Motif
-          <textarea name="motif" rows={3} className={classeChamp} />
-        </label>
-      )}
+      {type === 'MISSION' && <ChampsMission />}
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Création...' : "Créer l'absence"}

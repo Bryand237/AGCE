@@ -40,6 +40,7 @@ export default async function ModifierAbsencePage({ params }: { params: Promise<
         ) : (
           <FormulaireModifierAbsence
             absenceId={id}
+            type={absence.type}
             dateDebut={absence.dateDebut.toISOString().slice(0, 10)}
             dateFin={absence.dateFin.toISOString().slice(0, 10)}
             motif={absence.motif}

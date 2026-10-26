@@ -13,6 +13,9 @@ export const AbsenceSchema = z
     // Facultative : un congé de maternité reçoit une fin calculée par l'application.
     dateFin: date('La date de fin').optional(),
     motif: z.string().optional(),
+    // Mission : établissement d'accueil et objet, enregistrés ensemble dans le motif.
+    lieuAccueil: z.string().optional(),
+    objetMission: z.string().optional(),
   })
   .superRefine((a, ctx) => {
     if (a.dateFin && a.dateFin.getTime() < a.dateDebut.getTime()) {
@@ -30,6 +33,9 @@ export const ModificationAbsenceSchema = z
       .trim()
       .optional()
       .transform((v) => v || null),
+    // Mission : établissement d'accueil et objet, enregistrés ensemble dans le motif.
+    lieuAccueil: z.string().optional(),
+    objetMission: z.string().optional(),
   })
   .superRefine((a, ctx) => {
     if (a.dateFin.getTime() < a.dateDebut.getTime()) {

@@ -31,7 +31,17 @@ const ABSENCE = {
   dateFin: new Date('2026-07-28'),
   referenceCorrespondance: 'N° 26-114/UN/DFALSH du 05 mai 2026',
   dateDemandeInteressee: new Date('2026-04-21'),
+  motif: null as string | null,
 }
+
+const MOTIF_MISSION = "Lieu d'accueil : Université de Douala\nObjet : Jury de soutenance de thèses"
+const HOMME = {
+  nom: 'Mbarga',
+  prenom: 'Paul',
+  matricule: '7654321B',
+  grade: 'MAITRE_DE_CONFERENCES',
+  sexe: 'M',
+} as const
 
 function generer(
   type = 'CONGE_MATERNITE',
@@ -65,6 +75,9 @@ describe('genererAttestationAbsence', () => {
 
     generer('CONGE_MALADIE')
     expect(capture.fichier).toMatch(/attestation-conge-maladie\.docx$/)
+
+    generer('MISSION')
+    expect(capture.fichier).toMatch(/attestation-mission\.docx$/)
   })
 
   it('refuse un type d’absence sans gabarit', () => {
@@ -114,5 +127,70 @@ describe('genererAttestationAbsence', () => {
 
   it('accorde la civilité au sexe de l’enseignante', () => {
     expect(generer().civilite).toBe('Madame')
+  })
+})
+
+describe('genererAttestationAbsence — mission', () => {
+  beforeEach(() => {
+    capture.fichier = ''
+    capture.donnees = {}
+  })
+
+  const mission = (surcharge: Partial<Parameters<typeof genererAttestationAbsence>[1]> = {}) =>
+    generer('MISSION', { absence: { ...ABSENCE, motif: MOTIF_MISSION }, ...surcharge })
+
+  it('donne à la décision l’établissement d’accueil et l’objet saisis', () => {
+    const d = mission()
+    expect(d.lieuAccueil).toBe('Université de Douala')
+    expect(d.objetMission).toBe('Jury de soutenance de thèses')
+  })
+
+  it('imprime les dates de la mission en toutes lettres', () => {
+    const d = mission()
+    expect(d.dateDebut).toBe('14 avril 2026')
+    expect(d.dateFin).toBe('28 juillet 2026')
+  })
+
+  it('accorde « intéressée » et « autorisée » au féminin', () => {
+    const d = mission()
+    expect(d.civilite).toBe('Madame')
+    expect(d.interesse).toBe('intéressée')
+    expect(d.autorise).toBe('autorisée')
+  })
+
+  it('accorde « intéressé » et « autorisé » au masculin', () => {
+    const d = mission({ enseignant: HOMME })
+    expect(d.civilite).toBe('Monsieur')
+    expect(d.interesse).toBe('intéressé')
+    expect(d.autorise).toBe('autorisé')
+  })
+
+  it('met l’apostrophe typographique dans le lieu d’accueil et dans l’objet', () => {
+    const d = mission({
+      absence: {
+        ...ABSENCE,
+        motif: "Lieu d'accueil : Institut d'études\nObjet : Séminaire de l'équipe",
+      },
+    })
+    expect(d.lieuAccueil).toBe('Institut d’études')
+    expect(d.objetMission).toBe('Séminaire de l’équipe')
+  })
+
+  it('lit un ancien motif libre comme l’objet, sans établissement d’accueil', () => {
+    const d = mission({ absence: { ...ABSENCE, motif: 'Colloque à Paris' } })
+    expect(d.lieuAccueil).toBe('')
+    expect(d.objetMission).toBe('Colloque à Paris')
+  })
+
+  it('laisse un blanc quand la mission n’a ni lieu ni objet (la page l’empêche avant)', () => {
+    const d = mission({ absence: { ...ABSENCE, motif: null } })
+    expect(d.lieuAccueil).toBe('')
+    expect(d.objetMission).toBe('')
+  })
+
+  it('ne passe pas à un congé les champs de la mission : ils restent vides', () => {
+    const d = generer('CONGE_MALADIE')
+    expect(d.lieuAccueil).toBe('')
+    expect(d.objetMission).toBe('')
   })
 })

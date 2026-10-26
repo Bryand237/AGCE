@@ -10,6 +10,7 @@ const absence = (partiel: Partial<AbsenceAJuger> = {}): AbsenceAJuger => ({
 })
 
 const CONGE = { type: 'CONGE_MATERNITE' } as const
+const MISSION = { type: 'MISSION' } as const
 
 describe('valider', () => {
   it('n’est permis que depuis « en attente »', () => {
@@ -30,6 +31,15 @@ describe('terminer', () => {
     expect(erreurEtapeAbsence('terminer', absence({ statut: 'EN_PERIODE' }))).toBeUndefined()
     expect(erreurEtapeAbsence('terminer', absence({ statut: 'DEPASSE' }))).toBeUndefined()
   })
+
+  it.each([null, 'EN_ATTENTE', 'VALIDEE'] as const)(
+    'une mission se termine sans attendre son attestation (%s) : le retour ne la suppose pas',
+    (statutAttestation) => {
+      expect(
+        erreurEtapeAbsence('terminer', absence({ ...MISSION, statutAttestation }))
+      ).toBeUndefined()
+    }
+  )
 
   it('est refusé avant la validation de l’absence', () => {
     expect(erreurEtapeAbsence('terminer', absence({ statut: 'EN_ATTENTE' }))).toBe(
@@ -120,8 +130,15 @@ describe('genererAttestation', () => {
     ).toBeUndefined()
   })
 
-  it('est refusé pour une mission', () => {
-    expect(erreurEtapeAbsence('genererAttestation', absence())).toBe(
+  it('est permis pour une mission en cours qui n’a pas encore d’attestation', () => {
+    expect(erreurEtapeAbsence('genererAttestation', absence(MISSION))).toBeUndefined()
+    expect(
+      erreurEtapeAbsence('genererAttestation', absence({ ...MISSION, statut: 'DEPASSE' }))
+    ).toBeUndefined()
+  })
+
+  it.each(['CONGE_ADMINISTRATIF', 'AUTRE'] as const)('est refusé pour le type %s', (type) => {
+    expect(erreurEtapeAbsence('genererAttestation', absence({ type }))).toBe(
       "Ce type d'absence n'a pas d'attestation."
     )
   })
@@ -155,8 +172,17 @@ describe('validerAttestation', () => {
     ).toBeUndefined()
   })
 
-  it('est refusé pour une mission', () => {
-    expect(erreurEtapeAbsence('validerAttestation', absence())).toBe(
+  it('est permis pour le brouillon d’une mission en cours', () => {
+    expect(
+      erreurEtapeAbsence(
+        'validerAttestation',
+        absence({ ...MISSION, statutAttestation: 'EN_ATTENTE' })
+      )
+    ).toBeUndefined()
+  })
+
+  it.each(['CONGE_ADMINISTRATIF', 'AUTRE'] as const)('est refusé pour le type %s', (type) => {
+    expect(erreurEtapeAbsence('validerAttestation', absence({ type }))).toBe(
       "Ce type d'absence n'a pas d'attestation."
     )
   })
@@ -211,6 +237,42 @@ describe('parcours complet d’un congé', () => {
     expect(permises(absence({ ...CONGE, statutAttestation: 'VALIDEE' }))).toEqual(['terminer'])
     expect(
       permises(absence({ ...CONGE, statut: 'TERMINE', statutAttestation: 'VALIDEE' }))
+    ).toEqual([])
+  })
+})
+
+describe('parcours complet d’une mission', () => {
+  it('propose l’attestation dès la validation, sans jamais bloquer le retour', () => {
+    const ETAPES: EtapeAbsence[] = [
+      'valider',
+      'terminer',
+      'modifier',
+      'supprimer',
+      'genererAttestation',
+      'validerAttestation',
+    ]
+    const permises = (a: AbsenceAJuger) =>
+      ETAPES.filter((e) => erreurEtapeAbsence(e, a) === undefined)
+
+    expect(permises(absence({ ...MISSION, statut: 'EN_ATTENTE' }))).toEqual([
+      'valider',
+      'modifier',
+      'supprimer',
+    ])
+    expect(permises(absence({ ...MISSION, statutAttestation: null }))).toEqual([
+      'terminer',
+      'modifier',
+      'supprimer',
+      'genererAttestation',
+    ])
+    expect(permises(absence({ ...MISSION, statutAttestation: 'EN_ATTENTE' }))).toEqual([
+      'terminer',
+      'supprimer',
+      'validerAttestation',
+    ])
+    expect(permises(absence({ ...MISSION, statutAttestation: 'VALIDEE' }))).toEqual(['terminer'])
+    expect(
+      permises(absence({ ...MISSION, statut: 'TERMINE', statutAttestation: 'VALIDEE' }))
     ).toEqual([])
   })
 })

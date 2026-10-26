@@ -14,6 +14,7 @@ import { erreursDeSaisie } from '@/lib/validations/champs'
 import { calculerFinCongeMaternite } from '@/domain/absences/calculerFinCongeMaternite'
 import { erreurDateRetour } from '@/domain/absences/retourAbsence'
 import { erreurEtapeAbsence, type EtapeAbsence } from '@/domain/absences/etapesAbsence'
+import { erreurDetailsMission, motifAEnregistrer } from '@/domain/absences/motifMission'
 import { genererAttestationAbsence } from '@/lib/documents/genererAttestationAbsence'
 
 export type EtatFormulaire = {
@@ -51,6 +52,9 @@ export async function creerAbsence(
     dateDebut: formData.get('dateDebut'),
     dateFin: formData.get('dateFin') || undefined,
     motif: formData.get('motif') || undefined,
+    // Le formulaire d'une mission envoie ces deux champs au lieu du motif (voir motifMission.ts).
+    lieuAccueil: formData.get('lieuAccueil') ?? undefined,
+    objetMission: formData.get('objetMission') ?? undefined,
   })
   // Le formulaire n'affiche qu'une ligne d'erreur : le premier message y est joint.
   if (!parsed.success) return erreursDeSaisie(parsed.error)
@@ -86,7 +90,7 @@ export async function creerAbsence(
         type: parsed.data.type,
         dateDebut: parsed.data.dateDebut,
         dateFin,
-        motif: parsed.data.motif,
+        motif: motifAEnregistrer(parsed.data),
       },
     })
     absenceId = absence.id
@@ -181,7 +185,14 @@ export async function modifierAbsence(
     if (lecture.disparue) return { message: ABSENCE_DISPARUE }
     if (lecture.refus) return { message: lecture.refus }
 
-    await prisma.absence.update({ where: { id: absenceId }, data: parsed.data })
+    const { lieuAccueil, objetMission, ...donnees } = parsed.data
+    await prisma.absence.update({
+      where: { id: absenceId },
+      data: {
+        ...donnees,
+        motif: motifAEnregistrer({ motif: donnees.motif, lieuAccueil, objetMission }),
+      },
+    })
   } catch (erreur) {
     return { message: messageErreur(erreur, 'modifierAbsence', { introuvable: ABSENCE_DISPARUE }) }
   }
@@ -229,6 +240,12 @@ export async function genererAttestation(
   if (!absence) return { message: 'Absence introuvable.' }
   const refus = erreurEtapeAbsence('genererAttestation', absence)
   if (refus) return { message: refus }
+  // La décision de mission imprime l'établissement d'accueil et l'objet : sans eux, un blanc
+  // resterait dans un acte signé.
+  if (absence.type === 'MISSION') {
+    const manque = erreurDetailsMission(absence.motif)
+    if (manque) return { message: manque }
+  }
   if (!absence.enseignant.departement) {
     return {
       message:

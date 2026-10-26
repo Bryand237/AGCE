@@ -416,6 +416,11 @@ describe('listes d’absences — missions', () => {
     expect(valeur("Lieu d'accueil / motif", ligne)).toBe('Colloque international à Paris')
   })
 
+  it('reprend l’établissement d’accueil puis l’objet, sans leurs intitulés', () => {
+    const ligne = ligneMission("Lieu d'accueil : Université de Douala\nObjet : Jury de thèses")
+    expect(valeur("Lieu d'accueil / motif", ligne)).toBe('Université de Douala — Jury de thèses')
+  })
+
   it('laisse la cellule vide quand la mission n’a pas de motif', () => {
     expect(valeur("Lieu d'accueil / motif", ligneMission(null))).toBe('')
   })

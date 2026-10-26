@@ -12,15 +12,18 @@ import {
   type EtatFormulaire,
 } from './actions'
 import { classeBoutonPrimaire, classeChamp, classeFormulaire } from '@/lib/ui-classes'
+import { lireMotifMission } from '@/domain/absences/motifMission'
+import { ChampsMission } from './champs-mission'
 
 const etatInitial: EtatFormulaire = {}
 
 export function FormulaireValidationAbsence({
   absenceId,
-  estCongeMaternite,
+  avecAttestation,
 }: {
   absenceId: string
-  estCongeMaternite: boolean
+  /** La décision citera la correspondance et la demande de l'intéressé(e) : on les demande ici. */
+  avecAttestation: boolean
 }) {
   const [state, formAction, isPending] = useActionState(
     validerAbsence.bind(null, absenceId),
@@ -37,7 +40,7 @@ export function FormulaireValidationAbsence({
         Auteur de la validation
         <input name="auteurValidation" required placeholder="Le Recteur" className={classeChamp} />
       </label>
-      {estCongeMaternite && (
+      {avecAttestation && (
         <>
           <label className="flex flex-col gap-1 text-sm">
             Référence de la correspondance
@@ -91,15 +94,19 @@ export function FormulaireTerminerAbsence({
 
 export function FormulaireModifierAbsence({
   absenceId,
+  type,
   dateDebut,
   dateFin,
   motif,
 }: {
   absenceId: string
+  type: string
   dateDebut: string
   dateFin: string
   motif: string | null
 }) {
+  // Pour une mission, le motif enregistré porte l'établissement d'accueil et l'objet.
+  const mission = lireMotifMission(motif)
   const [state, formAction, isPending] = useActionState(
     modifierAbsence.bind(null, absenceId),
     etatInitial
@@ -130,10 +137,14 @@ export function FormulaireModifierAbsence({
           />
         </label>
       </div>
-      <label className="flex flex-col gap-1 text-sm">
-        Motif
-        <textarea name="motif" rows={3} defaultValue={motif ?? ''} className={classeChamp} />
-      </label>
+      {type === 'MISSION' ? (
+        <ChampsMission lieuAccueil={mission.lieuAccueil} objet={mission.objet} />
+      ) : (
+        <label className="flex flex-col gap-1 text-sm">
+          Motif
+          <textarea name="motif" rows={3} defaultValue={motif ?? ''} className={classeChamp} />
+        </label>
+      )}
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : 'Enregistrer'}
@@ -157,6 +168,7 @@ export function BlocAttestationAbsence({
   consultationSeule = false,
   signature = null,
   raisonBrouillon = null,
+  raisonGeneration = null,
 }: {
   absenceId: string
   statutAttestation: string | null
@@ -164,6 +176,8 @@ export function BlocAttestationAbsence({
   consultationSeule?: boolean
   signature?: string | null
   raisonBrouillon?: string | null
+  /** Ce qui manque avant de pouvoir générer le brouillon (mission sans lieu d'accueil ou objet). */
+  raisonGeneration?: string | null
 }) {
   const [etatGenerer, formActionGenerer, isPendingGenerer] = useActionState(
     genererAttestation.bind(null, absenceId),
@@ -176,6 +190,7 @@ export function BlocAttestationAbsence({
 
   if (!statutAttestation) {
     if (consultationSeule) return null
+    if (raisonGeneration) return <p className="text-muted-foreground text-sm">{raisonGeneration}</p>
     return (
       <form action={formActionGenerer} className="flex flex-col gap-2">
         {etatGenerer.message && (

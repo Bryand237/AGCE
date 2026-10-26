@@ -65,6 +65,7 @@ const ABSENCE_COMPLETE = {
   },
 }
 
+const MOTIF_MISSION = "Lieu d'accueil : Université de Douala\nObjet : Jury de soutenance de thèses"
 const CONGE_AVEC_BROUILLON = { type: 'CONGE_MATERNITE', statutAttestation: 'EN_ATTENTE' }
 const CONGE_SIGNE = { type: 'CONGE_MATERNITE', statutAttestation: 'VALIDEE' }
 
@@ -105,6 +106,45 @@ describe('actions absences : erreurs de la base', () => {
 
     it('ouvre la fiche de l’absence créée', async () => {
       await expect(creerAbsence({}, saisie())).rejects.toThrow('NEXT_REDIRECT /absences/abs-1')
+    })
+
+    it('enregistre l’établissement d’accueil et l’objet d’une mission dans le motif', async () => {
+      await expect(
+        creerAbsence(
+          {},
+          formulaire({
+            matricule: '12345',
+            type: 'MISSION',
+            dateDebut: '2026-10-01',
+            dateFin: '2026-10-10',
+            lieuAccueil: 'Université de Douala',
+            objetMission: 'Jury de soutenance de thèses',
+          })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT /absences/abs-1')
+
+      expect(prismaFactice.absence.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ type: 'MISSION', motif: MOTIF_MISSION }),
+      })
+    })
+
+    it('laisse le motif d’un autre type d’absence tel qu’il est saisi', async () => {
+      await expect(
+        creerAbsence(
+          {},
+          formulaire({
+            matricule: '12345',
+            type: 'CONGE_MALADIE',
+            dateDebut: '2026-10-01',
+            dateFin: '2026-10-10',
+            motif: 'Repos',
+          })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(prismaFactice.absence.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ motif: 'Repos' }),
+      })
     })
 
     it('répond par un message, sans lever d’exception, quand la base est injoignable', async () => {
@@ -297,6 +337,48 @@ describe('actions absences : erreurs de la base', () => {
     })
   })
 
+  describe('modifierAbsence : établissement d’accueil et objet d’une mission', () => {
+    it('les recompose dans le motif et ne les envoie pas à la base comme colonnes', async () => {
+      await modifierAbsence(
+        'abs-1',
+        {},
+        formulaire({
+          dateDebut: '2026-10-01',
+          dateFin: '2026-10-10',
+          lieuAccueil: 'Université de Douala',
+          objetMission: 'Jury de soutenance de thèses',
+        })
+      )
+
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: {
+          dateDebut: new Date('2026-10-01'),
+          dateFin: new Date('2026-10-10'),
+          motif: MOTIF_MISSION,
+        },
+      })
+    })
+
+    it('vide le motif quand les deux champs sont laissés vides', async () => {
+      await modifierAbsence(
+        'abs-1',
+        {},
+        formulaire({
+          dateDebut: '2026-10-01',
+          dateFin: '2026-10-10',
+          lieuAccueil: ' ',
+          objetMission: '',
+        })
+      )
+
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: expect.objectContaining({ motif: null }),
+      })
+    })
+  })
+
   it('validerAttestation annonce la réussite avec le drapeau « succes »', async () => {
     absenceEn(CONGE_AVEC_BROUILLON)
 
@@ -374,6 +456,46 @@ describe('actions absences : erreurs de la base', () => {
       expect(etat.message).toMatch(/Cette absence n'existe plus/)
       expect(etat.succes).toBeUndefined()
     })
+
+    describe('pour une mission', () => {
+      it('génère le brouillon quand l’établissement d’accueil et l’objet sont renseignés', async () => {
+        absenceEn({ type: 'MISSION', motif: MOTIF_MISSION })
+
+        const etat = await genererAttestation('abs-1', {})
+
+        expect(etat).toEqual({ message: 'Brouillon généré.', succes: true })
+        expect(genererAttestationAbsence).toHaveBeenCalledWith(
+          'MISSION',
+          expect.objectContaining({ absence: expect.objectContaining({ motif: MOTIF_MISSION }) })
+        )
+        expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+          where: { id: 'abs-1' },
+          data: expect.objectContaining({ statutAttestation: 'EN_ATTENTE' }),
+        })
+      })
+
+      it.each([
+        [null, /l'établissement d'accueil et l'objet de la mission/],
+        ['Objet : Jury de thèses', /l'établissement d'accueil de la mission/],
+        ["Lieu d'accueil : Université de Douala", /l'objet de la mission/],
+      ])('refuse sans rien générer quand le motif est %j', async (motif, message) => {
+        absenceEn({ type: 'MISSION', motif })
+
+        const etat = await genererAttestation('abs-1', {})
+
+        expect(etat.message).toMatch(message)
+        expect(etat.succes).toBeUndefined()
+        expect(genererAttestationAbsence).not.toHaveBeenCalled()
+        expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+        expect(revalidatePath).not.toHaveBeenCalled()
+      })
+
+      it('ne demande ni lieu ni objet pour un congé', async () => {
+        absenceEn({ type: 'CONGE_MALADIE', motif: null })
+
+        expect((await genererAttestation('abs-1', {})).succes).toBe(true)
+      })
+    })
   })
   describe('ordre des étapes : l’état enregistré décide', () => {
     const valider = () =>
@@ -438,10 +560,16 @@ describe('actions absences : erreurs de la base', () => {
         /existe déjà/,
       ],
       [
-        'générer une attestation pour une mission',
+        'générer une attestation pour un type d’absence qui n’en a pas',
         () => genererAttestation('abs-1', {}),
-        {},
+        { type: 'CONGE_ADMINISTRATIF' },
         /n'a pas d'attestation/,
+      ],
+      [
+        'générer l’attestation d’une mission sans établissement d’accueil ni objet',
+        () => genererAttestation('abs-1', {}),
+        { type: 'MISSION', motif: null },
+        /l'établissement d'accueil et l'objet/,
       ],
       [
         'valider une attestation sans brouillon',
@@ -462,6 +590,18 @@ describe('actions absences : erreurs de la base', () => {
       // Le message doit rester sous le formulaire : une page rechargée le ferait disparaître.
       expect(revalidatePath).not.toHaveBeenCalled()
     })
+
+    it.each([null, 'EN_ATTENTE', 'VALIDEE'])(
+      'une mission peut être terminée sans attendre sa signature (attestation : %s)',
+      async (statutAttestation) => {
+        absenceEn({ type: 'MISSION', statutAttestation })
+
+        const etat = await terminer()
+
+        expect(etat.message).toBeUndefined()
+        expect(prismaFactice.absence.update).toHaveBeenCalledTimes(1)
+      }
+    )
 
     it('un congé dont l’attestation est signée peut être terminé', async () => {
       absenceEn(CONGE_SIGNE)

@@ -14,7 +14,7 @@ const TYPES = ['MISSION', 'CONGE_MATERNITE', 'CONGE_MALADIE'] as const
 const ATTESTATIONS = [null, 'EN_ATTENTE', 'VALIDEE'] as const
 
 describe('presentationAttestation', () => {
-  it.each(['CONGE_MATERNITE', 'CONGE_MALADIE'] as const)(
+  it.each(['CONGE_MATERNITE', 'CONGE_MALADIE', 'MISSION'] as const)(
     'propose les étapes d’un %s en cours, avec ou sans attestation',
     (type) => {
       for (const statut of ['EN_PERIODE', 'DEPASSE'] as const) {
@@ -41,17 +41,20 @@ describe('presentationAttestation', () => {
     expect(presentationAttestation(absence({ statut: 'EN_ATTENTE' }))).toBe('aucune')
   })
 
-  it('ne montre rien pour une mission, quel que soit son statut', () => {
-    for (const statut of STATUTS_ABSENCE) {
+  it('ne montre rien pour une mission en attente ou terminée sans attestation', () => {
+    for (const statut of ['EN_ATTENTE', 'TERMINE'] as const) {
       expect(presentationAttestation(absence({ type: 'MISSION', statut }))).toBe('aucune')
     }
   })
 
-  it('ne propose aucune étape pour une mission en cours, mais garde un document existant consultable', () => {
-    expect(
-      presentationAttestation(absence({ type: 'MISSION', statutAttestation: 'VALIDEE' }))
-    ).toBe('consultation')
-  })
+  it.each(['EN_ATTENTE', 'VALIDEE'] as const)(
+    'garde consultable l’attestation (%s) d’une mission terminée',
+    (statutAttestation) => {
+      expect(
+        presentationAttestation(absence({ type: 'MISSION', statut: 'TERMINE', statutAttestation }))
+      ).toBe('consultation')
+    }
+  )
 
   it('ne fait jamais disparaître une attestation enregistrée (toutes les combinaisons)', () => {
     for (const type of TYPES) {

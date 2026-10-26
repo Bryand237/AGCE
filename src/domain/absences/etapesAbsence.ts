@@ -1,13 +1,15 @@
 import type { StatutAbsence, TypeAbsence } from '../enseignants/dossier'
-import { TYPES_AVEC_ATTESTATION } from './typesAvecAttestation'
+import { TYPES_AVEC_ATTESTATION, TYPES_RETOUR_APRES_ATTESTATION } from './typesAvecAttestation'
 
 /**
  * L'ordre des étapes de la vie d'une absence, imposé par le serveur.
  *
  *   en attente ──valider──▶ en période / dépassée ──terminer──▶ terminée
  *                                │
- *                                └─ (congés) générer le brouillon d'attestation
+ *                                └─ (congés et missions) générer le brouillon d'attestation
  *                                   ──valider l'attestation──▶ attestation signée
+ *
+ * Le retour d'un congé exige l'attestation signée ; celui d'une mission ne l'exige pas.
  *
  * Une action serveur est une adresse HTTP appelable sans passer par la page : un onglet resté
  * ouvert ou un double envoi peut déclencher une étape que la page ne propose plus (re-valider,
@@ -54,8 +56,8 @@ export function erreurEtapeAbsence(
       if (statut === 'EN_ATTENTE') {
         return "Cette absence n'est pas encore validée : validez-la avant d'enregistrer le retour."
       }
-      // Un congé ne se clôt qu'une fois son attestation signée.
-      if (avecAttestation && statutAttestation !== 'VALIDEE') {
+      // Un congé ne se clôt qu'une fois son attestation signée (pas une mission).
+      if (TYPES_RETOUR_APRES_ATTESTATION.includes(type) && statutAttestation !== 'VALIDEE') {
         return "La fin d'absence ne peut être enregistrée qu'après validation de l'attestation."
       }
       return undefined

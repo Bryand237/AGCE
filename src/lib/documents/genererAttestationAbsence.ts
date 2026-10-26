@@ -12,21 +12,22 @@ import {
   formaterDureeSemaines,
   calculerDureeSemaines,
 } from '@/domain/absences/formaterDureeSemaines'
+import { lireMotifMission } from '@/domain/absences/motifMission'
 
 type Params = {
   absence: Pick<
     Absence,
-    'dateDebut' | 'dateFin' | 'referenceCorrespondance' | 'dateDemandeInteressee'
+    'dateDebut' | 'dateFin' | 'referenceCorrespondance' | 'dateDemandeInteressee' | 'motif'
   >
   enseignant: Pick<Enseignant, 'nom' | 'prenom' | 'grade' | 'sexe' | 'matricule'>
   departement: Pick<Departement, 'nom'>
   etablissement: Pick<Etablissement, 'nom' | 'type'>
 }
 
-// Seul CONGE_MATERNITE a un vrai template pour l'instant — voir plus bas.
 const TEMPLATES: Record<string, string> = {
   CONGE_MATERNITE: 'attestation-conge-maternite.docx',
   CONGE_MALADIE: 'attestation-conge-maladie.docx',
+  MISSION: 'attestation-mission.docx',
 }
 
 export function genererAttestationAbsence(
@@ -41,9 +42,16 @@ export function genererAttestationAbsence(
   )
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
 
+  // Établissement d'accueil et objet d'une mission : enregistrés ensemble dans le motif.
+  const mission = lireMotifMission(absence.motif)
+  const feminin = enseignant.sexe === 'F'
+
   doc.render(
     typographierValeurs({
-      civilite: enseignant.sexe === 'F' ? 'Madame' : 'Monsieur',
+      civilite: feminin ? 'Madame' : 'Monsieur',
+      // Accords des gabarits qui ne figent pas le sexe (la décision de mission).
+      interesse: feminin ? 'intéressée' : 'intéressé',
+      autorise: feminin ? 'autorisée' : 'autorisé',
       nomComplet: nomCompletPourActe(enseignant.nom, enseignant.prenom),
       matricule: enseignant.matricule,
       gradeActuel: LIBELLES_GRADE[enseignant.grade] ?? enseignant.grade,
@@ -57,6 +65,8 @@ export function genererAttestationAbsence(
       ),
       referenceCorrespondance: absence.referenceCorrespondance ?? '',
       dateDemandeInteressee: formaterDateLongue(absence.dateDemandeInteressee),
+      lieuAccueil: mission.lieuAccueil,
+      objetMission: mission.objet,
     })
   )
 

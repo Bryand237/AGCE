@@ -440,6 +440,45 @@ documents ressemblent aux décisions originales :
 Pour modifier un gabarit, éditer le fichier `.docx` dans Word et le déposer dans `templates/`.
 Les balises `{nomComplet}`, `{dateDebut}`… doivent rester d'un seul tenant.
 
+Les décisions d'absence sont :
+
+| Gabarit                                      | Absence            |
+| -------------------------------------------- | ------------------ |
+| `templates/attestation-conge-maternite.docx` | congé de maternité |
+| `templates/attestation-conge-maladie.docx`   | congé de maladie   |
+| `templates/attestation-mission.docx`         | mission            |
+
+Balises communes aux trois : `{civilite}`, `{nomComplet}`, `{matricule}`, `{gradeActuel}`,
+`{nomDepartement}`, `{nomEtablissement}`, `{titreResponsable}`, `{dateDebut}`, `{dateFin}`,
+`{referenceCorrespondance}`, `{dateDemandeInteressee}`. Le gabarit de **mission** en ajoute
+quatre : `{lieuAccueil}` et `{objetMission}` (voir ci-dessous), et `{interesse}` /
+`{autorise}`, qui s'accordent au sexe de l'enseignant (« intéressée » / « intéressé »,
+« autorisée » / « autorisé »).
+
+Le gabarit de mission est dérivé de celui du congé de maladie : mêmes en-tête, visas,
+signature et ampliations ; seuls le titre, la formule « demande de l'intéressé(e) » et les
+trois articles changent (autorisation de la mission, reprise de service dans
+l'établissement de départ, publication). Les références du visa « correspondance » y sont en
+Arial Narrow : dans les trois gabarits d'origine elles portaient le style « Source Text »
+(police à chasse fixe) et s'imprimaient en police de machine à écrire.
+
+### Établissement d'accueil et objet d'une mission
+
+La base n'a pas de colonne pour le lieu d'accueil (le schéma ne change pas) : le formulaire
+d'une mission demande **l'établissement d'accueil** et **l'objet**, enregistrés ensemble dans
+le champ `motif` de l'absence, chacun sur sa ligne avec son intitulé :
+
+```
+Lieu d'accueil : Université de Douala
+Objet : Participation au jury de soutenance de thèses
+```
+
+Un motif libre saisi avant cette convention est lu comme l'**objet** de la mission. La
+convention est dans `src/domain/absences/motifMission.ts` ; la liste « Enseignants en
+mission » l'affiche sur une ligne (« Université de Douala — Participation au jury… »).
+Le brouillon d'une mission **ne se génère qu'avec les deux informations** : un blanc ne doit
+pas rester dans une décision signée.
+
 ## Changements de statut d'un enseignant
 
 Un enseignant **actif** peut être marqué **transféré** ou **retraité**. Un transféré
@@ -482,8 +521,8 @@ mêmes étapes.
 | Étape                          | Permise quand                                                         |
 | ------------------------------ | --------------------------------------------------------------------- |
 | Valider l'absence              | elle est en attente                                                   |
-| Générer le brouillon           | congé en période ou dépassé, sans attestation                         |
-| Valider (signer) l'attestation | congé en période ou dépassé, avec un brouillon                        |
+| Générer le brouillon           | congé ou mission en période ou dépassé, sans attestation              |
+| Valider (signer) l'attestation | congé ou mission en période ou dépassé, avec un brouillon             |
 | Terminer (retour)              | en période ou dépassée ; pour un congé, une fois l'attestation signée |
 | Modifier les dates             | ni terminée, ni attestation générée (brouillon ou signée)             |
 | Supprimer                      | toujours, sauf quand l'attestation est signée                         |
@@ -495,6 +534,9 @@ mêmes étapes.
   y compris une fois l'absence terminée : la fiche garde alors le bloc « Attestation » en
   simple consultation (lien de téléchargement, date et auteur de la signature), sans
   aucune étape. La règle est dans `src/domain/absences/presentationAttestation.ts`.
+- Une **mission** a la même attestation qu'un congé (brouillon, signature, téléchargement à
+  tout moment), mais son retour **ne dépend pas** de la signature : ce n'est pas le cas des
+  congés. Les types concernés sont dans `src/domain/absences/typesAvecAttestation.ts`.
 - Le bouton « Supprimer » demande une confirmation. Une absence déjà supprimée (autre
   onglet, double clic) ramène simplement à la liste.
 - Un refus s'affiche sous le formulaire, sans recharger la page, avec le motif.

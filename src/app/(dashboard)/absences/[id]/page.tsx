@@ -8,7 +8,11 @@ import {
   FormulaireSupprimerAbsence,
   BlocAttestationAbsence,
 } from '../formulaires'
-import { TYPES_AVEC_ATTESTATION } from '@/domain/absences/typesAvecAttestation'
+import {
+  TYPES_AVEC_ATTESTATION,
+  TYPES_RETOUR_APRES_ATTESTATION,
+} from '@/domain/absences/typesAvecAttestation'
+import { erreurDetailsMission, lireMotifMission } from '@/domain/absences/motifMission'
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { presentationAttestation } from '@/domain/absences/presentationAttestation'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
@@ -79,6 +83,10 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
 
   // Une attestation enregistrée reste téléchargeable à tout moment, absence terminée comprise.
   const presentation = presentationAttestation(absence)
+  // Une mission ne peut recevoir son brouillon qu'avec son établissement d'accueil et son objet.
+  const mission = absence.type === 'MISSION' ? lireMotifMission(absence.motif) : null
+  const raisonGeneration =
+    mission && absence.statutAttestation === null ? erreurDetailsMission(absence.motif) : undefined
   const signature =
     absence.statutAttestation === 'VALIDEE' && absence.dateValidationAttestation
       ? `Signée le ${formatDate(absence.dateValidationAttestation)}${absence.auteurValidationAttestation ? ` (${absence.auteurValidationAttestation})` : ''}`
@@ -215,7 +223,14 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               <Item label="Statut" valeur={LIBELLES_STATUT[absence.statut] ?? absence.statut} />
               <Item label="Date de début" valeur={formatDate(absence.dateDebut)} />
               <Item label="Date de fin" valeur={formatDate(absence.dateFin)} />
-              <Item label="Motif" valeur={absence.motif ?? '—'} />
+              {mission ? (
+                <>
+                  <Item label="Établissement d'accueil" valeur={mission.lieuAccueil || '—'} />
+                  <Item label="Objet de la mission" valeur={mission.objet || '—'} multiligne />
+                </>
+              ) : (
+                <Item label="Motif" valeur={absence.motif ?? '—'} multiligne />
+              )}
               <Item label="Enregistrée le" valeur={formatDate(absence.createdAt)} />
               {absence.dateValidation && (
                 <Item
@@ -252,7 +267,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
           {absence.statut === 'EN_ATTENTE' && (
             <FormulaireValidationAbsence
               absenceId={id}
-              estCongeMaternite={TYPES_AVEC_ATTESTATION.includes(absence.type)}
+              avecAttestation={TYPES_AVEC_ATTESTATION.includes(absence.type)}
             />
           )}
 
@@ -266,12 +281,13 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
                 consultationSeule={presentation === 'consultation'}
                 signature={signature}
                 raisonBrouillon={erreurEtapeAbsence('validerAttestation', absence) ?? null}
+                raisonGeneration={raisonGeneration ?? null}
               />
             </div>
           )}
 
           {(absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') &&
-            (!TYPES_AVEC_ATTESTATION.includes(absence.type) ||
+            (!TYPES_RETOUR_APRES_ATTESTATION.includes(absence.type) ||
             absence.statutAttestation === 'VALIDEE' ? (
               <FormulaireTerminerAbsence absenceId={id} estDepasse={absence.statut === 'DEPASSE'} />
             ) : (
@@ -296,11 +312,23 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   )
 }
 
-function Item({ label, valeur }: { label: string; valeur: string }) {
+function Item({
+  label,
+  valeur,
+  multiligne = false,
+}: {
+  label: string
+  valeur: string
+  multiligne?: boolean
+}) {
   return (
     <div>
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-foreground mt-0.5 font-medium">{valeur}</dd>
+      <dd
+        className={`text-foreground mt-0.5 font-medium ${multiligne ? 'whitespace-pre-line' : ''}`}
+      >
+        {valeur}
+      </dd>
     </div>
   )
 }

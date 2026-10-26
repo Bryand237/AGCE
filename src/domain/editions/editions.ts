@@ -86,9 +86,9 @@ export const DEFINITIONS_EDITION: Record<
       'Les enseignants en activité actuellement en mission, avec les dates de la mission, y ' +
       "compris ceux dont le retour n'est pas encore enregistré.",
     avertissement:
-      "La base n'indique ni le lieu d'accueil ni si la mission est à l'étranger : la liste " +
-      "reprend toutes les missions en cours, et la colonne « Lieu d'accueil / motif » reproduit " +
-      "le motif saisi à la création de l'absence.",
+      "La base n'indique pas si la mission est à l'étranger : la liste reprend toutes les " +
+      "missions en cours, et la colonne « Lieu d'accueil / motif » reproduit l'établissement " +
+      "d'accueil et l'objet saisis à la création de l'absence.",
   },
 }
 

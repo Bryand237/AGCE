@@ -161,6 +161,17 @@ describe('construireCsvEdition — congés et missions', () => {
     expect(donnees![entetes!.indexOf("Lieu d'accueil / motif")]).toBe('Paris')
   })
 
+  it('missions : la colonne reprend l’établissement d’accueil puis l’objet', () => {
+    const [entetes, donnees] = cellules(
+      construireCsvEdition({ cle: 'missions' }, [
+        ligne(absence('MISSION', "Lieu d'accueil : Université de Douala\nObjet : Jury de thèses")),
+      ])
+    )
+    expect(donnees![entetes!.indexOf("Lieu d'accueil / motif")]).toBe(
+      'Université de Douala — Jury de thèses'
+    )
+  })
+
   it('missions : un motif avec « ; » ou un retour à la ligne reste dans sa cellule', () => {
     const texte = construireCsvEdition({ cle: 'missions' }, [
       ligne(absence('MISSION', 'Colloque; atelier\nParis')),
