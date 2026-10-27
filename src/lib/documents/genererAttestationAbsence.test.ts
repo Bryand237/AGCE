@@ -130,6 +130,27 @@ describe('genererAttestationAbsence', () => {
   })
 })
 
+describe('genererAttestationAbsence — congé de maladie', () => {
+  beforeEach(() => {
+    capture.fichier = ''
+    capture.donnees = {}
+  })
+
+  it('donne à la décision les dates du congé et la civilité de l’enseignant', () => {
+    const d = generer('CONGE_MALADIE', { enseignant: HOMME })
+    expect(d.civilite).toBe('Monsieur')
+    expect(d.interesse).toBe('intéressé')
+    expect(d.dateDebut).toBe('14 avril 2026')
+    expect(d.dateFin).toBe('28 juillet 2026')
+  })
+
+  it('accorde « intéressée » au féminin', () => {
+    const d = generer('CONGE_MALADIE')
+    expect(d.civilite).toBe('Madame')
+    expect(d.interesse).toBe('intéressée')
+  })
+})
+
 describe('genererAttestationAbsence — mission', () => {
   beforeEach(() => {
     capture.fichier = ''

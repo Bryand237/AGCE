@@ -448,19 +448,29 @@ Les décisions d'absence sont :
 | `templates/attestation-conge-maladie.docx`   | congé de maladie   |
 | `templates/attestation-mission.docx`         | mission            |
 
-Balises communes aux trois : `{civilite}`, `{nomComplet}`, `{matricule}`, `{gradeActuel}`,
-`{nomDepartement}`, `{nomEtablissement}`, `{titreResponsable}`, `{dateDebut}`, `{dateFin}`,
-`{referenceCorrespondance}`, `{dateDemandeInteressee}`. Le gabarit de **mission** en ajoute
-quatre : `{lieuAccueil}` et `{objetMission}` (voir ci-dessous), et `{interesse}` /
-`{autorise}`, qui s'accordent au sexe de l'enseignant (« intéressée » / « intéressé »,
-« autorisée » / « autorisé »).
+Balises des trois gabarits : `{nomComplet}`, `{gradeActuel}`, `{nomDepartement}`,
+`{nomEtablissement}`, `{titreResponsable}`, `{dateDebut}`, `{dateFin}`,
+`{referenceCorrespondance}`, `{dateDemandeInteressee}`. Les gabarits de **maladie** et de
+**mission** y ajoutent `{civilite}` (« Madame » / « Monsieur ») et `{interesse}`
+(« intéressée » / « intéressé »), qui s'accordent au sexe de l'enseignant : le congé de
+maternité ne vise que des femmes, son gabarit les écrit au féminin. Celui de la mission
+ajoute encore `{autorise}` (« autorisée » / « autorisé »), `{lieuAccueil}` et `{objetMission}`
+(voir ci-dessous).
 
-Le gabarit de mission est dérivé de celui du congé de maladie : mêmes en-tête, visas,
-signature et ampliations ; seuls le titre, la formule « demande de l'intéressé(e) » et les
-trois articles changent (autorisation de la mission, reprise de service dans
-l'établissement de départ, publication). Les références du visa « correspondance » y sont en
-Arial Narrow : dans les trois gabarits d'origine elles portaient le style « Source Text »
-(police à chasse fixe) et s'imprimaient en police de machine à écrire.
+Le gabarit de **maladie** est dérivé de celui de maternité : mêmes en-tête, visas, signature
+et ampliations. Il remplace ce qui est propre à la maternité (quatorze semaines « avec solde
+entière », « avant et après la date présumée d'accouchement », « Madame », « l'intéressée »)
+par : article 1er « Un congé de maladie est accordé du … au … à … », article 2 « À l'issue de ce
+congé, l'intéressé(e) reprendra le service à 7 heures 30 minutes », article 3 (publication). Ni
+durée en semaines ni solde n'y sont écrites : la base ne les connaît pas.
+
+Le gabarit de **mission** est dérivé du même modèle : seuls le titre, la formule « demande de
+l'intéressé(e) » et les trois articles changent (autorisation de la mission, reprise de service
+dans l'établissement de départ, publication). Les gabarits de maladie et de mission tiennent
+sur une page (lignes vides réduites, signature et ampliations insécables) et leurs références du
+visa « correspondance » sont en Arial Narrow : dans ceux de maternité et d'avancement elles
+portent encore le style « Source Text » (police à chasse fixe) et s'impriment en police de
+machine à écrire.
 
 ### Établissement d'accueil et objet d'une mission
 

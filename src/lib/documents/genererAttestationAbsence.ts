@@ -8,10 +8,6 @@ import { formaterDateLongue } from '@/domain/dates/formaterDateLongue'
 import { nomCompletPourActe } from '@/domain/documents/nomCompletPourActe'
 import { typographierValeurs } from '@/domain/documents/typographie'
 import type { Absence, Enseignant, Departement, Etablissement } from '@/generated/prisma/client'
-import {
-  formaterDureeSemaines,
-  calculerDureeSemaines,
-} from '@/domain/absences/formaterDureeSemaines'
 import { lireMotifMission } from '@/domain/absences/motifMission'
 
 type Params = {
@@ -60,9 +56,6 @@ export function genererAttestationAbsence(
       titreResponsable: titreResponsable(etablissement.type),
       dateDebut: formaterDateLongue(absence.dateDebut),
       dateFin: formaterDateLongue(absence.dateFin),
-      dureeEnLettres: formaterDureeSemaines(
-        calculerDureeSemaines(absence.dateDebut, absence.dateFin)
-      ),
       referenceCorrespondance: absence.referenceCorrespondance ?? '',
       dateDemandeInteressee: formaterDateLongue(absence.dateDemandeInteressee),
       lieuAccueil: mission.lieuAccueil,
