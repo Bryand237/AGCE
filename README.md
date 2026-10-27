@@ -340,6 +340,18 @@ formulaire « Mettre à jour » ne propose que des positions acceptées.
   (`rapportValideModifiable.ts`).
 - Toute écriture de `positionActuelleId` écrit `grade` dans la même requête.
 
+### Notation d'une position
+
+Trois écritures d'une même position de la grille : **longue** à l'écran (« 2ème Classe, 6ème
+Échelon »), **de décision** dans les documents Word (« 2ème Classe 6ème Echelon »), **compacte**
+dans le rapport PDF (« 2C/6E/1115 ») et **officielle** dans les décisions (« 2C/6E/1115 » aussi).
+Les Assistants ont des échelons (1 à 3) sans classe : ils s'écrivent « 1er Échelon », « 1E/465 »,
+jamais « — ». Leur indice distingue la voie « sans thèse » de la voie « avec thèse » (l'échelon 1
+vaut 465 ou 605). La règle de la partie « classe / échelon » n'est écrite qu'à un endroit
+(`notationPosition.ts`). Cette notation est une proposition à faire valider par le client.
+Les paliers sans échelon numéroté (Délégué, Stagiaire, Classe Exceptionnelle, Hors Échelle)
+s'écrivent par leur abréviation dans le rapport PDF, sans indice.
+
 ## Validation d'un rapport d'avancement
 
 Les sélections d'un rapport datent de sa création ; la validation peut venir des

@@ -18,6 +18,12 @@ describe('formaterPositionDecision', () => {
     expect(formaterPositionDecision(position({ echelon: 3 }))).toBe('2ème Classe 3ème Echelon')
   })
 
+  it('écrit « 1er Echelon » pour un Assistant, qui n’a pas de classe', () => {
+    expect(
+      formaterPositionDecision(position({ grade: 'ASSISTANT', classe: null, echelon: 1 }))
+    ).toBe('1er Echelon')
+  })
+
   it('laisse les positions sans classe ni échelon comme dans l’application', () => {
     expect(formaterPositionDecision(position({ sousCategorie: 'DELEGUE' }))).toBe(
       'Chargé de Cours Délégué'

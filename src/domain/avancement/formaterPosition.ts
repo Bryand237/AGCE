@@ -9,7 +9,12 @@ type PositionGrille = {
 
 const ORDINAUX_CLASSE: Record<number, string> = { 1: '1ère', 2: '2ème' }
 const ORDINAUX_ECHELON: Record<number, string> = {
-  1: '1er', 2: '2ème', 3: '3ème', 4: '4ème', 5: '5ème', 6: '6ème',
+  1: '1er',
+  2: '2ème',
+  3: '3ème',
+  4: '4ème',
+  5: '5ème',
+  6: '6ème',
 }
 
 /**
@@ -23,8 +28,11 @@ export function formaterPosition(position: PositionGrille): string {
   if (position.sousCategorie === 'STAGIAIRE') return `${libelleGrade} Stagiaire`
   if (position.sousCategorie === 'CLASSE_EXCEPTIONNELLE') return 'Classe Exceptionnelle'
   if (position.sousCategorie === 'HORS_ECHELLE') return 'Hors Échelle'
-  if (position.classe && position.echelon) {
-    return `${ORDINAUX_CLASSE[position.classe] ?? position.classe} Classe, ${ORDINAUX_ECHELON[position.echelon] ?? position.echelon} Échelon`
+  if (position.echelon != null) {
+    const echelon = `${ORDINAUX_ECHELON[position.echelon] ?? position.echelon} Échelon`
+    // Les Assistants ont des échelons sans classe : « 1er Échelon ».
+    if (position.classe == null) return echelon
+    return `${ORDINAUX_CLASSE[position.classe] ?? position.classe} Classe, ${echelon}`
   }
   return '—'
 }

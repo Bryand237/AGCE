@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { recupererGrilleEchelonIndiciaire, recupererRapportDetail } from '../../donnees'
 import { FormulaireModifierRapport, FormulaireModifierSelection } from '../../formulaires'
 import { classeFormulaire } from '@/lib/ui-classes'
+import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
 import { positionsProposables } from '@/domain/avancement/positionProposee'
 import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
 
@@ -75,10 +76,7 @@ export default async function ModifierRapportPage({ params }: { params: Promise<
                   </h3>
                   <p className="text-muted-foreground mb-3 text-sm">
                     Position actuelle :{' '}
-                    {selection.enseignant.positionActuelle.classe != null &&
-                    selection.enseignant.positionActuelle.echelon != null
-                      ? `${selection.enseignant.positionActuelle.classe}C/${selection.enseignant.positionActuelle.echelon}E/${selection.enseignant.positionActuelle.indice}`
-                      : `—/${selection.enseignant.positionActuelle.indice}`}
+                    {formaterClasseEchelonIndice(selection.enseignant.positionActuelle)}
                   </p>
                   {refus || !avancement ? (
                     <p className="text-muted-foreground text-sm">{refus}</p>
