@@ -458,6 +458,24 @@ documents ressemblent aux décisions originales :
 Pour modifier un gabarit, éditer le fichier `.docx` dans Word et le déposer dans `templates/`.
 Les balises `{nomComplet}`, `{dateDebut}`… doivent rester d'un seul tenant.
 
+### Numéro de décision et date de signature
+
+Les **quatre** gabarits portent `{numeroDecision}` (« DECISION N°{numeroDecision}/UN/R/… ») et
+`{dateSignature}` (« Fait à Ngaoundéré, le {dateSignature} »). Un test (`gabarits.test.ts`)
+lit les vrais fichiers et échoue si l'une de ces balises disparaît ou est coupée en deux par
+Word : sans elles, le numéro saisi n'apparaîtrait nulle part sur le papier.
+
+- **Brouillon** : ni numéro ni date ne sont connus, le document garde ses blancs
+  (`N°--------------------------` et `le ________________` ; `N°___________` et `le` seul pour
+  la décision d'avancement). La décision d'avancement imprime tout de même la date de
+  signature prévue par le conseil (« Métadonnées du conseil ») quand elle est renseignée.
+- **Signature** (« Marquer signée ») : le document est **refait** avec le numéro et la date saisis
+  dans le formulaire, puis remplace le brouillon dans la base. Pour une attestation, la
+  signature est refusée, sans rien enregistrer, si le document ne peut pas être refait
+  (mission sans établissement d'accueil ou objet, enseignant sans département).
+- Le numéro est enregistré sans espaces autour : c'est tel quel qu'il est imprimé.
+  Les valeurs par défaut des blancs sont dans `src/domain/documents/mentionsDeSignature.ts`.
+
 Les décisions d'absence sont :
 
 | Gabarit                                      | Absence            |
@@ -466,7 +484,7 @@ Les décisions d'absence sont :
 | `templates/attestation-conge-maladie.docx`   | congé de maladie   |
 | `templates/attestation-mission.docx`         | mission            |
 
-Balises des trois gabarits : `{nomComplet}`, `{gradeActuel}`, `{nomDepartement}`,
+Balises des trois gabarits d'absence : `{nomComplet}`, `{gradeActuel}`, `{nomDepartement}`,
 `{nomEtablissement}`, `{titreResponsable}`, `{dateDebut}`, `{dateFin}`,
 `{referenceCorrespondance}`, `{dateDemandeInteressee}`. Les gabarits de **maladie** et de
 **mission** y ajoutent `{civilite}` (« Madame » / « Monsieur ») et `{interesse}`

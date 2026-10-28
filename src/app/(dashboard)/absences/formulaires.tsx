@@ -222,6 +222,10 @@ export function BlocAttestationAbsence({
       <div className="flex flex-col gap-4">
         {lienBrouillon}
         <form action={formActionValider} className="flex flex-col gap-3">
+          <p className="text-muted-foreground text-sm">
+            Le numéro et la date saisis sont imprimés sur l&apos;attestation, qui est refaite à la
+            signature.
+          </p>
           <label className="flex flex-col gap-1 text-sm">
             Numéro de décision
             <input name="numeroDecision" required className={classeChamp} />

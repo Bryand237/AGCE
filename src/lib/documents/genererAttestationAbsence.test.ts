@@ -215,3 +215,43 @@ describe('genererAttestationAbsence — mission', () => {
     expect(d.objetMission).toBe('')
   })
 })
+
+describe('genererAttestationAbsence — numéro et date de signature', () => {
+  beforeEach(() => {
+    capture.donnees = {}
+  })
+
+  it.each(['CONGE_MATERNITE', 'CONGE_MALADIE', 'MISSION'])(
+    'garde les blancs du gabarit pour un brouillon (%s)',
+    (type) => {
+      const d = generer(
+        type,
+        type === 'MISSION' ? { absence: { ...ABSENCE, motif: MOTIF_MISSION } } : {}
+      )
+
+      expect(d.numeroDecision).toBe('--------------------------')
+      expect(d.dateSignature).toBe('________________')
+    }
+  )
+
+  it.each(['CONGE_MATERNITE', 'CONGE_MALADIE', 'MISSION'])(
+    'imprime le numéro saisi et la date de signature en toutes lettres (%s)',
+    (type) => {
+      const d = generer(type, {
+        absence: { ...ABSENCE, motif: MOTIF_MISSION },
+        numeroDecision: ' 0412/26 ',
+        dateSignature: new Date('2026-10-01'),
+      })
+
+      expect(d.numeroDecision).toBe('0412/26')
+      expect(d.dateSignature).toBe('1er octobre 2026')
+    }
+  )
+
+  it('garde les blancs quand le numéro est vide ou la date manque', () => {
+    const d = generer('CONGE_MALADIE', { numeroDecision: '  ', dateSignature: null })
+
+    expect(d.numeroDecision).toBe('--------------------------')
+    expect(d.dateSignature).toBe('________________')
+  })
+})

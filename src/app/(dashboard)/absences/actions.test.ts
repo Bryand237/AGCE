@@ -397,6 +397,95 @@ describe('actions absences : erreurs de la base', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/absences/abs-1')
   })
 
+  describe('validerAttestation : le document signé porte le numéro et la date', () => {
+    const saisie = () =>
+      formulaire({
+        numeroDecision: ' 12/26 ',
+        dateValidation: '2026-10-01',
+        auteurValidation: 'Le Recteur',
+      })
+
+    it('refait l’attestation avec le numéro et la date saisis, et l’enregistre', async () => {
+      absenceEn(CONGE_AVEC_BROUILLON)
+      genererAttestationAbsence.mockReturnValue(Buffer.from('signee'))
+
+      await validerAttestation('abs-1', {}, saisie())
+
+      expect(genererAttestationAbsence).toHaveBeenCalledWith(
+        'CONGE_MATERNITE',
+        expect.objectContaining({ numeroDecision: '12/26', dateSignature: new Date('2026-10-01') })
+      )
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: {
+          decisionGeneree: new Uint8Array(Buffer.from('signee')),
+          statutAttestation: 'VALIDEE',
+          numeroDecision: '12/26',
+          dateValidationAttestation: new Date('2026-10-01'),
+          auteurValidationAttestation: 'Le Recteur',
+        },
+      })
+    })
+
+    it('refuse un numéro réduit à des espaces', async () => {
+      absenceEn(CONGE_AVEC_BROUILLON)
+
+      const etat = await validerAttestation(
+        'abs-1',
+        {},
+        formulaire({
+          numeroDecision: '   ',
+          dateValidation: '2026-10-01',
+          auteurValidation: 'Le Recteur',
+        })
+      )
+
+      expect(etat.message).toMatch(/obligatoires/)
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('ne signe rien quand le document ne peut pas être refait', async () => {
+      absenceEn(CONGE_AVEC_BROUILLON)
+      genererAttestationAbsence.mockImplementation(() => {
+        throw new Error('Gabarit illisible.')
+      })
+
+      const etat = await validerAttestation('abs-1', {}, saisie())
+
+      expect(etat).toEqual({ message: 'Gabarit illisible.' })
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('ne signe pas une mission dont l’établissement d’accueil ou l’objet manque', async () => {
+      absenceEn({ type: 'MISSION', statutAttestation: 'EN_ATTENTE', motif: null })
+
+      const etat = await validerAttestation('abs-1', {}, saisie())
+
+      expect(etat.message).toMatch(/l'établissement d'accueil et l'objet de la mission/)
+      expect(genererAttestationAbsence).not.toHaveBeenCalled()
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('répond que l’absence a disparu, sans rien refaire, si elle n’existe plus', async () => {
+      prismaFactice.absence.findUnique.mockResolvedValue(null)
+
+      const etat = await validerAttestation('abs-1', {}, saisie())
+
+      expect(etat.message).toMatch(/n'existe plus/)
+      expect(genererAttestationAbsence).not.toHaveBeenCalled()
+    })
+
+    it('le brouillon, lui, n’imprime ni numéro ni date', async () => {
+      absenceEn({ type: 'CONGE_MATERNITE' })
+
+      await genererAttestation('abs-1', {})
+
+      const parametres = genererAttestationAbsence.mock.calls[0]![1]
+      expect(parametres.numeroDecision).toBeUndefined()
+      expect(parametres.dateSignature).toBeUndefined()
+    })
+  })
+
   describe('supprimerAbsence', () => {
     it('retourne à la liste après la suppression', async () => {
       await expect(supprimerAbsence('abs-1', {}, formulaire())).rejects.toThrow(

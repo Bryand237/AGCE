@@ -118,6 +118,21 @@ describe('genererDecisionAvancement', () => {
     expect(d.dateSignature).toBe('3 février 2026')
   })
 
+  it('imprime le numéro saisi, sans espaces autour', () => {
+    expect(generer({ numeroDecision: ' 0000123 ' }).numeroDecision).toBe('0000123')
+  })
+
+  it('garde le blanc du gabarit pour un brouillon (numéro pas encore attribué)', () => {
+    expect(generer({ numeroDecision: '' }).numeroDecision).toBe('___________')
+    expect(generer({ numeroDecision: '   ' }).numeroDecision).toBe('___________')
+  })
+
+  it('imprime la date de signature prévue par le conseil quand aucune autre n’est donnée', () => {
+    const d = generer({ rapport: { ...RAPPORT, dateSignatureDecisions: new Date('2026-01-15') } })
+
+    expect(d.dateSignature).toBe('15 janvier 2026')
+  })
+
   it('écrit les positions comme la décision originale : « 2ème Classe 2ème Echelon »', () => {
     const d = generer()
 

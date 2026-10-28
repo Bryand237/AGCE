@@ -8,6 +8,11 @@ import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { formaterDateLongue } from '@/domain/dates/formaterDateLongue'
 import { nomCompletPourActe } from '@/domain/documents/nomCompletPourActe'
 import { typographierValeurs } from '@/domain/documents/typographie'
+import {
+  BLANC_NUMERO_AVANCEMENT,
+  dateSignatureImprimee,
+  numeroDecisionImprime,
+} from '@/domain/documents/mentionsDeSignature'
 import type { EchelonIndiciaire, Enseignant, SessionConseil } from '@/generated/prisma/client'
 
 type Params = {
@@ -16,6 +21,7 @@ type Params = {
   nouvellePosition: EchelonIndiciaire
   dateAncienEffet: Date
   dateNouvelEffet: Date
+  /** Vide pour un brouillon : le gabarit garde alors son blanc. */
   numeroDecision: string
   rapport: Pick<
     SessionConseil,
@@ -61,12 +67,13 @@ export function genererDecisionAvancement({
       nouvelleClasseLibelle: formaterPositionDecision(nouvellePosition),
       nouvelIndice: nouvellePosition.indice,
       nouvelAvancementCEI: formaterClasseEchelonIndice(nouvellePosition),
-      numeroDecision,
+      numeroDecision: numeroDecisionImprime(numeroDecision, BLANC_NUMERO_AVANCEMENT),
       referenceLoiFinances: rapport.referenceLoiFinances ?? '',
       referenceCirculaire: rapport.referenceCirculaire ?? '',
       dateSessionCU: formaterDateLongue(rapport.dateSessionCU),
       dateSessionCA: formaterDateLongue(rapport.dateSessionCA),
-      dateSignature: formaterDateLongue(dateSignatureEffective),
+      // Sans date de signature connue, « Ngaoundéré, le » reste à compléter à la main.
+      dateSignature: dateSignatureImprimee(dateSignatureEffective, ''),
     })
   )
 

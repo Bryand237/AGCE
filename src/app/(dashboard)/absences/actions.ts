@@ -41,6 +41,52 @@ async function lireEtape(absenceId: string, etape: EtapeAbsence) {
   return { disparue: false as const, absence, refus: erreurEtapeAbsence(etape, absence) }
 }
 
+/** L'absence avec ce qu'il faut pour remplir son attestation. */
+function lireAbsenceComplete(absenceId: string) {
+  return prisma.absence.findUnique({
+    where: { id: absenceId },
+    include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
+  })
+}
+type AbsenceComplete = NonNullable<Awaited<ReturnType<typeof lireAbsenceComplete>>>
+
+/**
+ * Remplit l'attestation de l'absence, ou dit pourquoi c'est impossible. Sans `signature`, c'est
+ * un brouillon : le numéro et la date gardent leurs blancs. À la signature, le document est
+ * REFAIT avec le numéro et la date saisis : ils sont imprimés dessus.
+ */
+function produireAttestation(
+  absence: AbsenceComplete,
+  signature?: { numeroDecision: string; dateSignature: Date }
+): { buffer: Buffer } | { message: string } {
+  // La décision de mission imprime l'établissement d'accueil et l'objet : sans eux, un blanc
+  // resterait dans un acte signé.
+  if (absence.type === 'MISSION') {
+    const manque = erreurDetailsMission(absence.motif)
+    if (manque) return { message: manque }
+  }
+  const departement = absence.enseignant.departement
+  if (!departement) {
+    return {
+      message:
+        'Cet enseignant n’a pas de département renseigné — impossible de générer l’attestation.',
+    }
+  }
+  try {
+    return {
+      buffer: genererAttestationAbsence(absence.type, {
+        absence,
+        enseignant: absence.enseignant,
+        departement,
+        etablissement: departement.etablissement,
+        ...signature,
+      }),
+    }
+  } catch (e) {
+    return { message: (e as Error).message }
+  }
+}
+
 export async function creerAbsence(
   _prevStat: EtatFormulaire,
   formData: FormData
@@ -230,45 +276,24 @@ export async function genererAttestation(
   await exigerUtilisateur()
   let absence
   try {
-    absence = await prisma.absence.findUnique({
-      where: { id: absenceId },
-      include: { enseignant: { include: { departement: { include: { etablissement: true } } } } },
-    })
+    absence = await lireAbsenceComplete(absenceId)
   } catch (erreur) {
     return { message: messageErreur(erreur, 'genererAttestation') }
   }
   if (!absence) return { message: 'Absence introuvable.' }
   const refus = erreurEtapeAbsence('genererAttestation', absence)
   if (refus) return { message: refus }
-  // La décision de mission imprime l'établissement d'accueil et l'objet : sans eux, un blanc
-  // resterait dans un acte signé.
-  if (absence.type === 'MISSION') {
-    const manque = erreurDetailsMission(absence.motif)
-    if (manque) return { message: manque }
-  }
-  if (!absence.enseignant.departement) {
-    return {
-      message:
-        'Cet enseignant n’a pas de département renseigné — impossible de générer l’attestation.',
-    }
-  }
 
-  let buffer: Buffer
-  try {
-    buffer = genererAttestationAbsence(absence.type, {
-      absence,
-      enseignant: absence.enseignant,
-      departement: absence.enseignant.departement,
-      etablissement: absence.enseignant.departement.etablissement,
-    })
-  } catch (e) {
-    return { message: (e as Error).message }
-  }
+  const attestation = produireAttestation(absence)
+  if ('message' in attestation) return { message: attestation.message }
 
   try {
     await prisma.absence.update({
       where: { id: absenceId },
-      data: { decisionGeneree: new Uint8Array(buffer), statutAttestation: 'EN_ATTENTE' },
+      data: {
+        decisionGeneree: new Uint8Array(attestation.buffer),
+        statutAttestation: 'EN_ATTENTE',
+      },
     })
   } catch (erreur) {
     return {
@@ -285,7 +310,8 @@ export async function validerAttestation(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const numeroDecision = formData.get('numeroDecision') as string
+  // Le numéro est imprimé sur l'attestation : il est enregistré tel qu'il y figurera.
+  const numeroDecision = String(formData.get('numeroDecision') ?? '').trim()
   const dateValidation = new Date(formData.get('dateValidation') as string)
   const auteurValidation = formData.get('auteurValidation') as string
   if (!numeroDecision || isNaN(dateValidation.getTime()) || !auteurValidation) {
@@ -293,13 +319,22 @@ export async function validerAttestation(
   }
 
   try {
-    const lecture = await lireEtape(absenceId, 'validerAttestation')
-    if (lecture.disparue) return { message: ABSENCE_DISPARUE }
-    if (lecture.refus) return { message: lecture.refus }
+    const absence = await lireAbsenceComplete(absenceId)
+    if (!absence) return { message: ABSENCE_DISPARUE }
+    const refus = erreurEtapeAbsence('validerAttestation', absence)
+    if (refus) return { message: refus }
+
+    // Le document signé porte le numéro et la date saisis : il est refait, pas seulement marqué.
+    const attestation = produireAttestation(absence, {
+      numeroDecision,
+      dateSignature: dateValidation,
+    })
+    if ('message' in attestation) return { message: attestation.message }
 
     await prisma.absence.update({
       where: { id: absenceId },
       data: {
+        decisionGeneree: new Uint8Array(attestation.buffer),
         statutAttestation: 'VALIDEE',
         numeroDecision,
         dateValidationAttestation: dateValidation,

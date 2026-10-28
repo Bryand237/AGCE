@@ -7,6 +7,12 @@ import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { formaterDateLongue } from '@/domain/dates/formaterDateLongue'
 import { nomCompletPourActe } from '@/domain/documents/nomCompletPourActe'
 import { typographierValeurs } from '@/domain/documents/typographie'
+import {
+  BLANC_DATE_ATTESTATION,
+  BLANC_NUMERO_ATTESTATION,
+  dateSignatureImprimee,
+  numeroDecisionImprime,
+} from '@/domain/documents/mentionsDeSignature'
 import type { Absence, Enseignant, Departement, Etablissement } from '@/generated/prisma/client'
 import { lireMotifMission } from '@/domain/absences/motifMission'
 
@@ -18,6 +24,12 @@ type Params = {
   enseignant: Pick<Enseignant, 'nom' | 'prenom' | 'grade' | 'sexe' | 'matricule'>
   departement: Pick<Departement, 'nom'>
   etablissement: Pick<Etablissement, 'nom' | 'type'>
+  /**
+   * Numéro et date de la signature, connus à la validation de l'attestation. Pour un brouillon,
+   * ils manquent : le document garde alors ses blancs (« N°---- », « le ____ »).
+   */
+  numeroDecision?: string | null
+  dateSignature?: Date | null
 }
 
 const TEMPLATES: Record<string, string> = {
@@ -28,7 +40,7 @@ const TEMPLATES: Record<string, string> = {
 
 export function genererAttestationAbsence(
   type: string,
-  { absence, enseignant, departement, etablissement }: Params
+  { absence, enseignant, departement, etablissement, numeroDecision, dateSignature }: Params
 ): Buffer {
   const nomFichier = TEMPLATES[type]
   if (!nomFichier) throw new Error(`Pas encore de template d'attestation pour le type ${type}.`)
@@ -60,6 +72,8 @@ export function genererAttestationAbsence(
       dateDemandeInteressee: formaterDateLongue(absence.dateDemandeInteressee),
       lieuAccueil: mission.lieuAccueil,
       objetMission: mission.objet,
+      numeroDecision: numeroDecisionImprime(numeroDecision, BLANC_NUMERO_ATTESTATION),
+      dateSignature: dateSignatureImprimee(dateSignature, BLANC_DATE_ATTESTATION),
     })
   )
 
