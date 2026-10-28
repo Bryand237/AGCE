@@ -312,6 +312,12 @@ Chaque formulaire est validé côté serveur par un schéma zod
   écrit dans le schéma reste prioritaire.
 - **`texteObligatoire()`** retire les espaces avant le contrôle : un nom
   réduit à des espaces est refusé au lieu d'être enregistré.
+- **Un champ facultatif vidé s'efface** : `texteOptionnel` (téléphone, diplôme, domaine de
+  recherche, poste de responsabilité) et l'e-mail rendent `null` quand le formulaire envoie une
+  chaîne vide, et `undefined` seulement quand le champ est absent de la requête. Prisma écrit
+  `null` mais ignore `undefined` : avec `undefined`, un numéro supprimé en modification
+  réapparaissait à l'écran et sur les documents. Pour tout nouveau champ facultatif, utiliser
+  `videEnNull` (`champs.ts`) plutôt que `|| undefined`.
 - **Les dates sont comparées entre elles** dans le schéma (`superRefine`) :
   naissance non future, prise de service après la naissance, date d'effet
   d'échelon non antérieure à la prise de service, fin d'absence ou de période

@@ -26,15 +26,18 @@ export const date = (libelle: string) =>
 export const texteObligatoire = (message: string) => z.string().trim().min(1, message)
 
 /**
- * Texte facultatif : un champ laissé vide (ou réduit à des espaces) vaut `undefined`.
- * Un <input> vide envoie une chaîne vide en FormData, jamais « absent » : .optional() seul
- * ne suffit donc pas à obtenir `undefined`.
+ * Ce qu'on enregistre pour un champ facultatif d'après ce que le formulaire a envoyé :
+ *   - une chaîne vide (champ laissé vide ou vidé) → `null` : Prisma l'écrit, la valeur est EFFACÉE ;
+ *   - rien (champ absent de la requête) → `undefined` : Prisma l'ignore, la valeur reste.
+ * Un <input> vide envoie une chaîne vide en FormData, jamais « absent ». Rendre `undefined` pour
+ * un champ vidé était l'erreur : en modification, l'ancienne valeur (un numéro de téléphone changé
+ * puis supprimé) restait affichée et imprimée, sans message.
  */
-export const texteOptionnel = z
-  .string()
-  .trim()
-  .optional()
-  .transform((v) => (v ? v : undefined))
+export const videEnNull = (valeur: string | undefined): string | null | undefined =>
+  valeur === undefined ? undefined : valeur === '' ? null : valeur
+
+/** Texte facultatif, sans espaces autour ; vide, il s'efface (voir `videEnNull`). */
+export const texteOptionnel = z.string().trim().optional().transform(videEnNull)
 
 /** Premier message d'une erreur de validation, pour les formulaires qui n'affichent qu'une ligne. */
 export function premierMessage(erreur: z.ZodError): string {

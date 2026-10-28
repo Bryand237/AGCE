@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { date, texteObligatoire, texteOptionnel } from './champs'
+import { date, texteObligatoire, texteOptionnel, videEnNull } from './champs'
 
 // Un <select> dont l'option « Non renseigné » a la valeur "" envoie une
 // chaîne vide, jamais « absent » : z.string().uuid().optional() la refusait
@@ -12,11 +12,13 @@ const uuidOptionnel = (messageInvalide: string) =>
     .preprocess((v) => (v === '' ? undefined : v), z.string().uuid(messageInvalide).optional())
     .transform((v) => v ?? null)
 
-// Un e-mail vide (ou réduit à des espaces) est admis ; sinon il doit être valide.
-const emailOptionnel = z.preprocess(
-  (v) => (typeof v === 'string' ? v.trim() : v),
-  z.string().email('Adresse e-mail invalide.').or(z.literal('')).optional()
-)
+// Un e-mail vide (ou réduit à des espaces) est admis et s'efface ; sinon il doit être valide.
+const emailOptionnel = z
+  .preprocess(
+    (v) => (typeof v === 'string' ? v.trim() : v),
+    z.string().email('Adresse e-mail invalide.').or(z.literal('')).optional()
+  )
+  .transform(videEnNull)
 
 export const EnseignantSchema = z
   .object({

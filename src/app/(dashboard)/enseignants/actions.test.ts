@@ -213,6 +213,29 @@ describe('actions enseignants : erreurs de la base', () => {
       )
     })
 
+    it('efface un champ facultatif vidé : l’ancienne valeur ne reste pas (null, pas undefined)', async () => {
+      await expect(
+        modifierEnseignant(
+          'ens-1',
+          {},
+          formulaire({ ...SAISIE, telephone: '', email: '', posteResponsabilite: '  ' })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(prismaFactice.enseignant.update).toHaveBeenCalledWith({
+        where: { id: 'ens-1' },
+        data: expect.objectContaining({ telephone: null, email: null, posteResponsabilite: null }),
+      })
+    })
+
+    it('laisse intact un champ facultatif absent de la requête', async () => {
+      await expect(modifierEnseignant('ens-1', {}, formulaire())).rejects.toThrow('NEXT_REDIRECT')
+
+      const { data } = prismaFactice.enseignant.update.mock.calls[0]![0]
+      expect(data.telephone).toBeUndefined()
+      expect(data.email).toBeUndefined()
+    })
+
     it('ouvre la fiche après une modification réussie', async () => {
       await expect(modifierEnseignant('ens-1', {}, formulaire())).rejects.toThrow(
         'NEXT_REDIRECT /enseignants/ens-1'
