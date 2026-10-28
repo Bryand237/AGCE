@@ -1,11 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
 import { TAILLE_PAGE } from '@/lib/constantes'
-const LIBELLES_TYPE: Record<string, string> = {
-  MISSION: 'Mission',
-  CONGE_MATERNITE: 'Congé de maternité',
-  CONGE_MALADIE: 'Congé de maladie',
-}
+import { effectifsParType } from '@/domain/absences/effectifsParType'
 
 /** Fait basculer en DEPASSE toute absence EN_PERIODE dont la fin est
  * passée. Appelée au chargement du tableau de bord — voir l'analyse sur
@@ -54,10 +50,9 @@ export async function recupererEffectifsParType() {
     where: { statut: { not: 'TERMINE' } },
     _count: true,
   })
-  return Object.entries(LIBELLES_TYPE).map(([type, nom]) => ({
-    grade: nom,
-    effectif: comptes.find((c) => c.type === type)?._count ?? 0,
-  }))
+  return effectifsParType(comptes.map((c) => ({ type: c.type, effectif: c._count }))).map(
+    ({ libelle, effectif }) => ({ grade: libelle, effectif })
+  )
 }
 
 export async function recupererAbsences({

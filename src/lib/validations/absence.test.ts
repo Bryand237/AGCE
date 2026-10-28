@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AbsenceSchema, ModificationAbsenceSchema } from './absence'
+import { TYPES_ABSENCE_SAISISSABLES } from '@/domain/absences/typesAbsence'
 
 function absence(surcharge: Record<string, unknown> = {}) {
   return {
@@ -19,6 +20,21 @@ function erreurs(
   const resultat = schema.safeParse(entree)
   return resultat.success ? {} : resultat.error.flatten().fieldErrors
 }
+
+describe('AbsenceSchema : types', () => {
+  it.each(TYPES_ABSENCE_SAISISSABLES)('accepte le type %s', (type) => {
+    expect(AbsenceSchema.safeParse(absence({ type })).success).toBe(true)
+  })
+
+  it.each(['CONGE_ADMINISTRATIF', 'AUTRE', 'VACANCES', ''])(
+    'refuse le type « %s », sans formulaire ni gabarit',
+    (type) => {
+      expect(erreurs(AbsenceSchema, absence({ type }))).toEqual({
+        type: ["Le type d'absence est obligatoire."],
+      })
+    }
+  )
+})
 
 describe('AbsenceSchema', () => {
   it('accepte une période cohérente', () => {

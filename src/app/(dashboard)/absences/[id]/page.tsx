@@ -14,15 +14,10 @@ import {
 } from '@/domain/absences/typesAvecAttestation'
 import { erreurDetailsMission, lireMotifMission } from '@/domain/absences/motifMission'
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { presentationAttestation } from '@/domain/absences/presentationAttestation'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
-
-const LIBELLES_TYPE: Record<string, string> = {
-  MISSION: 'Mission',
-  CONGE_MATERNITE: 'Congé de maternité',
-  CONGE_MALADIE: 'Congé de maladie',
-}
 
 const LIBELLES_STATUT: Record<string, string> = {
   EN_ATTENTE: 'En attente',
@@ -173,7 +168,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-6 lg:col-span-2">
           <section className="border-primary/20 bg-primary/5 rounded-2xl border px-6 py-5 shadow-sm">
             <h2 className="text-foreground mb-2 text-sm font-bold">
-              {LIBELLES_TYPE[absence.type]}
+              {LIBELLES_TYPE_ABSENCE[absence.type]}
             </h2>
             <p className="text-foreground text-sm">
               Du <strong>{formatDate(absence.dateDebut)}</strong> au{' '}
@@ -219,7 +214,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
           <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
             <h2 className="text-foreground mb-4 text-sm font-bold">Détails de l&apos;absence</h2>
             <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-              <Item label="Type" valeur={LIBELLES_TYPE[absence.type] ?? absence.type} />
+              <Item label="Type" valeur={LIBELLES_TYPE_ABSENCE[absence.type]} />
               <Item label="Statut" valeur={LIBELLES_STATUT[absence.statut] ?? absence.statut} />
               <Item label="Date de début" valeur={formatDate(absence.dateDebut)} />
               <Item label="Date de fin" valeur={formatDate(absence.dateFin)} />

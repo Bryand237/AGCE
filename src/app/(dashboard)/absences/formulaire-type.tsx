@@ -5,6 +5,8 @@ import { creerAbsence, type EtatFormulaire } from './actions'
 import { useActionConservee } from '@/lib/action-conservee'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 import { ChampsMission } from './champs-mission'
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { TYPES_ABSENCE_SAISISSABLES } from '@/domain/absences/typesAbsence'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -39,9 +41,11 @@ export function FormulaireAbsence({
           onChange={(e) => setType(e.target.value)}
           className={classeChamp}
         >
-          <option value="CONGE_MATERNITE">Congé de maternité</option>
-          <option value="CONGE_MALADIE">Congé de maladie</option>
-          <option value="MISSION">Mission</option>
+          {TYPES_ABSENCE_SAISISSABLES.map((valeur) => (
+            <option key={valeur} value={valeur}>
+              {LIBELLES_TYPE_ABSENCE[valeur]}
+            </option>
+          ))}
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm">

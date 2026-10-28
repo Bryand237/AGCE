@@ -559,6 +559,12 @@ mêmes étapes.
 - Une **mission** a la même attestation qu'un congé (brouillon, signature, téléchargement à
   tout moment), mais son retour **ne dépend pas** de la signature : ce n'est pas le cas des
   congés. Les types concernés sont dans `src/domain/absences/typesAvecAttestation.ts`.
+- La base connaît cinq **types** d'absence, mais seuls la mission, le congé de maternité et le
+  congé de maladie se saisissent (formulaire et validation du serveur). « Congé administratif »
+  et « autre » n'ont ni formulaire ni gabarit de décision : les ouvrir est une décision du client.
+  La liste des types saisissables est dans `src/domain/absences/typesAbsence.ts`, les libellés
+  dans `etatAbsence.ts` ; le graphique par type de la page des absences compte tous les types
+  (les deux derniers n'y figurent que s'ils existent).
 - Le bouton « Supprimer » demande une confirmation. Une absence déjà supprimée (autre
   onglet, double clic) ramène simplement à la liste.
 - Un refus s'affiche sous le formulaire, sans recharger la page, avec le motif.

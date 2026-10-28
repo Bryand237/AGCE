@@ -13,12 +13,8 @@ import { GraphiqueEffectifsParGrade } from '@/components/charts/graphique-effect
 import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 
-const LIBELLES_TYPE: Record<string, string> = {
-  MISSION: 'Mission',
-  CONGE_MATERNITE: 'Congé de maternité',
-  CONGE_MALADIE: 'Congé de maladie',
-}
 const LIBELLES_STATUT: Record<string, string> = {
   EN_ATTENTE: 'En attente',
   EN_PERIODE: 'En période',
@@ -174,7 +170,7 @@ export default async function PageAbsences({
                     </Link>
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
-                    {LIBELLES_TYPE[a.type] ?? a.type}
+                    {LIBELLES_TYPE_ABSENCE[a.type]}
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
                     {a.dateDebut.toLocaleDateString('fr-FR')} –{' '}
