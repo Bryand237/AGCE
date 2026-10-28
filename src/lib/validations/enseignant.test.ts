@@ -157,10 +157,10 @@ describe('EnseignantSchema — textes', () => {
     ])
   })
 
-  it('traite un champ facultatif réduit à des espaces comme absent', () => {
+  it('efface un champ facultatif réduit à des espaces (null, pas undefined)', () => {
     const resultat = EnseignantSchema.safeParse(formulaire({ telephone: '   ' }))
     expect(resultat.success).toBe(true)
-    if (resultat.success) expect(resultat.data.telephone).toBeUndefined()
+    if (resultat.success) expect(resultat.data.telephone).toBeNull()
   })
 
   it('refuse une adresse e-mail mal formée, avec un message en français', () => {
