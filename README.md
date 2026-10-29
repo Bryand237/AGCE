@@ -167,6 +167,38 @@ désigne `/connexion` (ou une réponse `401`). Une réponse `200` avec un PDF
 signifie que le contrôle d'accès est inactif. Les tests automatiques
 équivalents : `npm run test:e2e -- acces-protege`.
 
+### Identifiants de connexion (page « Mon compte »)
+
+L'icône d'engrenage de l'en-tête ouvre `/compte` : on y change l'**identifiant** et le **mot de
+passe** de connexion.
+
+- le **mot de passe actuel est exigé à chaque enregistrement** : une session laissée ouverte sur
+  un poste ne suffit pas pour prendre le compte ;
+- règles : identifiant de 3 à 50 caractères (lettres, chiffres, `.` `_` `@` `-`) ; mot de passe d'au
+  moins 8 caractères et d'au plus 72 octets (bcrypt ignorerait la suite). Un mot de passe laissé vide
+  n'est pas modifié ;
+- changer le mot de passe **ferme les autres sessions** du compte ; celle de la personne qui le
+  change reste ouverte.
+
+Les **identifiants initiaux** sont ceux du fichier `.env` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`), les
+mêmes que ceux créés par le seed. Le bouton « Rétablir les identifiants initiaux » de la page les
+remet (il demande aussi le mot de passe actuel), ferme toutes les sessions et renvoie à la
+connexion : on se reconnecte aussitôt avec eux, ce qui prouve qu'ils fonctionnent. **Garder ces deux
+lignes dans `.env`** après l'installation : sans elles, le bouton est indisponible.
+
+**Identifiants oubliés** (on ne peut plus ouvrir la page) : dans un terminal, depuis le dossier de
+l'application, base démarrée :
+
+```bash
+npm run admin:reset
+```
+
+Le compte reprend l'identifiant et le mot de passe de `.env` (il est créé s'il n'existe pas) et
+toutes les sessions sont fermées. Aucune autre donnée n'est touchée. Si plusieurs comptes existent
+et qu'aucun ne porte l'identifiant initial, le script refuse et ne modifie rien. Il n'y a volontairement
+ni adresse e-mail ni « mot de passe oublié » par courriel : l'application est utilisée sur un poste,
+et qui a accès au dossier de l'application et à son `.env` a déjà accès à la base.
+
 ## Accès réseau à la base de données
 
 Le port de la base (`DR_PORT`, 51213 par défaut) est publié par

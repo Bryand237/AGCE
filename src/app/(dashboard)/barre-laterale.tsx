@@ -11,6 +11,7 @@ import {
   Printer,
   Search,
   LogOut,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { seDeconnecter } from '@/app/connexion/actions'
@@ -31,6 +32,7 @@ const FIL_ARIANE: Record<string, string> = {
   absences: 'Absences',
   avancements: 'Avancements',
   editions: 'Éditions',
+  compte: 'Mon compte',
   nouveau: 'Nouveau',
   modifier: 'Modifier',
 }
@@ -156,6 +158,14 @@ export function EnTeteDashboard({
               {nomUtilisateur.charAt(0).toUpperCase()}
             </div>
           </div>
+
+          <Link
+            href="/compte"
+            title="Mon compte : identifiant et mot de passe"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+          >
+            <Settings size={18} />
+          </Link>
 
           <form action={seDeconnecter}>
             <button
