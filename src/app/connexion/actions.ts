@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { cookieSessionSecurise } from '@/lib/session-cookie'
 
 export type EtatFormulaire = { message?: string }
 
@@ -39,7 +40,7 @@ export async function seConnecter(
   const cookieStore = await cookies()
   cookieStore.set('session', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSessionSecurise(),
     sameSite: 'lax',
     expires: expiresAt,
     path: '/',

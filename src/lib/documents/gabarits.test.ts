@@ -64,3 +64,34 @@ describe('gabarits Word', () => {
     })
   })
 })
+
+// Les attestations citent en dur la loi de finances de l'exercice et la circulaire d'exécution
+// budgétaire : ces deux visas changent chaque année et se corrigent À LA MAIN dans Word (voir le
+// README, « Références légales des attestations »). Ce test ne vérifie pas leur année, qui
+// ferait échouer la suite chaque janvier : il vérifie que les trois attestations disent la même
+// chose, pour qu'une mise à jour oubliée sur l'une d'elles se voie.
+describe('références légales des attestations', () => {
+  const ATTESTATIONS = GABARITS.filter((nom) => nom.startsWith('attestation-'))
+
+  function visas(gabarit: string) {
+    const texte = textesDesRuns(gabarit).join('')
+    return {
+      loiDeFinances: texte.match(/la loi n°\s*\S+ du [^,]+, portant loi de finances[^;]*;/)?.[0],
+      circulaire: texte.match(/la circulaire n°\s*\S+ du [^,]+,/)?.[0],
+    }
+  }
+
+  it.each(ATTESTATIONS)('%s cite une loi de finances et une circulaire', (gabarit) => {
+    const { loiDeFinances, circulaire } = visas(gabarit)
+
+    expect(loiDeFinances).toMatch(/exercice 20\d\d/)
+    expect(circulaire).toBeDefined()
+  })
+
+  it('les attestations citent la même loi de finances et la même circulaire', () => {
+    const [premiere, ...autres] = ATTESTATIONS.map(visas)
+
+    expect(autres.length).toBeGreaterThan(0)
+    for (const visa of autres) expect(visa).toEqual(premiere)
+  })
+})

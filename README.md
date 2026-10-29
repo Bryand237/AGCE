@@ -199,6 +199,23 @@ et qu'aucun ne porte l'identifiant initial, le script refuse et ne modifie rien.
 ni adresse e-mail ni « mot de passe oublié » par courriel : l'application est utilisée sur un poste,
 et qui a accès au dossier de l'application et à son `.env` a déjà accès à la base.
 
+### Cookie de session : HTTP ou HTTPS
+
+Le cookie de connexion est marqué « Secure » **en production** (`NODE_ENV=production`) : le
+navigateur ne le renvoie alors qu'en HTTPS (sauf sur `localhost`). Une application de production
+servie en HTTP simple sur le réseau local (`http://192.168.x.x:3000`) accepterait donc la
+connexion, puis renverrait sans cesse à la page de connexion, sans message. Dans ce cas, ajouter
+dans `.env` :
+
+```
+SESSION_COOKIE_SECURE=false
+```
+
+puis relancer l'application. `true` impose l'attribut, `false` le retire ; sans la variable, rien ne
+change (« Secure » en production seulement, jamais avec `npm run dev`). N'utiliser `false` que sans
+HTTPS : l'accès à l'application doit alors rester limité au réseau de confiance, ou passer par un
+proxy HTTPS.
+
 ## Accès réseau à la base de données
 
 Le port de la base (`DR_PORT`, 51213 par défaut) est publié par
@@ -539,6 +556,37 @@ sur une page (lignes vides réduites, signature et ampliations insécables) et l
 visa « correspondance » sont en Arial Narrow : dans ceux de maternité et d'avancement elles
 portent encore le style « Source Text » (police à chasse fixe) et s'impriment en police de
 machine à écrire.
+
+### Références légales des attestations (mise à jour annuelle)
+
+Les trois attestations d'absence citent **en dur**, dans leurs visas, la loi de finances de
+l'exercice et la circulaire d'exécution budgétaire :
+
+- « la loi n° 2025/012 du 17 décembre 2025, portant loi de finances de la République du Cameroun
+  pour l'exercice 2026 » ;
+- « la circulaire n° 00001877/C/MINFI du 31 décembre 2025, portant Instructions relatives à
+  l'Exécution des lois de finances… ».
+
+Ces textes changent **chaque année** (à la publication de la loi de finances, en janvier). Tant
+qu'ils ne sont pas mis à jour, les attestations de la nouvelle année citent l'ancienne loi. La
+décision d'avancement n'est pas concernée : ses références viennent de la page du rapport
+(« Métadonnées du conseil »).
+
+**Chaque année**, pour `attestation-conge-maternite.docx`, `attestation-conge-maladie.docx` et
+`attestation-mission.docx` :
+
+1. ouvrir le fichier de `templates/` dans Word ;
+2. corriger les deux visas ci-dessus (numéro, date, exercice) ; ne pas toucher aux `{balises}` ;
+3. enregistrer au format `.docx` dans `templates/`, puis lancer `npm run test:run` : le test
+   `gabarits.test.ts` vérifie que les **trois** attestations citent la même loi de finances et la
+   même circulaire, de sorte qu'un fichier oublié se voit ;
+4. générer un brouillon de chaque type et relire les visas avant de signer quoi que ce soit.
+
+Ces références sont dans les gabarits, et non dans l'application ou la base : une valeur qui ne
+change qu'une fois l'an ne justifie ni un écran de réglage ni une migration. Si le client veut les
+modifier lui-même sans passer par Word, c'est une évolution à chiffrer à part (elle demanderait
+d'enregistrer ces deux références quelque part, ce que le schéma actuel ne permet pas sans
+migration).
 
 ### Établissement d'accueil et objet d'une mission
 
