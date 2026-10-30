@@ -52,7 +52,12 @@ export async function genererPdf(html: string, options: OptionsPdf = {}): Promis
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   })
   try {
-    const page = await browser.newPage()
+    // Les documents sont du HTML fabriqué par l'application : aucun script n'a à s'y exécuter.
+    // JavaScript est donc coupé dans la page, en plus de l'échappement des valeurs saisies
+    // (echapperHtml) : si une valeur échappait un jour à l'échappement, elle ne pourrait pas
+    // lire de fichier ni appeler de service depuis le Chromium du serveur.
+    const contexte = await browser.newContext({ javaScriptEnabled: false })
+    const page = await contexte.newPage()
     await page.setContent(html, { waitUntil: 'networkidle' })
     const pdf = await page.pdf({
       format: 'A4',
