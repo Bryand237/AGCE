@@ -6,8 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
 import { analyserErreur, messageErreur } from '@/lib/erreurs'
 import { EtablissementSchema, DepartementSchema } from '@/lib/validations/etablissement'
-import fs from 'fs/promises'
-import path from 'path'
+import { enregistrerImage, lireImageTeleversee, supprimerImage } from '@/lib/televersement'
 
 export type EtatFormulaire = {
   errors?: Record<string, string[]>
@@ -35,6 +34,11 @@ export async function creerEtablissement(
     return { errors: parsed.error.flatten().fieldErrors }
   }
 
+  // L'image est contrôlée AVANT d'enregistrer l'établissement : un fichier refusé ne laisse pas
+  // une fiche créée à moitié (le nouvel envoi se heurterait à une fausse abréviation en double).
+  const image = await lireImageTeleversee(formData.get('photo'))
+  if (image && 'erreur' in image) return { message: image.erreur }
+
   let etablissementId: string
   try {
     const created = await prisma.etablissement.create({ data: parsed.data })
@@ -52,17 +56,9 @@ export async function creerEtablissement(
   // L'établissement existe désormais. Quoi qu'il arrive à l'image, on quitte le formulaire :
   // y rester ferait annoncer un faux doublon d'abréviation au second clic sur « Créer ».
   let photoEnregistree = true
-  const photo = formData.get('photo') as File | null
-  if (photo && photo.size) {
+  if (image) {
     try {
-      const buffer = Buffer.from(await photo.arrayBuffer())
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'etablissements')
-      await fs.mkdir(uploadsDir, { recursive: true })
-      const ext = photo.type?.split('/')[1] || 'jpg'
-      const filename = `${etablissementId}.${ext}`
-      const filepath = path.join(uploadsDir, filename)
-      await fs.writeFile(filepath, buffer)
-      const url = `/uploads/etablissements/${filename}`
+      const url = await enregistrerImage('etablissements', etablissementId, image)
       await prisma.etablissement.update({ where: { id: etablissementId }, data: { photoUrl: url } })
     } catch (erreur) {
       console.error('creerEtablissement : image non enregistrée', erreur)
@@ -91,6 +87,10 @@ export async function modifierEtablissement(
     return { errors: parsed.error.flatten().fieldErrors }
   }
 
+  // Image contrôlée avant toute écriture : refusée, rien n'est modifié.
+  const image = await lireImageTeleversee(formData.get('photo'))
+  if (image && 'erreur' in image) return { message: image.erreur }
+
   let etablissementExistant: { photoUrl: string | null } | null
   try {
     etablissementExistant = await prisma.etablissement.findUnique({ where: { id } })
@@ -109,37 +109,16 @@ export async function modifierEtablissement(
   // doublon d'abréviation.
   let photoEnregistree = true
   try {
-    const removePhoto = (formData.get('removePhoto') as string | null) === 'on'
-    if (removePhoto && etablissementExistant?.photoUrl) {
-      const existingPath = path.join(
-        process.cwd(),
-        'public',
-        etablissementExistant.photoUrl.replace(/^\//, '')
-      )
-      await fs.unlink(existingPath).catch(() => {})
-      await prisma.etablissement.update({ where: { id }, data: { photoUrl: null } })
-    }
-
-    const photo = formData.get('photo') as File | null
-    if (photo && photo.size) {
-      if (etablissementExistant?.photoUrl) {
-        const existingPath = path.join(
-          process.cwd(),
-          'public',
-          etablissementExistant.photoUrl.replace(/^\//, '')
-        )
-        await fs.unlink(existingPath).catch(() => {})
-      }
-
-      const buffer = Buffer.from(await photo.arrayBuffer())
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'etablissements')
-      await fs.mkdir(uploadsDir, { recursive: true })
-      const ext = photo.type?.split('/')[1] || 'jpg'
-      const filename = `${id}.${ext}`
-      const filepath = path.join(uploadsDir, filename)
-      await fs.writeFile(filepath, buffer)
-      const url = `/uploads/etablissements/${filename}`
+    const ancienneUrl = etablissementExistant?.photoUrl ?? null
+    if (image) {
+      // Nouvelle image : le fichier neuf d'abord, la base ensuite, l'ancien fichier en dernier.
+      // Quelle que soit l'étape qui échoue, il reste toujours une image valide à l'écran.
+      const url = await enregistrerImage('etablissements', id, image)
       await prisma.etablissement.update({ where: { id }, data: { photoUrl: url } })
+      await supprimerImage(ancienneUrl)
+    } else if ((formData.get('removePhoto') as string | null) === 'on' && ancienneUrl) {
+      await prisma.etablissement.update({ where: { id }, data: { photoUrl: null } })
+      await supprimerImage(ancienneUrl)
     }
   } catch (erreur) {
     console.error('modifierEtablissement : image non enregistrée', erreur)

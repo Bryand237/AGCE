@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // La base, le disque et Next.js sont simulés : on vérifie ce que chaque action répond à
 // l'écran selon la nature de l'erreur, pas le moteur de la base.
@@ -31,7 +31,15 @@ const erreurPrisma = (code: string, meta: Record<string, unknown> = {}) =>
 const ETABLISSEMENT_ID = '3f2b8c1e-5a4d-4e6f-8a1b-2c3d4e5f6a7b'
 
 type Photo = { size: number; type: string; arrayBuffer: () => Promise<ArrayBuffer> }
-const PHOTO: Photo = { size: 3, type: 'image/png', arrayBuffer: async () => new ArrayBuffer(3) }
+
+/** Un fichier de test : seuls ses octets comptent (le type annoncé par le navigateur est ignoré). */
+const fichier = (octets: number[], type = 'image/png'): Photo => ({
+  size: octets.length,
+  type,
+  arrayBuffer: async () => new Uint8Array(octets).buffer as ArrayBuffer,
+})
+const SIGNATURE_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+const PHOTO = fichier([...SIGNATURE_PNG, 0, 0, 0, 0])
 
 /** Un formulaire de test : seules les méthodes utilisées par les actions sont fournies. */
 function formulaire(valeurs: Record<string, string> = {}, photo?: Photo) {
@@ -230,6 +238,183 @@ describe('actions établissements : erreurs de la base', () => {
       const etat = await creerDepartement({}, formulaire(SAISIE_DEPARTEMENT))
 
       expect(etat.message).toMatch(/Cet établissement n'existe plus/)
+    })
+  })
+})
+
+describe('actions établissements : photos téléversées', () => {
+  let dossierInitial: string | undefined
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dossierInitial = process.env.UPLOADS_DIR
+    process.env.UPLOADS_DIR = '/donnees/uploads'
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.etablissement.create.mockResolvedValue({ id: 'etab-1' })
+    prismaFactice.etablissement.update.mockResolvedValue({})
+    fsFactice.mkdir.mockResolvedValue(undefined)
+    fsFactice.writeFile.mockResolvedValue(undefined)
+    fsFactice.unlink.mockResolvedValue(undefined)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    if (dossierInitial === undefined) delete process.env.UPLOADS_DIR
+    else process.env.UPLOADS_DIR = dossierInitial
+  })
+
+  const ANCIENNE_URL = '/uploads/etablissements/etab-1.png'
+  const HTML_DEGUISE = fichier([...Buffer.from('<script>alert(1)</script>')], 'image/png')
+
+  describe('à la création', () => {
+    it('refuse un fichier qui n’est pas une image, même annoncé « image/png », sans rien créer', async () => {
+      const etat = await creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT, HTML_DEGUISE))
+
+      expect(etat.message).toMatch(/Format d'image non accepté/)
+      expect(prismaFactice.etablissement.create).not.toHaveBeenCalled()
+      expect(fsFactice.writeFile).not.toHaveBeenCalled()
+    })
+
+    it('refuse une image de plus de 4 Mo, sans rien créer', async () => {
+      const trop = fichier([...SIGNATURE_PNG])
+      trop.size = 5 * 1024 * 1024
+      trop.arrayBuffer = async () =>
+        new Uint8Array(5 * 1024 * 1024).fill(0x89).buffer as ArrayBuffer
+
+      const etat = await creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT, trop))
+
+      expect(etat.message).toMatch(/trop lourde/)
+      expect(prismaFactice.etablissement.create).not.toHaveBeenCalled()
+    })
+
+    it('enregistre sous un nom neuf, hors de public/, avec le vrai type et sans écraser', async () => {
+      await expect(creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))).rejects.toThrow(
+        'NEXT_REDIRECT'
+      )
+
+      const [chemin, , options] = fsFactice.writeFile.mock.calls[0]!
+      expect(chemin).toMatch(/^\/donnees\/uploads\/etablissements\/etab-1-\d{17}\.png$/)
+      expect(options).toEqual({ flag: 'wx' })
+      expect(prismaFactice.etablissement.update).toHaveBeenCalledWith({
+        where: { id: 'etab-1' },
+        data: {
+          photoUrl: expect.stringMatching(/^\/uploads\/etablissements\/etab-1-\d{17}\.png$/),
+        },
+      })
+    })
+
+    it('donne l’extension du vrai type, pas celle que le navigateur annonce', async () => {
+      const jpeg = fichier([0xff, 0xd8, 0xff, 0xe0, 0, 0], 'application/octet-stream')
+
+      await expect(creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT, jpeg))).rejects.toThrow(
+        'NEXT_REDIRECT'
+      )
+
+      expect(prismaFactice.etablissement.update).toHaveBeenCalledWith({
+        where: { id: 'etab-1' },
+        data: { photoUrl: expect.stringMatching(/\.jpg$/) },
+      })
+    })
+  })
+
+  describe('à la modification', () => {
+    beforeEach(() => {
+      prismaFactice.etablissement.findUnique.mockResolvedValue({
+        id: 'etab-1',
+        photoUrl: ANCIENNE_URL,
+      })
+    })
+
+    it('refuse un fichier qui n’est pas une image : rien n’est modifié', async () => {
+      const etat = await modifierEtablissement(
+        'etab-1',
+        {},
+        formulaire(SAISIE_ETABLISSEMENT, HTML_DEGUISE)
+      )
+
+      expect(etat.message).toMatch(/Format d'image non accepté/)
+      expect(prismaFactice.etablissement.update).not.toHaveBeenCalled()
+      expect(fsFactice.writeFile).not.toHaveBeenCalled()
+      expect(fsFactice.unlink).not.toHaveBeenCalled()
+    })
+
+    it('remplace la photo : fichier neuf, puis base, puis suppression de l’ancien', async () => {
+      await expect(
+        modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      const ecriture = fsFactice.writeFile.mock.invocationCallOrder[0]!
+      const base = prismaFactice.etablissement.update.mock.invocationCallOrder.at(-1)!
+      const suppression = fsFactice.unlink.mock.invocationCallOrder[0]!
+      expect(ecriture).toBeLessThan(base)
+      expect(base).toBeLessThan(suppression)
+    })
+
+    it('cherche l’ancien fichier à son nouvel emplacement et à l’ancien (public/uploads)', async () => {
+      await expect(
+        modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      const supprimes = fsFactice.unlink.mock.calls.map(([chemin]) => chemin)
+      expect(supprimes).toContain('/donnees/uploads/etablissements/etab-1.png')
+      expect(supprimes).toContain(`${process.cwd()}/public/uploads/etablissements/etab-1.png`)
+    })
+
+    it('garde l’ancienne photo, en base comme sur le disque, quand le nouveau fichier ne s’écrit pas', async () => {
+      fsFactice.writeFile.mockRejectedValue(new Error('EACCES'))
+
+      await expect(
+        modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))
+      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?photo=echec')
+
+      expect(prismaFactice.etablissement.update).not.toHaveBeenCalledWith({
+        where: { id: 'etab-1' },
+        data: { photoUrl: expect.anything() },
+      })
+      expect(fsFactice.unlink).not.toHaveBeenCalled()
+    })
+
+    it('supprime la photo quand la case est cochée : base d’abord, fichier ensuite', async () => {
+      await expect(
+        modifierEtablissement(
+          'etab-1',
+          {},
+          formulaire({ ...SAISIE_ETABLISSEMENT, removePhoto: 'on' })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(prismaFactice.etablissement.update).toHaveBeenCalledWith({
+        where: { id: 'etab-1' },
+        data: { photoUrl: null },
+      })
+      const base = prismaFactice.etablissement.update.mock.invocationCallOrder.at(-1)!
+      expect(base).toBeLessThan(fsFactice.unlink.mock.invocationCallOrder[0]!)
+    })
+
+    it('ne touche à aucun fichier quand on ne change pas la photo', async () => {
+      await expect(
+        modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT))
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(fsFactice.writeFile).not.toHaveBeenCalled()
+      expect(fsFactice.unlink).not.toHaveBeenCalled()
+    })
+
+    it('ne supprime jamais un fichier hors des dossiers d’images (adresse en base trafiquée)', async () => {
+      prismaFactice.etablissement.findUnique.mockResolvedValue({
+        id: 'etab-1',
+        photoUrl: '/uploads/../../etc/passwd',
+      })
+
+      await expect(
+        modifierEtablissement(
+          'etab-1',
+          {},
+          formulaire({ ...SAISIE_ETABLISSEMENT, removePhoto: 'on' })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(fsFactice.unlink).not.toHaveBeenCalled()
     })
   })
 })

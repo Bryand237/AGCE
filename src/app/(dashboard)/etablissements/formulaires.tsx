@@ -76,7 +76,12 @@ export function FormulaireEtablissement({
 
       <label className="flex flex-col gap-1 text-sm">
         Logo / image (facultatif)
-        <input name="photo" type="file" accept="image/*" className={classeChamp} />
+        <input
+          name="photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={classeChamp}
+        />
         {etablissement?.photoUrl && (
           <div className="mt-2 flex items-center gap-3">
             <Image
