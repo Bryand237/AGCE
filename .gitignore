@@ -35,3 +35,6 @@ templates/*.bak*
 # Sauvegardes et restaurations (contiennent des données personnelles)
 /backups/
 /restauration_fichiers/
+
+# Réglage local de Docker Compose (voir docs/DONNEES-DOCKER.md) : propre à chaque machine
+/docker-compose.override.yml

@@ -339,6 +339,68 @@ sauvegarde, pour ne pas faire circuler des secrets avec les copies : en
 conserver un exemplaire dans un endroit sûr. Ne jamais lancer
 `docker compose down -v` : l'option `-v` supprime le volume de la base.
 
+## Mettre à jour une installation existante
+
+Pour une machine où l'application tourne déjà (`npm run dev`, base dans Docker) et contient
+des données. **Aucune mise à jour de cette série ne touche à `prisma/` : pas de migration, pas de
+seed, la base et ses données restent telles quelles.** Le fichier `.env` n'est pas modifié non plus.
+
+```bash
+cd ~/AGCE                    # le dossier du projet
+npm run db:sauvegarder       # filet de sécurité, à faire avant toute mise à jour
+```
+
+Arrêter `npm run dev` (Ctrl+C), puis :
+
+```bash
+git pull
+npm install
+npx prisma generate
+npm run dev
+```
+
+`npx prisma migrate status` doit répondre « Database schema is up to date ». Ne **pas** lancer
+`npm run db:seed` (il ne se lance qu'une fois, à l'installation) ni `prisma migrate reset`.
+La base Docker n'est ni arrêtée ni recréée : `docker compose ps` doit toujours montrer `db`
+en marche (sinon `docker compose up -d db`).
+
+Les photos déjà enregistrées (`public/uploads/`) ne bougent pas et restent affichées. Si `git pull`
+refuse de s'exécuter à cause de modifications locales, faire `git stash`, puis `git pull`, puis
+`git stash pop`. **Ne jamais lancer `git clean`, `git checkout .` ni `git reset --hard`** : ces
+commandes suppriment les photos et les autres fichiers que Git ne suit pas.
+
+Pour placer la base sur un dossier du disque plutôt que dans un volume Docker, voir
+[`docs/DONNEES-DOCKER.md`](docs/DONNEES-DOCKER.md).
+
+## Images téléversées (photos et logos)
+
+Les photos des enseignants et les images des établissements sont contrôlées avant tout
+enregistrement (`src/domain/televersement/imageTeleversee.ts`) :
+
+- **types acceptés** : JPEG, PNG et WebP, reconnus par les **premiers octets du fichier**, jamais
+  d'après le type annoncé par le navigateur ni l'extension ; un fichier HTML ou SVG renommé
+  « .png » est refusé ;
+- **taille maximale** : 4 Mo (limite des actions serveur : 5 Mo) ;
+- **un fichier refusé n'enregistre rien** : ni la fiche, ni la modification, et le message
+  s'affiche dans le formulaire ;
+- **nom unique** `<identifiant>-<AAAAMMJJHHMMSSmmm>.<extension>` : une photo remplacée change
+  d'adresse, le navigateur n'affiche jamais l'ancienne ; le nouveau fichier est écrit en premier,
+  la base mise à jour ensuite, l'ancien fichier supprimé en dernier. Une panne à n'importe quelle
+  étape laisse donc toujours une photo valide.
+
+**Où sont les fichiers** (`src/lib/televersement.ts`, seul module qui lit, écrit et supprime des
+images) : par défaut dans `public/uploads/<enseignants|etablissements>/`, comme avant : rien ne
+change pour une installation existante, et `npm run db:sauvegarder` les copie. L'adresse
+enregistrée en base (`/uploads/<dossier>/<fichier>`) est servie par Next.js lorsque le fichier
+existe dans `public/`, sinon par la route `src/app/uploads/[...chemin]/route.ts` (type d'image
+reconnu à ses octets, en-tête `nosniff`). Cette route est publique, comme les photos l'ont
+toujours été (voir « Contrôle d'accès »).
+
+La variable `UPLOADS_DIR` désigne un autre dossier d'enregistrement ; l'image Docker la fixe à
+`/app/data/uploads` (volume `uploads`, appartenant à l'utilisateur de l'application, alors que
+`public/` est figé à la construction de l'image). Les anciens fichiers de `public/uploads` restent
+lus. **Ce dossier n'est pas couvert par `db:sauvegarder`** : le sauvegarder à part.
+
 ## Architecture
 
 ```
