@@ -74,16 +74,25 @@ d'union) à la place, ou installez le plugin Compose v2.
    `.lintstagedrc.json` et `.husky/pre-commit` sont déjà fournis —
    `husky init` ne fait qu'activer le mécanisme de hooks Git.
 
-5. Copier `.env.example` en `.env` et renseigner un vrai mot de passe.
+5. Copier `.env.example` en `.env` et remplacer **toutes** les valeurs « changer-… »
+   (mots de passe de la base et du compte administrateur). Chaque variable y est commentée.
 
-6. Démarrer uniquement la base de données pour la première migration :
+6. Démarrer uniquement la base de données, appliquer les migrations déjà
+   présentes dans `prisma/migrations/`, puis créer les données de départ :
 
    ```bash
    docker compose up -d db
-   npx prisma migrate dev --name init
+   npx prisma migrate deploy
    npx prisma generate
    npm run db:seed
    ```
+
+   `migrate deploy` applique les migrations existantes ; `migrate dev` sert à en
+   **créer** de nouvelles et n'a pas sa place dans une installation. **Le seed ne se
+   lance qu'une fois** : il crée la grille indiciaire, qui est unique, donc un second
+   lancement échoue. Il crée aussi le compte administrateur avec `ADMIN_USERNAME` et
+   `ADMIN_PASSWORD` ; pour changer ce compte ensuite, utiliser la page « Mon compte »
+   ou `npm run admin:reset` (voir « Contrôle d'accès »), jamais le seed.
 
    ⚠️ **Le `npx prisma generate` explicite n'est pas optionnel.**
    Contrairement aux versions précédentes, Prisma 7 ne régénère plus le
