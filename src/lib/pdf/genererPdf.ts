@@ -42,8 +42,8 @@ function trouverExecutableChromium(): string | undefined {
  * (liste des enseignants, rapport semestriel d'avancement...) — un seul
  * moteur de rendu à maintenir plutôt qu'un par document.
  *
- * En Docker, nécessite `npx playwright install --with-deps chromium`
- * dans le Dockerfile (déjà présent — voir README).
+ * En Docker, le Dockerfile installe le Chromium du système (apt) et renseigne
+ * PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, lue ci-dessus.
  */
 export async function genererPdf(html: string, options: OptionsPdf = {}): Promise<Buffer> {
   const executablePath = trouverExecutableChromium()

@@ -16,7 +16,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      - uploads:/app/public/uploads
+      # Photos et images téléversées : UPLOADS_DIR=/app/data/uploads dans le Dockerfile.
+      - uploads:/app/data/uploads
 
   db:
     image: postgres:16-alpine
