@@ -192,7 +192,7 @@ export default async function DetailEtablissement({
               <FormulaireDepartement etablissementId={id} />
             </div>
             <div className="border-border bg-card flex items-start rounded-2xl border p-6 shadow-sm">
-              <BoutonSupprimerEtablissement id={id} />
+              <BoutonSupprimerEtablissement id={id} nom={`« ${etablissement.nom} »`} />
             </div>
           </div>
         </div>

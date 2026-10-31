@@ -148,7 +148,10 @@ export function BoiteDialogue({
               <IconeAffichee className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 id={idTitre} className="text-foreground text-base leading-6 font-semibold">
+              <h2
+                id={idTitre}
+                className="text-foreground text-base leading-6 font-semibold text-balance"
+              >
                 {titre}
               </h2>
               {description && (

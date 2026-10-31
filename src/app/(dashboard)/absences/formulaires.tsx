@@ -11,6 +11,8 @@ import {
   validerAttestation,
   type EtatFormulaire,
 } from './actions'
+import { Alerte } from '@/components/ui/alerte'
+import { useConfirmation } from '@/components/ui/confirmation'
 import { classeBoutonPrimaire, classeChamp, classeFormulaire } from '@/lib/ui-classes'
 import { lireMotifMission } from '@/domain/absences/motifMission'
 import { ChampsMission } from './champs-mission'
@@ -265,26 +267,41 @@ export function FormulaireSupprimerAbsence({ absenceId }: { absenceId: string })
     supprimerAbsence.bind(null, absenceId),
     etatInitial
   )
-
   // Une suppression est définitive : le brouillon d'attestation et l'historique de l'absence
   // disparaissent avec elle.
-  function confirmer(e: React.FormEvent<HTMLFormElement>) {
-    if (!confirm('Supprimer définitivement cette absence ? Cette action est irréversible.')) {
-      e.preventDefault()
-    }
-  }
+  const confirmation = useConfirmation({
+    titre: 'Supprimer définitivement cette absence ?',
+    description:
+      "Le brouillon d'attestation et l'historique de cette absence seront supprimés avec elle. Cette action est irréversible.",
+    libelleConfirmer: "Supprimer l'absence",
+    libelleEnCours: 'Suppression…',
+    ton: 'danger',
+    icone: Trash2,
+    enCours: isPending,
+  })
 
   return (
-    <form action={formAction} onSubmit={confirmer} className="flex flex-col items-center gap-2">
-      <button
-        type="submit"
-        disabled={isPending}
-        className="border-border bg-card text-destructive hover:bg-destructive/5 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm disabled:opacity-50"
+    <>
+      <form
+        action={formAction}
+        onSubmit={confirmation.surEnvoi}
+        className="flex flex-col items-center gap-2"
       >
-        <Trash2 size={14} />
-        {isPending ? 'Suppression...' : 'Supprimer'}
-      </button>
-      {state.message && <p className="text-destructive max-w-60 text-xs">{state.message}</p>}
-    </form>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="border-border bg-card text-destructive hover:bg-destructive/5 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm disabled:opacity-50"
+        >
+          <Trash2 size={14} />
+          {isPending ? 'Suppression...' : 'Supprimer'}
+        </button>
+        {state.message && (
+          <Alerte ton="erreur" className="max-w-60 px-3 py-2 text-xs">
+            {state.message}
+          </Alerte>
+        )}
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }

@@ -46,6 +46,7 @@ export default async function DetailEnseignant({
   ])
   if (!enseignant) notFound()
 
+  const nomComplet = `${enseignant.prenom} ${enseignant.nom}`
   const retraitePrevue = calculerDateRetraitePrevue(enseignant.dateNaissance, enseignant.grade)
   const eligibleRetraite =
     enseignant.statut === 'ACTIF' && estEligibleRetraite(enseignant.dateNaissance, enseignant.grade)
@@ -251,9 +252,10 @@ export default async function DetailEnseignant({
 
           {enseignant.statut === 'ACTIF' && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormulaireTransfert enseignantId={id} />
+              <FormulaireTransfert enseignantId={id} nomComplet={nomComplet} />
               <FormulaireRetraite
                 enseignantId={id}
+                nomComplet={nomComplet}
                 dateRetraitePrevue={retraitePrevue.toISOString().slice(0, 10)}
               />
             </div>
@@ -270,7 +272,7 @@ export default async function DetailEnseignant({
                   enseignant.lieuTransfert &&
                   ` — destination : ${enseignant.lieuTransfert}`}
               </p>
-              <BoutonReactiver enseignantId={id} />
+              <BoutonReactiver enseignantId={id} nomComplet={nomComplet} />
             </section>
           )}
 

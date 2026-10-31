@@ -2,6 +2,9 @@
 
 import { useActionState } from 'react'
 import Image from 'next/image'
+import { Trash2 } from 'lucide-react'
+import { Alerte } from '@/components/ui/alerte'
+import { useConfirmation } from '@/components/ui/confirmation'
 import {
   creerEtablissement,
   modifierEtablissement,
@@ -142,26 +145,42 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
   )
 }
 
-export function BoutonSupprimerEtablissement({ id }: { id: string }) {
+export function BoutonSupprimerEtablissement({
+  id,
+  nom = 'cet établissement',
+}: {
+  id: string
+  /** Nom de l'établissement : rend la question de confirmation précise. */
+  nom?: string
+}) {
   const [state, formAction, isPending] = useActionState(
     supprimerEtablissement.bind(null, id),
     etatInitial
   )
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    if (!confirm('Supprimer définitivement cet établissement ?')) e.preventDefault()
-  }
+  const confirmation = useConfirmation({
+    titre: `Supprimer définitivement ${nom} ?`,
+    description:
+      "L'établissement sera retiré de la liste. Cette action est irréversible ; elle est refusée tant que des départements lui sont rattachés.",
+    libelleConfirmer: "Supprimer l'établissement",
+    libelleEnCours: 'Suppression…',
+    ton: 'danger',
+    icone: Trash2,
+    enCours: isPending,
+  })
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit}
-      className="border-destructive/20 bg-destructive/5 rounded-2xl border p-5"
-    >
-      {state.message && <p className="text-destructive mb-2 text-sm">{state.message}</p>}
-      <button type="submit" disabled={isPending} className={classeBoutonDanger}>
-        {isPending ? 'Suppression...' : "Supprimer l'établissement"}
-      </button>
-    </form>
+    <>
+      <form
+        action={formAction}
+        onSubmit={confirmation.surEnvoi}
+        className="border-destructive/20 bg-destructive/5 flex flex-col gap-3 rounded-2xl border p-5"
+      >
+        {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
+        <button type="submit" disabled={isPending} className={classeBoutonDanger}>
+          {isPending ? 'Suppression...' : "Supprimer l'établissement"}
+        </button>
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }

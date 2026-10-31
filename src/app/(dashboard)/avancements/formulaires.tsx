@@ -2,6 +2,9 @@
 
 import { useMemo } from 'react'
 import { useActionState } from 'react'
+import { Trash2 } from 'lucide-react'
+import { Alerte } from '@/components/ui/alerte'
+import { useConfirmation } from '@/components/ui/confirmation'
 import { useActionConservee } from '@/lib/action-conservee'
 import type { Grade } from '@/generated/prisma/enums'
 import {
@@ -352,21 +355,40 @@ export function FormulaireSupprimerRapport({
     supprimerRapport.bind(null, rapportId),
     etatInitial
   )
-
-  function confirmer(e: React.FormEvent<HTMLFormElement>) {
-    const detail =
-      nombreSelections > 0 ? ` ainsi que ses ${nombreSelections} sélection(s) d'enseignants` : ''
-    const question = `Supprimer définitivement le rapport ${numero}${detail} ? Cette action est irréversible.`
-    if (!confirm(question)) e.preventDefault()
-  }
+  const confirmation = useConfirmation({
+    titre: `Supprimer définitivement le rapport ${numero} ?`,
+    description: (
+      <>
+        {nombreSelections > 0 && (
+          <p>
+            Ses {nombreSelections} sélection{nombreSelections > 1 ? 's' : ''} d&apos;enseignants
+            seront supprimées avec lui.
+          </p>
+        )}
+        <p>Cette action est irréversible.</p>
+      </>
+    ),
+    libelleConfirmer: 'Supprimer le rapport',
+    libelleEnCours: 'Suppression…',
+    ton: 'danger',
+    icone: Trash2,
+    enCours: isPending,
+  })
 
   return (
-    <form action={formAction} onSubmit={confirmer} className="flex flex-col items-end gap-2">
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
-      <button type="submit" disabled={isPending} className={classeBoutonDanger}>
-        {isPending ? 'Suppression…' : 'Supprimer ce rapport'}
-      </button>
-    </form>
+    <>
+      <form
+        action={formAction}
+        onSubmit={confirmation.surEnvoi}
+        className="flex flex-col items-end gap-2"
+      >
+        {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
+        <button type="submit" disabled={isPending} className={classeBoutonDanger}>
+          {isPending ? 'Suppression…' : 'Supprimer ce rapport'}
+        </button>
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }
 
