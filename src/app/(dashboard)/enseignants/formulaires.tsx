@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { Alerte } from '@/components/ui/alerte'
 import { useConfirmation } from '@/components/ui/confirmation'
+import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import {
   marquerTransfere,
   marquerRetraite,
@@ -32,6 +33,14 @@ export function FormulaireTransfert({
     libelleConfirmer: 'Confirmer le transfert',
     libelleEnCours: 'Transfert…',
     enCours: isPending,
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[
+          { libelle: 'Date effective', valeur: dateEnClair(donnees.get('dateFinService')) },
+          { libelle: 'Destination', valeur: texteEnClair(donnees.get('lieuTransfert')) },
+        ]}
+      />
+    ),
   })
 
   return (
@@ -99,6 +108,11 @@ export function FormulaireRetraite({
     libelleConfirmer: 'Confirmer la retraite',
     libelleEnCours: 'Enregistrement…',
     enCours: isPending,
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[{ libelle: 'Date de départ', valeur: dateEnClair(donnees.get('dateFinService')) }]}
+      />
+    ),
   })
 
   return (

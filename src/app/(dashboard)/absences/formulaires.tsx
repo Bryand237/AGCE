@@ -13,6 +13,7 @@ import {
 } from './actions'
 import { Alerte } from '@/components/ui/alerte'
 import { useConfirmation } from '@/components/ui/confirmation'
+import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { classeBoutonPrimaire, classeChamp, classeFormulaire } from '@/lib/ui-classes'
 import { lireMotifMission } from '@/domain/absences/motifMission'
 import { ChampsMission } from './champs-mission'
@@ -77,20 +78,37 @@ export function FormulaireTerminerAbsence({
     terminerAbsence.bind(null, absenceId),
     etatInitial
   )
+  // Une absence terminée ne se modifie plus : une date de retour erronée ne se corrige pas.
+  const confirmation = useConfirmation({
+    titre: 'Enregistrer le retour de l’enseignant ?',
+    description: 'L’absence passera à « Terminée » et ne pourra plus être modifiée.',
+    libelleConfirmer: 'Enregistrer le retour',
+    libelleEnCours: 'Enregistrement…',
+    ton: 'avertissement',
+    enCours: isPending,
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[{ libelle: 'Date de retour', valeur: dateEnClair(donnees.get('dateRetour')) }]}
+      />
+    ),
+  })
   return (
-    <form action={formAction} className={classeFormulaire}>
-      <p className="text-foreground text-sm font-semibold">
-        {estDepasse ? 'Enseignant de retour (durée dépassée)' : "Marquer l'enseignant de retour"}
-      </p>
-      <label className="flex flex-col gap-1 text-sm">
-        Date de retour
-        <input type="date" name="dateRetour" required className={classeChamp} />
-      </label>
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
-      <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
-        {isPending ? 'Enregistrement...' : 'Marquer terminé'}
-      </button>
-    </form>
+    <>
+      <form action={formAction} onSubmit={confirmation.surEnvoi} className={classeFormulaire}>
+        <p className="text-foreground text-sm font-semibold">
+          {estDepasse ? 'Enseignant de retour (durée dépassée)' : "Marquer l'enseignant de retour"}
+        </p>
+        <label className="flex flex-col gap-1 text-sm">
+          Date de retour
+          <input type="date" name="dateRetour" required className={classeChamp} />
+        </label>
+        {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+        <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
+          {isPending ? 'Enregistrement...' : 'Marquer terminé'}
+        </button>
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }
 
@@ -189,6 +207,25 @@ export function BlocAttestationAbsence({
     validerAttestation.bind(null, absenceId),
     etatInitial
   )
+  // Une attestation signée fige l'absence : ni suppression, ni changement de dates ensuite.
+  const confirmation = useConfirmation({
+    titre: 'Marquer l’attestation comme signée ?',
+    description:
+      'Elle sera refaite avec le numéro et la date saisis. Ensuite, l’absence ne pourra plus être supprimée ni voir ses dates modifiées.',
+    libelleConfirmer: 'Marquer signée',
+    libelleEnCours: 'Enregistrement…',
+    ton: 'avertissement',
+    enCours: isPending,
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[
+          { libelle: 'Numéro de décision', valeur: texteEnClair(donnees.get('numeroDecision')) },
+          { libelle: 'Date de validation', valeur: dateEnClair(donnees.get('dateValidation')) },
+          { libelle: 'Auteur', valeur: texteEnClair(donnees.get('auteurValidation')) },
+        ]}
+      />
+    ),
+  })
 
   if (!statutAttestation) {
     if (consultationSeule) return null
@@ -223,7 +260,11 @@ export function BlocAttestationAbsence({
     return (
       <div className="flex flex-col gap-4">
         {lienBrouillon}
-        <form action={formActionValider} className="flex flex-col gap-3">
+        <form
+          action={formActionValider}
+          onSubmit={confirmation.surEnvoi}
+          className="flex flex-col gap-3"
+        >
           <p className="text-muted-foreground text-sm">
             Le numéro et la date saisis sont imprimés sur l&apos;attestation, qui est refaite à la
             signature.
@@ -249,6 +290,7 @@ export function BlocAttestationAbsence({
             {isPending ? 'Enregistrement...' : 'Marquer signée'}
           </button>
         </form>
+        {confirmation.dialogue}
       </div>
     )
   }

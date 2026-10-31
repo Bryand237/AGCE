@@ -3,14 +3,19 @@ import userEvent from '@testing-library/user-event'
 import type { FormEvent } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { useConfirmation } from './confirmation'
+import { Recapitulatif, texteEnClair } from './recapitulatif'
 
 /** Un formulaire comme ceux de l'application : le bouton « Ouvrir » est son bouton d'envoi. */
 function Formulaire({
   enCours = false,
   surEnvoi,
   demander,
+  avecRecapitulatif = false,
+  ton = 'danger',
 }: {
   enCours?: boolean
+  avecRecapitulatif?: boolean
+  ton?: 'danger' | 'avertissement' | 'neutre'
   surEnvoi: (evenement: FormEvent<HTMLFormElement>) => void
   demander?: (formulaire: HTMLFormElement) => boolean
 }) {
@@ -18,10 +23,17 @@ function Formulaire({
     titre: 'Supprimer cette absence ?',
     description: 'Cette action est irréversible.',
     libelleConfirmer: 'Supprimer',
-    ton: 'danger',
+    ton,
     enCours,
     surEnvoi,
     demander,
+    recapitulatif: avecRecapitulatif
+      ? (donnees) => (
+          <Recapitulatif
+            lignes={[{ libelle: 'Motif', valeur: texteEnClair(donnees.get('motif')) }]}
+          />
+        )
+      : undefined,
   })
   return (
     <>
@@ -123,5 +135,25 @@ describe('useConfirmation', () => {
 
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(surEnvoi).toHaveBeenCalledTimes(1)
+  })
+
+  it('relit la saisie du formulaire dans la fenêtre (récapitulatif)', async () => {
+    render(<Formulaire surEnvoi={envoiNote()} avecRecapitulatif />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ouvrir' }))
+
+    expect(screen.getByText('Motif')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('doublon')
+  })
+
+  it('met le focus sur Annuler quand la question est grave, sur Confirmer sinon', async () => {
+    const grave = render(<Formulaire surEnvoi={envoiNote()} ton="avertissement" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ouvrir' }))
+    expect(screen.getByRole('button', { name: 'Annuler' })).toHaveFocus()
+    grave.unmount()
+
+    render(<Formulaire surEnvoi={envoiNote()} ton="neutre" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ouvrir' }))
+    expect(screen.getByRole('button', { name: 'Supprimer' })).toHaveFocus()
   })
 })

@@ -30,8 +30,9 @@ const LARGEURS = {
  * L'état reste dans React (`ouvert`) : Échap et le clic sur le fond ne ferment jamais la fenêtre
  * directement, ils appellent `onFermer`, qui décide.
  *
- * - `ton="danger"` : rôle `alertdialog` (annoncé comme une alerte), clic sur le fond sans effet
- *   (un geste maladroit ne doit pas fermer une question grave sans que l'on s'en rende compte).
+ * - `ton="danger"` ou `"avertissement"` (question grave) : rôle `alertdialog` (annoncé comme une
+ *   alerte), clic sur le fond sans effet (un geste maladroit ne doit pas fermer une question
+ *   grave sans que l'on s'en rende compte).
  * - `fermable={false}` : Échap et fond ignorés (action en cours : on ne referme pas la fenêtre
  *   sous les doigts de l'utilisateur).
  * - L'élément qui porte `data-focus-initial` reçoit le focus à l'ouverture. Pour une action
@@ -63,7 +64,7 @@ export function BoiteDialogue({
   icone?: LucideIcon
   largeur?: keyof typeof LARGEURS
   fermable?: boolean
-  /** Défaut : la fenêtre se ferme au clic sur le fond, sauf en `danger`. */
+  /** Défaut : la fenêtre se ferme au clic sur le fond, sauf quand la question est grave. */
   fermerSurFond?: boolean
   /** Corps additionnel sous la description (liste, récapitulatif…). */
   children?: ReactNode
@@ -76,7 +77,8 @@ export function BoiteDialogue({
   const idDescription = useId()
   const { Icone, pastille } = TONS[ton]
   const IconeAffichee = icone ?? Icone
-  const fermerAuClicSurFond = fermerSurFond ?? ton !== 'danger'
+  const grave = ton !== 'neutre'
+  const fermerAuClicSurFond = fermerSurFond ?? !grave
 
   // Fait suivre l'état React au <dialog> natif.
   useEffect(() => {
@@ -114,7 +116,7 @@ export function BoiteDialogue({
   return (
     <dialog
       ref={dialogue}
-      role={ton === 'danger' ? 'alertdialog' : 'dialog'}
+      role={grave ? 'alertdialog' : 'dialog'}
       aria-labelledby={idTitre}
       aria-describedby={description ? idDescription : undefined}
       onMouseDown={memoriserDebutDeClic}

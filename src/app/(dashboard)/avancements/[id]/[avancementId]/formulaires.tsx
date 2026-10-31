@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react'
 import { genererDecision, validerDecision, type EtatFormulaire } from '../../actions'
+import { useConfirmation } from '@/components/ui/confirmation'
+import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
 const etatInitial: EtatFormulaire = {}
@@ -25,6 +27,25 @@ export function BlocDecision({
     validerDecision.bind(null, avancementId),
     etatInitial
   )
+  // Une décision signée porte son numéro et sa date : elle ne peut plus être régénérée.
+  const confirmation = useConfirmation({
+    titre: 'Marquer cette décision comme signée ?',
+    description:
+      'Elle sera régénérée avec le numéro et la date de signature saisis, puis ne pourra plus être modifiée.',
+    libelleConfirmer: 'Marquer signée',
+    libelleEnCours: 'Enregistrement…',
+    ton: 'avertissement',
+    enCours: isPending,
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[
+          { libelle: 'Numéro de décision', valeur: texteEnClair(donnees.get('numeroDecision')) },
+          { libelle: 'Date de signature', valeur: dateEnClair(donnees.get('dateValidation')) },
+          { libelle: 'Auteur', valeur: texteEnClair(donnees.get('auteurValidation')) },
+        ]}
+      />
+    ),
+  })
 
   if (!statutDecision) {
     return (
@@ -65,7 +86,11 @@ export function BlocDecision({
             </p>
           )}
         </div>
-        <form action={formActionValider} className="flex flex-col gap-3">
+        <form
+          action={formActionValider}
+          onSubmit={confirmation.surEnvoi}
+          className="flex flex-col gap-3"
+        >
           <label className="flex flex-col gap-1 text-sm">
             Numéro de décision
             <input name="numeroDecision" required placeholder="0000123" className={classeChamp} />
@@ -83,6 +108,7 @@ export function BlocDecision({
             {isPending ? 'Enregistrement...' : 'Marquer signée'}
           </button>
         </form>
+        {confirmation.dialogue}
       </div>
     )
   }

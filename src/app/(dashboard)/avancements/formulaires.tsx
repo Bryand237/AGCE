@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Alerte } from '@/components/ui/alerte'
 import { useConfirmation } from '@/components/ui/confirmation'
+import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { useActionConservee } from '@/lib/action-conservee'
 import type { Grade } from '@/generated/prisma/enums'
 import {
@@ -392,7 +393,16 @@ export function FormulaireSupprimerRapport({
   )
 }
 
-export function BlocValiderOuRejeter({ rapportId }: { rapportId: string }) {
+export function BlocValiderOuRejeter({
+  rapportId,
+  numero,
+  nombreSelections,
+}: {
+  rapportId: string
+  /** Numéro du rapport : rend la question de confirmation précise. */
+  numero?: string
+  nombreSelections?: number
+}) {
   // Le formulaire quitte la page quand la validation réussit : la saisie (date, auteur) est
   // conservée si le serveur répond par la liste des enseignants exclus, pour confirmer sans
   // tout ressaisir.
@@ -401,66 +411,116 @@ export function BlocValiderOuRejeter({ rapportId }: { rapportId: string }) {
     etatInitial
   )
 
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <form method="post" onSubmit={surEnvoiValider} className={classeFormulaire}>
-        <p className="text-foreground text-sm font-semibold">Valider le rapport</p>
-        <label className="flex flex-col gap-1 text-sm">
-          Date de validation
-          <input type="date" name="dateValidation" required className={classeChamp} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Auteur de la validation
-          <input
-            name="auteurValidation"
-            required
-            placeholder="Le Recteur"
-            className={classeChamp}
-          />
-        </label>
-        {state.message && <p className="text-destructive text-sm">{state.message}</p>}
-        {state.exclusions && state.exclusions.length > 0 && (
-          <ul className="border-border bg-muted/30 flex flex-col gap-1 rounded-lg border p-3 text-sm">
-            {state.exclusions.map((exclusion) => (
-              <li key={exclusion.enseignantId}>
-                <strong>{exclusion.nom}</strong> ({exclusion.matricule}) — {exclusion.motif}
-              </li>
-            ))}
-          </ul>
-        )}
-        {state.peutConfirmer && state.exclusions && (
-          <div className="flex flex-col gap-2">
-            <p className="text-muted-foreground text-xs">
-              Les enseignants ci-dessus seront retirés de ce rapport ; les autres avanceront.
-            </p>
-            <button
-              type="submit"
-              name="exclusionsConfirmees"
-              value={state.exclusions.map((exclusion) => exclusion.enseignantId).join(',')}
-              disabled={isPendingValider}
-              className={classeBoutonPrimaire}
-            >
-              {isPendingValider ? 'Validation...' : 'Valider sans ces enseignants'}
-            </button>
-          </div>
-        )}
-        {!state.peutConfirmer && (
-          <button type="submit" disabled={isPendingValider} className={classeBoutonPrimaire}>
-            {isPendingValider ? 'Validation...' : 'Valider'}
-          </button>
-        )}
-      </form>
+  // Valider modifie l'échelon de chaque enseignant retenu et ne se défait pas (un rapport validé
+  // ne peut plus être supprimé). Deuxième temps, quand le serveur a signalé des enseignants qui
+  // ne peuvent plus avancer : la question porte alors sur eux.
+  const exclusions = state.peutConfirmer && state.exclusions ? state.exclusions : null
+  const confirmation = useConfirmation({
+    titre: exclusions
+      ? `Valider le rapport${numero ? ` ${numero}` : ''} sans ${exclusions.length} enseignant${exclusions.length > 1 ? 's' : ''} ?`
+      : `Valider le rapport${numero ? ` ${numero}` : ''} ?`,
+    description: exclusions ? (
+      <p>
+        Les enseignants ci-dessous ne peuvent plus avancer : ils seront retirés du rapport, les
+        autres passeront à leur nouvel échelon. Cette validation ne se défait pas.
+      </p>
+    ) : (
+      <p>
+        Les enseignants retenus passeront à leur nouvel échelon et l&apos;historique des avancements
+        sera enregistré. Cette validation ne se défait pas : un rapport validé ne peut plus être
+        supprimé.
+      </p>
+    ),
+    libelleConfirmer: exclusions ? 'Valider sans eux' : 'Valider le rapport',
+    libelleEnCours: 'Validation…',
+    ton: 'avertissement',
+    enCours: isPendingValider,
+    surEnvoi: surEnvoiValider,
+    contenu: exclusions && (
+      <ul className="border-border bg-muted/40 flex flex-col gap-1 rounded-xl border p-3 text-sm">
+        {exclusions.map((exclusion) => (
+          <li key={exclusion.enseignantId}>
+            <strong>{exclusion.nom}</strong> ({exclusion.matricule}) — {exclusion.motif}
+          </li>
+        ))}
+      </ul>
+    ),
+    recapitulatif: (donnees) => (
+      <Recapitulatif
+        lignes={[
+          { libelle: 'Date de validation', valeur: dateEnClair(donnees.get('dateValidation')) },
+          { libelle: 'Auteur', valeur: texteEnClair(donnees.get('auteurValidation')) },
+          ...(nombreSelections === undefined
+            ? []
+            : [{ libelle: 'Enseignants sélectionnés', valeur: String(nombreSelections) }]),
+        ]}
+      />
+    ),
+  })
 
-      <form action={rejeterRapport.bind(null, rapportId)} className={classeFormulaire}>
-        <p className="text-foreground text-sm font-semibold">Rejeter</p>
-        <label className="flex flex-col gap-1 text-sm">
-          Motif
-          <textarea name="motif" required rows={3} className={classeChamp} />
-        </label>
-        <button type="submit" className={classeBoutonDanger}>
-          Rejeter
-        </button>
-      </form>
-    </div>
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <form method="post" onSubmit={confirmation.surEnvoi} className={classeFormulaire}>
+          <p className="text-foreground text-sm font-semibold">Valider le rapport</p>
+          <label className="flex flex-col gap-1 text-sm">
+            Date de validation
+            <input type="date" name="dateValidation" required className={classeChamp} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Auteur de la validation
+            <input
+              name="auteurValidation"
+              required
+              placeholder="Le Recteur"
+              className={classeChamp}
+            />
+          </label>
+          {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+          {state.exclusions && state.exclusions.length > 0 && (
+            <ul className="border-border bg-muted/30 flex flex-col gap-1 rounded-lg border p-3 text-sm">
+              {state.exclusions.map((exclusion) => (
+                <li key={exclusion.enseignantId}>
+                  <strong>{exclusion.nom}</strong> ({exclusion.matricule}) — {exclusion.motif}
+                </li>
+              ))}
+            </ul>
+          )}
+          {state.peutConfirmer && state.exclusions && (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-xs">
+                Les enseignants ci-dessus seront retirés de ce rapport ; les autres avanceront.
+              </p>
+              <button
+                type="submit"
+                name="exclusionsConfirmees"
+                value={state.exclusions.map((exclusion) => exclusion.enseignantId).join(',')}
+                disabled={isPendingValider}
+                className={classeBoutonPrimaire}
+              >
+                {isPendingValider ? 'Validation...' : 'Valider sans ces enseignants'}
+              </button>
+            </div>
+          )}
+          {!state.peutConfirmer && (
+            <button type="submit" disabled={isPendingValider} className={classeBoutonPrimaire}>
+              {isPendingValider ? 'Validation...' : 'Valider'}
+            </button>
+          )}
+        </form>
+
+        <form action={rejeterRapport.bind(null, rapportId)} className={classeFormulaire}>
+          <p className="text-foreground text-sm font-semibold">Rejeter</p>
+          <label className="flex flex-col gap-1 text-sm">
+            Motif
+            <textarea name="motif" required rows={3} className={classeChamp} />
+          </label>
+          <button type="submit" className={classeBoutonDanger}>
+            Rejeter
+          </button>
+        </form>
+      </div>
+      {confirmation.dialogue}
+    </>
   )
 }

@@ -92,9 +92,16 @@ testent pas et ne disent rien de précis. Les composants de `src/components/ui/`
 3. Le bouton de confirmation reprend le verbe de l'action (« Supprimer l'absence »), jamais
    « Oui » ni « OK ».
 
-`ton: 'danger'` pour tout ce qui détruit ou ne se défait pas : la fenêtre est annoncée comme une
-alerte, le focus part sur « Annuler » et un clic à côté ne la ferme pas. Une action qui se corrige
-ensuite (changer un statut, réactiver) reste en `neutre`.
+Le `ton` suit la gravité :
+
+- `danger` : l'action détruit des données (suppressions) ;
+- `avertissement` : l'action ne se défait pas sans rien détruire (signer, valider, rétablir) ;
+- `neutre` : on peut la corriger ensuite (transfert, retraite, réactivation).
+
+Les deux premiers sont annoncés comme une alerte, le focus part sur « Annuler » et un clic à côté
+ne ferme pas la fenêtre. Pour une signature ou une validation, `recapitulatif` relit à
+l'utilisateur ce qu'il vient de saisir (date, numéro, auteur) : c'est le dernier moment pour voir
+une faute de frappe qu'on ne pourra plus corriger. Jamais de mot de passe dans un récapitulatif.
 
 **Ne pas empiler les avertissements.** Une action courante qui se défait facilement n'a pas besoin
 de confirmation : à force de demander, on obtient des clics machinaux, y compris sur les

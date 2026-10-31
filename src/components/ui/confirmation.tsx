@@ -21,11 +21,21 @@ export type OptionsConfirmation = {
   /** Texte du bouton pendant l'action (défaut : le libellé suivi de « … »). */
   libelleEnCours?: string
   libelleAnnuler?: string
-  /** `danger` pour tout ce qui détruit ou ne se défait pas ; sinon `neutre`. */
+  /**
+   * `danger` : détruit des données. `avertissement` : ne se défait pas (signature, validation).
+   * `neutre` : se corrige ensuite. Les deux premiers sont annoncés comme une alerte, focalisent
+   * « Annuler » et ne se ferment pas au clic sur le fond.
+   */
   ton?: TonDialogue
   icone?: LucideIcon
-  /** Corps additionnel (récapitulatif, liste…). */
+  /** Corps additionnel (liste…). */
   contenu?: ReactNode
+  /**
+   * Récapitulatif de ce qui va être enregistré, calculé à l'ouverture à partir de la saisie du
+   * formulaire (ex. la date de retour, le numéro de décision) : l'utilisateur relit ce qu'il a
+   * tapé avant de s'engager. Ne jamais y mettre un mot de passe.
+   */
+  recapitulatif?: (donnees: FormData) => ReactNode
   /** L'état « en cours » du formulaire (le 3ᵉ élément de useActionState / useActionConservee). */
   enCours: boolean
   /**
@@ -65,10 +75,11 @@ export type OptionsConfirmation = {
  * formulaire reste affiché avec son message d'erreur, à côté du bouton.
  */
 export function useConfirmation(options: OptionsConfirmation) {
-  const { surEnvoi: envoyer, demander, ...affichage } = options
+  const { surEnvoi: envoyer, demander, recapitulatif, ...affichage } = options
   const { enCours } = affichage
   const [ouvert, setOuvert] = useState(false)
   const [actionVue, setActionVue] = useState(false)
+  const [resume, setResume] = useState<ReactNode>(null)
   const confirmee = useRef(false)
   // Garde contre le double clic : deux clics dans le même instant arrivent avant que React n'ait
   // affiché l'état « en cours », que `enCours` seul ne verrait donc pas.
@@ -95,7 +106,9 @@ export function useConfirmation(options: OptionsConfirmation) {
     evenement.preventDefault()
     formulaire.current = evenement.currentTarget
     envoiLance.current = false
-    declencheur.current = (evenement.nativeEvent as SubmitEvent).submitter
+    const envoyeur = (evenement.nativeEvent as SubmitEvent).submitter
+    declencheur.current = envoyeur
+    if (recapitulatif) setResume(recapitulatif(new FormData(evenement.currentTarget, envoyeur)))
     setOuvert(true)
   }
 
@@ -125,7 +138,20 @@ export function useConfirmation(options: OptionsConfirmation) {
   }
 
   const dialogue = (
-    <BoiteConfirmation ouvert={ouvert} onConfirmer={confirmer} onAnnuler={annuler} {...affichage} />
+    <BoiteConfirmation
+      ouvert={ouvert}
+      onConfirmer={confirmer}
+      onAnnuler={annuler}
+      {...affichage}
+      contenu={
+        resume || affichage.contenu ? (
+          <div className="space-y-3">
+            {resume}
+            {affichage.contenu}
+          </div>
+        ) : undefined
+      }
+    />
   )
 
   return { surEnvoi, dialogue, ouvert }
@@ -162,6 +188,8 @@ export function BoiteConfirmation({
   onAnnuler: () => void
 }) {
   const danger = ton === 'danger'
+  // Question grave : « Annuler » reçoit le focus, Entrée n'engage rien par réflexe.
+  const grave = ton !== 'neutre'
   const largeurBouton = 'w-full sm:w-auto'
   return (
     <BoiteDialogue
@@ -178,7 +206,7 @@ export function BoiteConfirmation({
             type="button"
             onClick={onAnnuler}
             disabled={enCours}
-            data-focus-initial={danger ? '' : undefined}
+            data-focus-initial={grave ? '' : undefined}
             className={cn(classeBoutonSecondaire, largeurBouton)}
           >
             {libelleAnnuler}
@@ -188,7 +216,7 @@ export function BoiteConfirmation({
             type="button"
             onClick={onConfirmer}
             aria-disabled={enCours}
-            data-focus-initial={danger ? undefined : ''}
+            data-focus-initial={grave ? undefined : ''}
             className={cn(
               danger ? classeBoutonDangerPlein : classeBoutonPrimaire,
               largeurBouton,

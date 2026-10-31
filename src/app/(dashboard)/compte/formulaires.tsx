@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { modifierIdentifiants, retablirIdentifiantsInitiaux, type EtatFormulaire } from './actions'
+import { useConfirmation } from '@/components/ui/confirmation'
 import { classeBoutonDanger, classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
 const etatInitial: EtatFormulaire = {}
@@ -83,29 +84,45 @@ export function FormulaireRetablissement({
   nomUtilisateurInitial: string
 }) {
   const [state, formAction, isPending] = useActionState(retablirIdentifiantsInitiaux, etatInitial)
-  return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <p className="text-muted-foreground text-sm">
-        L&apos;identifiant redeviendra{' '}
-        <strong className="text-foreground">{nomUtilisateurInitial}</strong> et le mot de passe
-        celui du fichier <code>.env</code> (ADMIN_PASSWORD). Vous serez déconnecté et vous vous
-        reconnecterez avec ces identifiants.
+  const confirmation = useConfirmation({
+    titre: 'Rétablir les identifiants initiaux ?',
+    description: (
+      <p>
+        Votre identifiant et votre mot de passe actuels seront remplacés par ceux du fichier{' '}
+        <code>.env</code>. Vous serez déconnecté.
       </p>
-      <label className="flex flex-col gap-1 text-sm">
-        Mot de passe actuel
-        <input
-          type="password"
-          name="motDePasseActuel"
-          required
-          autoComplete="current-password"
-          className={classeChamp}
-        />
-        <Erreur state={state} champ="motDePasseActuel" />
-      </label>
-      <Message state={state} />
-      <button type="submit" disabled={isPending} className={classeBoutonDanger}>
-        {isPending ? 'Rétablissement...' : 'Rétablir les identifiants initiaux'}
-      </button>
-    </form>
+    ),
+    libelleConfirmer: 'Rétablir',
+    libelleEnCours: 'Rétablissement…',
+    ton: 'avertissement',
+    enCours: isPending,
+  })
+  return (
+    <>
+      <form action={formAction} onSubmit={confirmation.surEnvoi} className="flex flex-col gap-4">
+        <p className="text-muted-foreground text-sm">
+          L&apos;identifiant redeviendra{' '}
+          <strong className="text-foreground">{nomUtilisateurInitial}</strong> et le mot de passe
+          celui du fichier <code>.env</code> (ADMIN_PASSWORD). Vous serez déconnecté et vous vous
+          reconnecterez avec ces identifiants.
+        </p>
+        <label className="flex flex-col gap-1 text-sm">
+          Mot de passe actuel
+          <input
+            type="password"
+            name="motDePasseActuel"
+            required
+            autoComplete="current-password"
+            className={classeChamp}
+          />
+          <Erreur state={state} champ="motDePasseActuel" />
+        </label>
+        <Message state={state} />
+        <button type="submit" disabled={isPending} className={classeBoutonDanger}>
+          {isPending ? 'Rétablissement...' : 'Rétablir les identifiants initiaux'}
+        </button>
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }

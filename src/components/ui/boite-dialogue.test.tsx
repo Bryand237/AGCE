@@ -44,10 +44,13 @@ describe('BoiteDialogue', () => {
     expect(fenetre).toHaveAccessibleDescription('Cette action est irréversible.')
   })
 
-  it('est une alerte (alertdialog) pour une action dangereuse', () => {
-    boite({ ton: 'danger' })
-    expect(screen.getByRole('alertdialog', { name: 'Supprimer cette absence ?' })).toBeVisible()
-  })
+  it.each(['danger', 'avertissement'] as const)(
+    'est une alerte (alertdialog) pour une question grave (ton « %s »)',
+    (ton) => {
+      boite({ ton })
+      expect(screen.getByRole('alertdialog', { name: 'Supprimer cette absence ?' })).toBeVisible()
+    }
+  )
 
   it('met le focus sur l’élément marqué data-focus-initial', () => {
     boite()
@@ -68,17 +71,20 @@ describe('BoiteDialogue', () => {
     expect(onFermer).not.toHaveBeenCalled()
   })
 
-  it('se ferme au clic sur le fond, sauf en danger', () => {
+  it('se ferme au clic sur le fond, sauf quand la question est grave', () => {
     const neutre = boite()
     fireEvent.mouseDown(dialogue())
     fireEvent.click(dialogue())
     expect(neutre.onFermer).toHaveBeenCalledTimes(1)
     neutre.unmount()
 
-    const danger = boite({ ton: 'danger' })
-    fireEvent.mouseDown(dialogue())
-    fireEvent.click(dialogue())
-    expect(danger.onFermer).not.toHaveBeenCalled()
+    for (const ton of ['danger', 'avertissement'] as const) {
+      const grave = boite({ ton })
+      fireEvent.mouseDown(dialogue())
+      fireEvent.click(dialogue())
+      expect(grave.onFermer).not.toHaveBeenCalled()
+      grave.unmount()
+    }
   })
 
   it('ne se ferme pas quand le clic commence dans la fenêtre (sélection de texte)', () => {
