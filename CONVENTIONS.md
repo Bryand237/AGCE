@@ -70,3 +70,39 @@ de `react`/`next`. Si une fonction métier a besoin de données, elle les
 reçoit en paramètre — c'est la Server Action ou le composant appelant
 qui va les chercher via Prisma. C'est ce qui permet de tester les
 règles d'avancement en quelques millisecondes, sans base de données.
+
+## Messages à l'utilisateur : fenêtres, alertes, notifications
+
+Jamais `confirm()`, `alert()` ni `prompt()` : ils sont laids, bloquent le navigateur, ne se
+testent pas et ne disent rien de précis. Les composants de `src/components/ui/` les remplacent.
+
+| Situation                                                      | Composant                                         |
+| -------------------------------------------------------------- | ------------------------------------------------- |
+| Saisie invalide dans un champ                                  | Texte d'erreur sous le champ (`state.errors`)     |
+| Une action vient d'échouer (base arrêtée, doublon, interdit…)  | `<Alerte ton="erreur">` à côté du bouton          |
+| Une action vient de réussir                                    | Notification (toast), qui disparaît seule         |
+| Action destructrice, irréversible ou lourde de conséquences    | Fenêtre de confirmation (`useConfirmation`)       |
+| État durable de la page (retraite dépassée, absence en retard) | `<Alerte>` fixe, dans la page                     |
+
+**Confirmer.** Le formulaire garde son action serveur et son état d'attente ; on lui ajoute
+`useConfirmation` (voir l'exemple en tête de `confirmation.tsx`). Le texte suit trois règles :
+
+1. Le titre est une question précise : « Supprimer cette absence ? », pas « Êtes-vous sûr ? ».
+2. La description dit ce qui sera perdu ou changé, et si cela peut se défaire.
+3. Le bouton de confirmation reprend le verbe de l'action (« Supprimer l'absence »), jamais
+   « Oui » ni « OK ».
+
+`ton: 'danger'` pour tout ce qui détruit ou ne se défait pas : la fenêtre est annoncée comme une
+alerte, le focus part sur « Annuler » et un clic à côté ne la ferme pas. Une action qui se corrige
+ensuite (changer un statut, réactiver) reste en `neutre`.
+
+**Ne pas empiler les avertissements.** Une action courante qui se défait facilement n'a pas besoin
+de confirmation : à force de demander, on obtient des clics machinaux, y compris sur les
+questions qui comptent.
+
+**Échec d'une action** : la fenêtre se ferme et le message d'erreur s'affiche dans le formulaire,
+au même endroit que les autres erreurs. La saisie n'est jamais perdue (voir `useActionConservee`).
+
+**Comportements propres à `<dialog>`** (arrière-plan inerte, Échap, focus qui revient au bouton
+d'origine) viennent du navigateur : les tests jsdom ne les voient pas, ils se contrôlent à la main
+(liste de contrôle dans le message du commit « fenêtres de confirmation »).
