@@ -8,6 +8,7 @@ import { GraphiqueEffectifsParSexe } from '@/components/charts/graphique-effecti
 import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
+import { lirePage } from '@/lib/pagination'
 
 type Recherche = { page?: string; recherche?: string; tri?: 'asc' | 'desc' }
 
@@ -30,11 +31,11 @@ export default async function PageEtablissements({
   searchParams: Promise<Recherche>
 }) {
   const params = await searchParams
-  const page = Number(params.page ?? 1)
+  const pageDemandee = lirePage(params.page)
   const tri = params.tri === 'desc' ? 'desc' : 'asc'
 
   const [liste, stats, effectifs] = await Promise.all([
-    recupererEtablissements({ page, recherche: params.recherche, tri }),
+    recupererEtablissements({ page: pageDemandee, recherche: params.recherche, tri }),
     recupererStatsEtablissements(),
     recupererEffectifsParEtablissement(),
   ])
@@ -190,17 +191,17 @@ export default async function PageEtablissements({
           {liste.total > 1 ? 's' : ''})
         </span>
         <div className="flex gap-2">
-          {page > 1 && (
+          {liste.page > 1 && (
             <Link
-              href={construireLien(params, page - 1)}
+              href={construireLien(params, liste.page - 1)}
               className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
             >
               Précédent
             </Link>
           )}
-          {page < liste.totalPages && (
+          {liste.page < liste.totalPages && (
             <Link
-              href={construireLien(params, page + 1)}
+              href={construireLien(params, liste.page + 1)}
               className="border-border bg-card hover:bg-muted rounded-2xl border px-3 py-1.5 shadow-sm"
             >
               Suivant

@@ -440,6 +440,26 @@ Règle de dépendance : `app` peut importer `domain` et `lib`. `domain` ne
 doit jamais importer `lib/prisma` ni quoi que ce soit de React — c'est
 ce qui le garde testable sans base de données ni navigateur.
 
+## Listes paginées
+
+Les listes de la base (absences, rapports d'avancement, établissements, départements d'un
+établissement) se lisent toutes de la même façon (`src/lib/pagination.ts`) :
+
+- **`lirePage(params.page)`** lit le numéro de page de l'adresse : toujours un entier de 1 au
+  moins. `?page=abc`, `0`, `-3` ou `2.5` ouvrent la page 1 (avant, Prisma refusait la valeur et
+  la page affichait une erreur) ;
+- **`bornerPage(page, total)`** ramène la page demandée dans les pages qui existent : `?page=999`
+  ouvre la dernière page, pas un tableau vide. On lit donc le total (`count`) **avant** la page,
+  et la page renvoyée par la lecture est celle qu'il faut afficher ;
+- chaque `orderBy` finit par l'**identifiant** : PostgreSQL ne garantit pas l'ordre des lignes à
+  valeur égale d'une requête à l'autre, et avec `skip`/`take` une ligne pouvait apparaître sur
+  deux pages ou sur aucune. Même chose quand le critère se répète beaucoup (le type d'un
+  établissement : deux valeurs seulement, d'où un tri par nom en plus).
+
+Deux tests (`src/app/pagination-des-pages.test.ts`) refusent le retour de `Number(params.page)` et
+d'un `skip` calculé sans `bornerPage`. La liste des enseignants, elle, est filtrée et découpée en
+mémoire (`paginer`), avec la même règle.
+
 ## Validation des saisies
 
 Chaque formulaire est validé côté serveur par un schéma zod

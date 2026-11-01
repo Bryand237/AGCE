@@ -15,6 +15,7 @@ import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { aujourdhui } from '@/domain/dates/jourCivil'
+import { lirePage } from '@/lib/pagination'
 
 const LIBELLES_STATUT: Record<string, string> = {
   EN_ATTENTE: 'En attente',
@@ -32,14 +33,14 @@ export default async function PageAbsences({
   // Le même jour pour les compteurs et pour les lignes : rien n'est écrit en base, « dépassé »
   // se calcule d'après la date de fin (voir statutEffectif).
   const jour = aujourdhui()
-  const page = Number(params.page ?? 1)
+  const pageDemandee = lirePage(params.page)
   const tri = params.tri === 'grade' || params.tri === 'statut' ? params.tri : undefined
 
-  const [stats, effectifsSexe, effectifsType, { absences, totalPages }] = await Promise.all([
+  const [stats, effectifsSexe, effectifsType, { absences, page, totalPages }] = await Promise.all([
     recupererStatsAbsences(jour),
     recupererEffectifsAbsenceParGradeSexe(),
     recupererEffectifsParType(),
-    recupererAbsences({ page, recherche: params.recherche, tri, jour }),
+    recupererAbsences({ page: pageDemandee, recherche: params.recherche, tri, jour }),
   ])
 
   function construireLien(p: number) {

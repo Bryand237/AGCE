@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
-import { TAILLE_PAGE } from '@/lib/constantes'
+import { bornerPage } from '@/lib/pagination'
 import { effectifsParType } from '@/domain/absences/effectifsParType'
 import { RANG_STATUT, statutEffectif } from '@/domain/absences/statutEffectif'
 import { aujourdhui } from '@/domain/dates/jourCivil'
@@ -56,6 +56,11 @@ export async function recupererEffectifsParType() {
   )
 }
 
+// Les dates se répètent (plusieurs absences le même jour) : sans l'identifiant en dernier critère,
+// PostgreSQL peut ordonner les lignes égales différemment d'une requête à l'autre, et avec
+// skip/take une absence apparaît sur deux pages ou sur aucune.
+const ORDRE_PAR_DATE = [{ dateDebut: 'desc' as const }, { id: 'asc' as const }]
+
 const SELECTION_LISTE = {
   id: true,
   type: true,
@@ -66,7 +71,8 @@ const SELECTION_LISTE = {
 } as const
 
 /**
- * Une page de la liste des absences. Le `statut` de chaque ligne est le statut EFFECTIF au jour
+ * Une page de la liste des absences. `page` est celle qu'on demande ; celle qui est renvoyée est
+ * ramenée dans les limites (voir bornerPage). Le `statut` de chaque ligne est le statut EFFECTIF au jour
  * `jour` (voir statutEffectif), pas la valeur enregistrée : « Dépassé » apparaît dès que la fin
  * est passée, sans attendre qu'une écriture le fasse.
  */
@@ -109,34 +115,42 @@ export async function recupererAbsences({
       }))
       .sort((a, b) => a.rang - b.rang || b.debut - a.debut || a.id.localeCompare(b.id))
 
-    const ids = ordonnees.slice((page - 1) * TAILLE_PAGE, page * TAILLE_PAGE).map((l) => l.id)
+    const pagination = bornerPage(page, ordonnees.length)
+    const ids = ordonnees.slice(pagination.skip, pagination.skip + pagination.take).map((l) => l.id)
     const detail = await prisma.absence.findMany({
       where: { id: { in: ids } },
       select: SELECTION_LISTE,
     })
     const parId = new Map(detail.map((ligne) => [ligne.id, ligne]))
-    return [ids.flatMap((id) => parId.get(id) ?? []), ordonnees.length] as const
+    return [ids.flatMap((id) => parId.get(id) ?? []), pagination] as const
   }
 
-  const [lignes, total] =
-    tri === 'statut'
-      ? await pageTrieeParStatut()
-      : await Promise.all([
-          prisma.absence.findMany({
-            where,
-            orderBy:
-              tri === 'grade'
-                ? { enseignant: { grade: 'asc' as const } }
-                : { dateDebut: 'desc' as const },
-            skip: (page - 1) * TAILLE_PAGE,
-            take: TAILLE_PAGE,
-            select: SELECTION_LISTE,
-          }),
-          prisma.absence.count({ where }),
-        ])
+  /** Tri par colonne : le total d'abord (pour ramener la page demandée dans les limites). */
+  async function pageTrieeParColonne() {
+    const pagination = bornerPage(page, await prisma.absence.count({ where }))
+    const lignes = await prisma.absence.findMany({
+      where,
+      orderBy:
+        tri === 'grade'
+          ? [
+              { enseignant: { grade: 'asc' as const } },
+              { enseignant: { nom: 'asc' as const } },
+              { enseignant: { prenom: 'asc' as const } },
+              ...ORDRE_PAR_DATE,
+            ]
+          : ORDRE_PAR_DATE,
+      skip: pagination.skip,
+      take: pagination.take,
+      select: SELECTION_LISTE,
+    })
+    return [lignes, pagination] as const
+  }
+
+  const [lignes, pagination] =
+    tri === 'statut' ? await pageTrieeParStatut() : await pageTrieeParColonne()
 
   const absences = lignes.map((ligne) => ({ ...ligne, statut: statutEffectif(ligne, jour) }))
-  return { absences, page, totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)) }
+  return { absences, page: pagination.page, totalPages: pagination.totalPages }
 }
 
 export async function recupererAbsenceDetail(id: string) {

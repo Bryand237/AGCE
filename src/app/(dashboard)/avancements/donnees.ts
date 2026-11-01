@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
-import { TAILLE_PAGE } from '@/lib/constantes'
+import { bornerPage } from '@/lib/pagination'
 
 export async function recupererStatsRapports() {
   const [total, valides, brouillons, dernierRapport] = await Promise.all([
@@ -63,17 +63,18 @@ export async function recupererRapports({
       ? { periodeDebut: { lte: commeDate! }, periodeFin: { gte: commeDate! } }
       : { numero: { contains: recherche, mode: 'insensitive' as const } }
 
-  const [rapports, total] = await Promise.all([
-    prisma.sessionConseil.findMany({
-      where,
-      orderBy: { periodeDebut: 'desc' },
-      skip: (page - 1) * TAILLE_PAGE,
-      take: TAILLE_PAGE,
-      include: { _count: { select: { selections: true } } },
-    }),
-    prisma.sessionConseil.count({ where }),
-  ])
-  return { rapports, page, totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)) }
+  // Le total d'abord : la page demandée est ramenée dans les limites avant d'être lue.
+  const pagination = bornerPage(page, await prisma.sessionConseil.count({ where }))
+  const rapports = await prisma.sessionConseil.findMany({
+    where,
+    // L'identifiant départage deux rapports de même début : sinon une ligne peut apparaître sur
+    // deux pages (ou sur aucune) d'une requête à l'autre.
+    orderBy: [{ periodeDebut: 'desc' }, { id: 'asc' }],
+    skip: pagination.skip,
+    take: pagination.take,
+    include: { _count: { select: { selections: true } } },
+  })
+  return { rapports, page: pagination.page, totalPages: pagination.totalPages }
 }
 
 export async function recupererGrilleEchelonIndiciaire() {

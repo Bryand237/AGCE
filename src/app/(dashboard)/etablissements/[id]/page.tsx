@@ -5,6 +5,7 @@ import { ArrowLeft, Building2, Layers, Pencil, Users } from 'lucide-react'
 import { recupererEtablissementParIdPaged } from '../donnees'
 import { FormulaireDepartement, BoutonSupprimerEtablissement } from '../formulaires'
 import { StatCard } from '@/components/dashboard/stat-card'
+import { lirePage } from '@/lib/pagination'
 
 const LIBELLES_TYPE: Record<string, string> = {
   ECOLE: 'École',
@@ -20,12 +21,12 @@ export default async function DetailEtablissement({
 }) {
   const { id } = await params
   const sp = await searchParams
-  const page = Number(sp.page ?? 1)
+  const pageDemandee = lirePage(sp.page)
 
-  const data = await recupererEtablissementParIdPaged(id, page, 10)
+  const data = await recupererEtablissementParIdPaged(id, pageDemandee, 10)
   if (!data) notFound()
 
-  const { etablissement, departements, total, totalPages, totalEnseignants } = data
+  const { etablissement, departements, page, total, totalPages, totalEnseignants } = data
 
   const moyenneParDept =
     etablissement._count.departements > 0

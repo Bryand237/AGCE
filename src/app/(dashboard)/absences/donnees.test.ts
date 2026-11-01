@@ -122,17 +122,72 @@ describe('recupererAbsences', () => {
     ])
   })
 
-  it('trie par date de début décroissante par défaut, en demandant une seule page à la base', async () => {
-    prismaFactice.absence.findMany.mockResolvedValue([])
-    prismaFactice.absence.count.mockResolvedValue(45)
+  describe('pagination et ordre', () => {
+    beforeEach(() => {
+      prismaFactice.absence.findMany.mockResolvedValue([])
+    })
 
-    const { totalPages } = await recupererAbsences({ page: 2, jour: AUJOURDHUI })
+    /** Les arguments de la lecture de la page (l'unique findMany du tri par colonne). */
+    const lecture = () => prismaFactice.absence.findMany.mock.calls[0]![0]
 
-    expect(prismaFactice.absence.findMany).toHaveBeenCalledTimes(1)
-    expect(prismaFactice.absence.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { dateDebut: 'desc' }, skip: 20, take: 20 })
-    )
-    expect(totalPages).toBe(3)
+    it('lit une seule page, du plus récent au plus ancien, avec l’identifiant pour départager', async () => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page, totalPages } = await recupererAbsences({ page: 2, jour: AUJOURDHUI })
+
+      expect(prismaFactice.absence.findMany).toHaveBeenCalledTimes(1)
+      expect(lecture()).toEqual(
+        expect.objectContaining({
+          orderBy: [{ dateDebut: 'desc' }, { id: 'asc' }],
+          skip: 20,
+          take: 20,
+        })
+      )
+      expect([page, totalPages]).toEqual([2, 3])
+    })
+
+    it('départage aussi le tri par grade : nom, prénom, puis date et identifiant', async () => {
+      prismaFactice.absence.count.mockResolvedValue(5)
+
+      await recupererAbsences({ tri: 'grade', jour: AUJOURDHUI })
+
+      expect(lecture().orderBy).toEqual([
+        { enseignant: { grade: 'asc' } },
+        { enseignant: { nom: 'asc' } },
+        { enseignant: { prenom: 'asc' } },
+        { dateDebut: 'desc' },
+        { id: 'asc' },
+      ])
+    })
+
+    it('ramène une page trop grande à la dernière, au lieu d’un tableau vide', async () => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page, totalPages } = await recupererAbsences({ page: 999, jour: AUJOURDHUI })
+
+      expect(lecture()).toEqual(expect.objectContaining({ skip: 40, take: 20 }))
+      expect([page, totalPages]).toEqual([3, 3])
+    })
+
+    it.each([0, -3, 0.4, Number.NaN])('ne passe jamais %s à skip', async (demandee) => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page } = await recupererAbsences({ page: demandee, jour: AUJOURDHUI })
+
+      expect(lecture()).toEqual(expect.objectContaining({ skip: 0 }))
+      expect(page).toBe(1)
+    })
+
+    it('lit le total avant la page : c’est lui qui borne la page demandée', async () => {
+      prismaFactice.absence.count.mockResolvedValue(0)
+
+      const { page, totalPages } = await recupererAbsences({ page: 7, jour: AUJOURDHUI })
+
+      expect(prismaFactice.absence.count.mock.invocationCallOrder[0]).toBeLessThan(
+        prismaFactice.absence.findMany.mock.invocationCallOrder[0]!
+      )
+      expect([page, totalPages]).toEqual([1, 1])
+    })
   })
 
   describe('tri par statut', () => {
@@ -192,6 +247,21 @@ describe('recupererAbsences', () => {
       expect(totalPages).toBe(2)
       const demandeDetail = prismaFactice.absence.findMany.mock.calls[1]![0]
       expect(demandeDetail.where.id.in).toHaveLength(5)
+    })
+
+    it('ramène une page trop grande à la dernière', async () => {
+      const beaucoup = Array.from({ length: 25 }, (_, n) =>
+        ligne(`a${String(n).padStart(2, '0')}`, 'EN_PERIODE', '2026-10-01', '2026-11-20')
+      )
+      simulerLaBase(beaucoup)
+
+      const { absences, page, totalPages } = await recupererAbsences({
+        tri: 'statut',
+        page: 999,
+        jour: AUJOURDHUI,
+      })
+
+      expect([page, totalPages, absences.length]).toEqual([2, 2, 5])
     })
 
     it('départage les statuts égaux et les dates égales par l’identifiant : l’ordre est stable', async () => {
