@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Alerte } from '@/components/ui/alerte'
 import { ArrowLeft } from 'lucide-react'
 import { recupererAbsenceDetail } from '../../donnees'
 import { FormulaireModifierAbsence } from '../../formulaires'
@@ -34,9 +35,9 @@ export default async function ModifierAbsencePage({ params }: { params: Promise<
 
       <section className={classeFormulaire}>
         {refus ? (
-          <p className="text-sm" role="alert">
+          <Alerte ton="avertissement" role="alert">
             {refus}
-          </p>
+          </Alerte>
         ) : (
           <FormulaireModifierAbsence
             absenceId={id}

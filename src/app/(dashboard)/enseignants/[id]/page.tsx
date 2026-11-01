@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Alerte } from '@/components/ui/alerte'
 import { ArrowLeft, CalendarDays, CalendarOff, Mail, Pencil, Phone, TrendingUp } from 'lucide-react'
 import { recupererEnseignantDetail } from '../donnees'
 import { recupererGrilleEchelonIndiciaire } from '@/app/(dashboard)/avancements/donnees'
@@ -70,23 +71,17 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
       </Link>
 
       {eligibleRetraite && (
-        <div
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
-          role="alert"
-        >
+        <Alerte ton="avertissement" role="alert">
           Cet enseignant a dépassé l&apos;âge de retraite de son grade. Pensez à le marquer retraité
           ci-dessous.
-        </div>
+        </Alerte>
       )}
 
       {!eligibleRetraite && procheRetraite && (
-        <div
-          className="border-primary/20 bg-primary/5 text-foreground rounded-2xl border px-5 py-4 text-sm"
-          role="status"
-        >
+        <Alerte ton="info">
           Retraite prévue le <strong>{formatDate(retraitePrevue)}</strong> — dans les 2 prochaines
           années.
-        </div>
+        </Alerte>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

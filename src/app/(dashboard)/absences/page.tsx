@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CalendarOff, Clock, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
 import EtatPage from '@/components/etats/etat-page'
+import { Alerte } from '@/components/ui/alerte'
 import {
   synchroniserStatutsAbsences,
   recupererStatsAbsences,
@@ -60,17 +61,14 @@ export default async function PageAbsences({
       </PageHeader>
 
       {stats.depasse > 0 && (
-        <div
-          className="border-destructive/30 bg-destructive/5 text-destructive rounded-2xl border px-5 py-4 text-sm"
-          role="alert"
-        >
+        <Alerte ton="erreur" role="alert">
           <strong>
             {stats.depasse} absence{stats.depasse > 1 ? 's ont' : ' a'}
           </strong>{' '}
           dépassé
           {stats.depasse > 1 ? ' leur' : ' sa'} durée prévue — l&apos;enseignant n&apos;est pas
           encore rentré.
-        </div>
+        </Alerte>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

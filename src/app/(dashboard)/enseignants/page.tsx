@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import EtatPage from '@/components/etats/etat-page'
+import { Alerte } from '@/components/ui/alerte'
 import Image from 'next/image'
 import {
   recupererStatsEnseignants,
@@ -109,13 +110,11 @@ export default async function PageEnseignants({
       </PageHeader>
 
       {eligiblesRetraite.length > 0 && (
-        <div
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+        <Alerte
+          ton="avertissement"
           role="alert"
+          titre={`${eligiblesRetraite.length} enseignant(s) ont dépassé l'âge de retraite`}
         >
-          <p className="font-semibold">
-            {eligiblesRetraite.length} enseignant(s) ont dépassé l&apos;âge de retraite
-          </p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {eligiblesRetraite.map((e) => (
               <li key={e.id}>
@@ -128,17 +127,14 @@ export default async function PageEnseignants({
               </li>
             ))}
           </ul>
-        </div>
+        </Alerte>
       )}
 
       {prochesRetraite.length > 0 && (
-        <div
-          className="border-primary/20 bg-primary/5 rounded-2xl border px-5 py-4 text-sm"
-          role="status"
+        <Alerte
+          ton="info"
+          titre={`${prochesRetraite.length} enseignant(s) proche(s) de la retraite (2 ans)`}
         >
-          <p className="text-foreground font-semibold">
-            {prochesRetraite.length} enseignant(s) proche(s) de la retraite (2 ans)
-          </p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {prochesRetraite.slice(0, 8).map((e) => (
               <li key={e.id}>
@@ -156,7 +152,7 @@ export default async function PageEnseignants({
               </li>
             )}
           </ul>
-        </div>
+        </Alerte>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
