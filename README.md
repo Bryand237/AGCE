@@ -761,6 +761,14 @@ mêmes étapes.
   (les deux derniers n'y figurent que s'ils existent).
 - Le bouton « Supprimer » demande une confirmation. Une absence déjà supprimée (autre
   onglet, double clic) ramène simplement à la liste.
+- Le statut **« Dépassé »** n'est jamais écrit en base : il se déduit de la date de fin à
+  chaque affichage (`src/domain/absences/statutEffectif.ts`), pour la liste, ses compteurs et
+  la fiche. Une absence validée est « en période » jusqu'à son **dernier jour compris**,
+  « dépassée » dès le lendemain, sans qu'il faille ouvrir une page pour le déclencher. Les
+  anciennes valeurs « dépassé » enregistrées auparavant sont relues d'après les dates : une fin
+  repoussée depuis fait redevenir l'absence « en période ». Le tri par statut de la liste suit
+  ce statut calculé. Un test (`src/app/pages-sans-ecriture.test.ts`) interdit toute écriture en
+  base dans une page, une mise en page ou un fichier `donnees.ts`.
 - Un refus s'affiche sous le formulaire, sans recharger la page, avec le motif.
 - Comme pour les statuts d'enseignant, la relecture et l'écriture ne sont pas une
   transaction : sans objet pour un usage local à un seul poste.

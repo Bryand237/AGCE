@@ -16,6 +16,8 @@ import { erreurDetailsMission, lireMotifMission } from '@/domain/absences/motifM
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { presentationAttestation } from '@/domain/absences/presentationAttestation'
+import { statutEffectif } from '@/domain/absences/statutEffectif'
+import { aujourdhui } from '@/domain/dates/jourCivil'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -63,11 +65,12 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   const absence = await recupererAbsenceDetail(id)
   if (!absence) notFound()
 
+  // « Dépassé » se déduit de la date de fin à chaque affichage, il n'est pas lu dans la base
+  // (voir statutEffectif) : la fiche est juste même si personne n'a ouvert la liste.
+  const statut = statutEffectif(absence, aujourdhui())
   const dureeJours = calculerDureeJours(absence.dateDebut, absence.dateFin)
   const joursRestants =
-    absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE'
-      ? calculerJoursRestants(absence.dateFin)
-      : null
+    statut === 'EN_PERIODE' || statut === 'DEPASSE' ? calculerJoursRestants(absence.dateFin) : null
   const { enseignant } = absence
 
   // Les boutons suivent les règles que le serveur impose de toute façon (etapesAbsence.ts) :
@@ -118,9 +121,9 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               </p>
             </div>
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STYLES_STATUT[absence.statut]}`}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STYLES_STATUT[statut]}`}
             >
-              {LIBELLES_STATUT[absence.statut]}
+              {LIBELLES_STATUT[statut]}
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {!refusModification && (
@@ -194,13 +197,13 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               value={joursRestants ?? '—'}
               icon={Clock}
               description={
-                absence.statut === 'TERMINE'
+                statut === 'TERMINE'
                   ? 'Absence terminée'
-                  : absence.statut === 'EN_ATTENTE'
+                  : statut === 'EN_ATTENTE'
                     ? 'En attente de validation'
                     : "Jusqu'à la date de fin"
               }
-              color={absence.statut === 'DEPASSE' ? 'rose' : 'green'}
+              color={statut === 'DEPASSE' ? 'rose' : 'green'}
             />
             <StatCard
               title="Absences"
@@ -215,7 +218,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             <h2 className="text-foreground mb-4 text-sm font-bold">Détails de l&apos;absence</h2>
             <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
               <Item label="Type" valeur={LIBELLES_TYPE_ABSENCE[absence.type]} />
-              <Item label="Statut" valeur={LIBELLES_STATUT[absence.statut] ?? absence.statut} />
+              <Item label="Statut" valeur={LIBELLES_STATUT[statut] ?? statut} />
               <Item label="Date de début" valeur={formatDate(absence.dateDebut)} />
               <Item label="Date de fin" valeur={formatDate(absence.dateFin)} />
               {mission ? (
@@ -259,7 +262,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             </dl>
           </section>
 
-          {absence.statut === 'EN_ATTENTE' && (
+          {statut === 'EN_ATTENTE' && (
             <FormulaireValidationAbsence
               absenceId={id}
               avecAttestation={TYPES_AVEC_ATTESTATION.includes(absence.type)}
@@ -281,10 +284,10 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {(absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') &&
+          {(statut === 'EN_PERIODE' || statut === 'DEPASSE') &&
             (!TYPES_RETOUR_APRES_ATTESTATION.includes(absence.type) ||
             absence.statutAttestation === 'VALIDEE' ? (
-              <FormulaireTerminerAbsence absenceId={id} estDepasse={absence.statut === 'DEPASSE'} />
+              <FormulaireTerminerAbsence absenceId={id} estDepasse={statut === 'DEPASSE'} />
             ) : (
               <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
                 <p className="text-muted-foreground text-sm">
@@ -294,7 +297,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               </div>
             ))}
 
-          {absence.statut === 'TERMINE' && absence.dateRetour && (
+          {statut === 'TERMINE' && absence.dateRetour && (
             <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
               <p className="text-muted-foreground text-sm">
                 Retour enregistré le {formatDate(absence.dateRetour)}.

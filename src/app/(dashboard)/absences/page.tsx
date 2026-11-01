@@ -3,7 +3,6 @@ import { CalendarOff, Clock, AlertTriangle, CheckCircle2, Plus } from 'lucide-re
 import EtatPage from '@/components/etats/etat-page'
 import { Alerte } from '@/components/ui/alerte'
 import {
-  synchroniserStatutsAbsences,
   recupererStatsAbsences,
   recupererEffectifsAbsenceParGradeSexe,
   recupererEffectifsParType,
@@ -15,6 +14,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { aujourdhui } from '@/domain/dates/jourCivil'
 
 const LIBELLES_STATUT: Record<string, string> = {
   EN_ATTENTE: 'En attente',
@@ -28,16 +28,18 @@ export default async function PageAbsences({
 }: {
   searchParams: Promise<{ page?: string; recherche?: string; tri?: string }>
 }) {
-  await synchroniserStatutsAbsences()
   const params = await searchParams
+  // Le même jour pour les compteurs et pour les lignes : rien n'est écrit en base, « dépassé »
+  // se calcule d'après la date de fin (voir statutEffectif).
+  const jour = aujourdhui()
   const page = Number(params.page ?? 1)
   const tri = params.tri === 'grade' || params.tri === 'statut' ? params.tri : undefined
 
   const [stats, effectifsSexe, effectifsType, { absences, totalPages }] = await Promise.all([
-    recupererStatsAbsences(),
+    recupererStatsAbsences(jour),
     recupererEffectifsAbsenceParGradeSexe(),
     recupererEffectifsParType(),
-    recupererAbsences({ page, recherche: params.recherche, tri }),
+    recupererAbsences({ page, recherche: params.recherche, tri, jour }),
   ])
 
   function construireLien(p: number) {

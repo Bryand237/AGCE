@@ -28,8 +28,11 @@ describe('verifierMotDePasse — identifiant inconnu', () => {
     await verifierMotDePasse('deux', undefined)
     await verifierMotDePasse('trois', undefined)
 
-    // Fabriquer un hash à chaque connexion doublerait le temps de réponse (hash puis compare).
-    expect(hacher.mock.calls.length).toBeLessThanOrEqual(1)
+    // `compare` passe lui-même par `bcrypt.hash` (avec le sel extrait du hash, une chaîne) : seuls
+    // les appels qui donnent un COÛT (un nombre) fabriquent un nouveau hash. Fabriquer un hash à
+    // chaque connexion doublerait le temps de réponse (hash puis compare).
+    const fabrications = hacher.mock.calls.filter(([, sel]) => typeof sel === 'number')
+    expect(fabrications.length).toBeLessThanOrEqual(1)
   })
 
   it('refuse toujours, quel que soit le mot de passe', async () => {
