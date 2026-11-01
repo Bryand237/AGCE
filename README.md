@@ -208,6 +208,25 @@ et qu'aucun ne porte l'identifiant initial, le script refuse et ne modifie rien.
 ni adresse e-mail ni « mot de passe oublié » par courriel : l'application est utilisée sur un poste,
 et qui a accès au dossier de l'application et à son `.env` a déjà accès à la base.
 
+### Page de connexion : essais limités, sessions
+
+- **5 essais par identifiant, puis 5 minutes d'attente.** À partir du sixième essai en cinq
+  minutes, la page répond « Trop de tentatives de connexion. Réessayez dans N minutes. » même avec
+  le bon mot de passe. Le blocage s'arrête de lui-même quand le plus ancien essai a plus de cinq
+  minutes ; une connexion réussie remet le compteur à zéro. Redémarrer l'application (`Ctrl+C`
+  puis `npm run dev`) le remet aussi à zéro : le compteur est en mémoire, rien n'est écrit dans la
+  base.
+- La limite porte sur l'**identifiant** (« MBALA » et « mbala » comptent ensemble), pas sur
+  l'adresse du poste : derrière une passerelle, tous les postes ont la même. Quelqu'un qui connaît
+  l'identifiant peut donc le bloquer cinq minutes en se trompant exprès, sans pouvoir deviner le
+  mot de passe pour autant. Un identifiant qui n'existe pas est limité de la même façon : le
+  blocage ne révèle pas quels comptes existent.
+- Un identifiant inconnu et un mauvais mot de passe reçoivent la même réponse (« Identifiants
+  incorrects. ») **et prennent le même temps** : le mot de passe est comparé dans les deux cas.
+- **« Rester connecté 30 jours »** : case de la page de connexion, décochée par défaut. Décochée,
+  la session dure 12 heures. À ne cocher que sur un ordinateur que l'on est seul à utiliser.
+- Les **sessions expirées** sont supprimées de la base à chaque connexion réussie.
+
 ### Cookie de session : HTTP ou HTTPS
 
 Le cookie de connexion est marqué « Secure » **en production** (`NODE_ENV=production`) : le

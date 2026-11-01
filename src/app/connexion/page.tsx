@@ -1,3 +1,4 @@
+import { Alerte } from '@/components/ui/alerte'
 import { FormulaireConnexion } from './formulaire-connexion'
 
 export default async function PageConnexion({
@@ -20,10 +21,10 @@ export default async function PageConnexion({
           </div>
         </div>
         {initiaux && (
-          <p className="mb-4 rounded-xl bg-primary/10 p-3 text-sm text-primary">
+          <Alerte ton="info" className="mb-4">
             Identifiants initiaux rétablis : connectez-vous avec l&apos;identifiant et le mot de
             passe du fichier <code>.env</code> (ADMIN_USERNAME, ADMIN_PASSWORD).
-          </p>
+          </Alerte>
         )}
         <FormulaireConnexion />
         <details className="mt-6 text-sm text-muted-foreground">
@@ -32,7 +33,8 @@ export default async function PageConnexion({
             Dans un terminal, depuis le dossier de l&apos;application, lancez{' '}
             <code className="rounded bg-muted px-1.5 py-0.5">npm run admin:reset</code> : le compte
             reprend l&apos;identifiant et le mot de passe du fichier <code>.env</code>. Les données
-            ne sont pas touchées.
+            ne sont pas touchées. Après cinq essais manqués, la connexion est suspendue cinq
+            minutes pour cet identifiant.
           </p>
         </details>
       </div>
