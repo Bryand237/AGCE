@@ -16,7 +16,7 @@ export default async function DetailEtablissement({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ page?: string; photo?: string }>
+  searchParams: Promise<{ page?: string }>
 }) {
   const { id } = await params
   const sp = await searchParams
@@ -41,16 +41,6 @@ export default async function DetailEtablissement({
         <ArrowLeft size={16} />
         Retour à la liste
       </Link>
-
-      {sp.photo === 'echec' && (
-        <div
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
-          role="alert"
-        >
-          Les informations sont enregistrées, mais l&apos;image n&apos;a pas pu l&apos;être. Ouvrez
-          « Modifier » pour la renvoyer.
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Zone gauche — carte établissement */}

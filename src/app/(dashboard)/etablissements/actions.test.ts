@@ -105,7 +105,7 @@ describe('actions établissements : erreurs de la base', () => {
 
     it('revient à la liste après une création sans image', async () => {
       await expect(creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT))).rejects.toThrow(
-        'NEXT_REDIRECT /etablissements'
+        'NEXT_REDIRECT /etablissements?msg=etablissement_cree'
       )
     })
 
@@ -113,7 +113,7 @@ describe('actions établissements : erreurs de la base', () => {
       fsFactice.writeFile.mockRejectedValue(new Error('EACCES'))
 
       await expect(creerEtablissement({}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))).rejects.toThrow(
-        'NEXT_REDIRECT /etablissements/etab-1?photo=echec'
+        'NEXT_REDIRECT /etablissements/etab-1?msg=image_etablissement_echec'
       )
       expect(prismaFactice.etablissement.create).toHaveBeenCalledTimes(1)
     })
@@ -142,13 +142,13 @@ describe('actions établissements : erreurs de la base', () => {
 
       await expect(
         modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))
-      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?photo=echec')
+      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?msg=image_etablissement_echec')
     })
 
     it('ouvre la fiche après une modification réussie', async () => {
       await expect(
         modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT))
-      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1')
+      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?msg=etablissement_modifie')
     })
   })
 
@@ -164,7 +164,7 @@ describe('actions établissements : erreurs de la base', () => {
 
     it('retourne à la liste après la suppression', async () => {
       await expect(supprimerEtablissement('etab-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /etablissements'
+        'NEXT_REDIRECT /etablissements?msg=etablissement_supprime'
       )
     })
 
@@ -172,7 +172,7 @@ describe('actions établissements : erreurs de la base', () => {
       prismaFactice.etablissement.delete.mockRejectedValue(erreurPrisma('P2025'))
 
       await expect(supprimerEtablissement('etab-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /etablissements'
+        'NEXT_REDIRECT /etablissements?msg=etablissement_supprime'
       )
     })
 
@@ -365,7 +365,7 @@ describe('actions établissements : photos téléversées', () => {
 
       await expect(
         modifierEtablissement('etab-1', {}, formulaire(SAISIE_ETABLISSEMENT, PHOTO))
-      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?photo=echec')
+      ).rejects.toThrow('NEXT_REDIRECT /etablissements/etab-1?msg=image_etablissement_echec')
 
       expect(prismaFactice.etablissement.update).not.toHaveBeenCalledWith({
         where: { id: 'etab-1' },

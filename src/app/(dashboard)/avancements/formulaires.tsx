@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useActionState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { useActionConservee } from '@/lib/action-conservee'
@@ -58,7 +59,7 @@ export function FormulaireMetadonneesSession({
   // La page reste affichée après l'enregistrement : le formulaire garde la saisie, qui est la
   // valeur enregistrée, et ne revient pas à l'ancienne quand le serveur refuse une date.
   const [state, surEnvoi, isPending] = useActionConservee(
-    mettreAJourMetadonneesSession.bind(null, rapportId),
+    useReussiteNotifiee(mettreAJourMetadonneesSession.bind(null, rapportId)),
     etatInitial
   )
   const manquantes = metadonneesManquantes(metadonnees)
@@ -146,11 +147,7 @@ export function FormulaireMetadonneesSession({
           <p className="text-destructive text-sm">{state.errors.dateSignatureDecisions[0]}</p>
         )}
       </label>
-      {state.message && (
-        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
-          {state.message}
-        </p>
-      )}
+      {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : 'Enregistrer les métadonnées'}
       </button>
@@ -194,7 +191,7 @@ export function FormulaireAjouterEnseignant({
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Ajout...' : 'Ajouter'}
       </button>
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
     </form>
   )
 }
@@ -210,7 +207,7 @@ export function FormulaireModifierRapport({
   // enregistrée) au lieu de revenir à l'ancienne, ce qui ferait renvoyer l'ancienne période
   // par le bouton « Enregistrer quand même ».
   const [state, surEnvoi, isPending] = useActionConservee(
-    mettreAJourRapport.bind(null, rapport.id),
+    useReussiteNotifiee(mettreAJourRapport.bind(null, rapport.id)),
     etatInitial
   )
 
@@ -248,11 +245,7 @@ export function FormulaireModifierRapport({
           ? 'La fin de période est la date d’effet des avancements de ce rapport. La modifier reporte la nouvelle date sur l’historique et sur les fiches des enseignants, tant qu’aucune décision n’a été générée et que chacun occupe encore la position issue du rapport.'
           : 'Modifier la période ne recalcule pas la liste des enseignants déjà sélectionnés : vérifiez-la ensuite.'}
       </p>
-      {state.message && (
-        <p className={`text-sm ${state.succes ? 'text-muted-foreground' : 'text-destructive'}`}>
-          {state.message}
-        </p>
-      )}
+      {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
           {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
@@ -296,7 +289,7 @@ export function FormulaireModifierSelection({
   grille: LigneGrille[]
 }) {
   const [state, formAction, isPending] = useActionState(
-    modifierSelection.bind(null, rapportId, selectionId),
+    useReussiteNotifiee(modifierSelection.bind(null, rapportId, selectionId)),
     etatInitial
   )
 
@@ -337,7 +330,7 @@ export function FormulaireModifierSelection({
         <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
           {isPending ? 'Modification…' : 'Mettre à jour'}
         </button>
-        {state.message && <p className="text-muted-foreground text-sm">{state.message}</p>}
+        {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
       </div>
     </form>
   )
@@ -476,7 +469,7 @@ export function BlocValiderOuRejeter({
               className={classeChamp}
             />
           </label>
-          {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+          {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
           {state.exclusions && state.exclusions.length > 0 && (
             <ul className="border-border bg-muted/30 flex flex-col gap-1 rounded-lg border p-3 text-sm">
               {state.exclusions.map((exclusion) => (

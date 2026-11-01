@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Image from 'next/image'
 import { Trash2 } from 'lucide-react'
 import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import {
   creerEtablissement,
@@ -101,7 +102,7 @@ export function FormulaireEtablissement({
         )}
       </label>
 
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
 
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : action === 'creer' ? 'Créer' : 'Enregistrer'}
@@ -111,7 +112,10 @@ export function FormulaireEtablissement({
 }
 
 export function FormulaireDepartement({ etablissementId }: { etablissementId: string }) {
-  const [state, formAction, isPending] = useActionState(creerDepartement, etatInitial)
+  const [state, formAction, isPending] = useActionState(
+    useReussiteNotifiee(creerDepartement),
+    etatInitial
+  )
 
   return (
     <form action={formAction} className={classeFormulaire}>
@@ -132,11 +136,7 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
         )}
       </label>
 
-      {state.message && (
-        <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
-          {state.message}
-        </p>
-      )}
+      {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
 
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Ajout...' : 'Ajouter le département'}

@@ -105,7 +105,9 @@ describe('actions absences : erreurs de la base', () => {
       })
 
     it('ouvre la fiche de l’absence créée', async () => {
-      await expect(creerAbsence({}, saisie())).rejects.toThrow('NEXT_REDIRECT /absences/abs-1')
+      await expect(creerAbsence({}, saisie())).rejects.toThrow(
+        'NEXT_REDIRECT /absences/abs-1?msg=absence_creee'
+      )
     })
 
     it('enregistre l’établissement d’accueil et l’objet d’une mission dans le motif', async () => {
@@ -121,7 +123,7 @@ describe('actions absences : erreurs de la base', () => {
             objetMission: 'Jury de soutenance de thèses',
           })
         )
-      ).rejects.toThrow('NEXT_REDIRECT /absences/abs-1')
+      ).rejects.toThrow('NEXT_REDIRECT /absences/abs-1?msg=absence_creee')
 
       expect(prismaFactice.absence.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ type: 'MISSION', motif: MOTIF_MISSION }),
@@ -489,7 +491,7 @@ describe('actions absences : erreurs de la base', () => {
   describe('supprimerAbsence', () => {
     it('retourne à la liste après la suppression', async () => {
       await expect(supprimerAbsence('abs-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /absences'
+        'NEXT_REDIRECT /absences?msg=absence_supprimee'
       )
       expect(prismaFactice.absence.delete).toHaveBeenCalledWith({ where: { id: 'abs-1' } })
     })
@@ -498,7 +500,7 @@ describe('actions absences : erreurs de la base', () => {
       prismaFactice.absence.findUnique.mockResolvedValue(null)
 
       await expect(supprimerAbsence('abs-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /absences'
+        'NEXT_REDIRECT /absences?msg=absence_supprimee'
       )
       expect(prismaFactice.absence.delete).not.toHaveBeenCalled()
     })
@@ -507,7 +509,7 @@ describe('actions absences : erreurs de la base', () => {
       prismaFactice.absence.delete.mockRejectedValue(erreurPrisma('P2025'))
 
       await expect(supprimerAbsence('abs-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /absences'
+        'NEXT_REDIRECT /absences?msg=absence_supprimee'
       )
     })
 
@@ -704,7 +706,7 @@ describe('actions absences : erreurs de la base', () => {
     it('un brouillon d’attestation peut encore être supprimé, une attestation signée jamais', async () => {
       absenceEn(CONGE_AVEC_BROUILLON)
       await expect(supprimerAbsence('abs-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /absences'
+        'NEXT_REDIRECT /absences?msg=absence_supprimee'
       )
       expect(prismaFactice.absence.delete).toHaveBeenCalledTimes(1)
     })

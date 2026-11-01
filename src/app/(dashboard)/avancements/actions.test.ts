@@ -103,7 +103,7 @@ describe('supprimerRapport', () => {
     prismaFactice.sessionConseil.findUnique.mockResolvedValue(rapportBrouillon())
 
     await expect(supprimerRapport(RAPPORT, {}, new FormData())).rejects.toThrow(
-      'NEXT_REDIRECT /avancements'
+      'NEXT_REDIRECT /avancements?msg=rapport_supprime'
     )
 
     expect(prismaFactice.$transaction).toHaveBeenCalledTimes(1)
@@ -480,7 +480,7 @@ describe('écritures de la position : le grade suit', () => {
     })
 
     await expect(supprimerRapport(RAPPORT, {}, new FormData())).rejects.toThrow(
-      'NEXT_REDIRECT /avancements'
+      'NEXT_REDIRECT /avancements?msg=rapport_supprime'
     )
 
     expect(tx.enseignant.update).toHaveBeenCalledWith({
@@ -555,7 +555,9 @@ describe('validerRapport : sélections périmées', () => {
   it('valide tout le monde quand les sélections sont d’actualité, grade compris', async () => {
     rapportAvec([selectionAValider(1), selectionAValider(2)])
 
-    await expect(valider()).rejects.toThrow(`NEXT_REDIRECT /avancements/${RAPPORT}`)
+    await expect(valider()).rejects.toThrow(
+      `NEXT_REDIRECT /avancements/${RAPPORT}?msg=rapport_valide`
+    )
 
     expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(2)
     expect(tx.enseignant.update).toHaveBeenCalledWith({
@@ -611,7 +613,7 @@ describe('validerRapport : sélections périmées', () => {
     rapportAvec([selectionAValider(1), selectionAValider(2, { statut: 'TRANSFERE' })])
 
     await expect(valider({ exclusionsConfirmees: 'ens-2' })).rejects.toThrow(
-      `NEXT_REDIRECT /avancements/${RAPPORT}`
+      `NEXT_REDIRECT /avancements/${RAPPORT}?msg=rapport_valide`
     )
 
     expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(1)
@@ -699,7 +701,7 @@ describe('creerRapport : brouillon sur la même période', () => {
 
   it('crée le rapport sans avertissement quand aucun brouillon ne chevauche la période', async () => {
     await expect(creerRapport({}, donnees(PERIODE))).rejects.toThrow(
-      'NEXT_REDIRECT /avancements/r-nouveau'
+      'NEXT_REDIRECT /avancements/r-nouveau?msg=rapport_cree'
     )
 
     expect(prismaFactice.sessionConseil.create).toHaveBeenCalledTimes(1)
@@ -748,7 +750,7 @@ describe('creerRapport : brouillon sur la même période', () => {
 
     await expect(
       creerRapport({}, donnees({ ...PERIODE, confirmerChevauchement: 'oui' }))
-    ).rejects.toThrow('NEXT_REDIRECT /avancements/r-nouveau')
+    ).rejects.toThrow('NEXT_REDIRECT /avancements/r-nouveau?msg=rapport_cree')
 
     expect(prismaFactice.sessionConseil.findMany).not.toHaveBeenCalled()
     expect(prismaFactice.sessionConseil.create).toHaveBeenCalledTimes(1)

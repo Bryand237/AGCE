@@ -7,6 +7,7 @@ import { exigerUtilisateur } from '@/lib/auth'
 import { analyserErreur, messageErreur } from '@/lib/erreurs'
 import { EtablissementSchema, DepartementSchema } from '@/lib/validations/etablissement'
 import { enregistrerImage, lireImageTeleversee, supprimerImage } from '@/lib/televersement'
+import { avecMessage } from '@/lib/messages-flash'
 
 export type EtatFormulaire = {
   errors?: Record<string, string[]>
@@ -67,8 +68,12 @@ export async function creerEtablissement(
   }
 
   revalidatePath('/etablissements')
-  // Image en échec : la fiche signale que l'image est à renvoyer (bandeau « photo=echec »).
-  redirect(photoEnregistree ? '/etablissements' : `/etablissements/${etablissementId}?photo=echec`)
+  // Image en échec : la fiche s'ouvre avec l'avertissement « image à renvoyer ».
+  redirect(
+    photoEnregistree
+      ? avecMessage('/etablissements', 'etablissement_cree')
+      : avecMessage(`/etablissements/${etablissementId}`, 'image_etablissement_echec')
+  )
 }
 
 export async function modifierEtablissement(
@@ -126,7 +131,12 @@ export async function modifierEtablissement(
   }
 
   revalidatePath('/etablissements')
-  redirect(photoEnregistree ? `/etablissements/${id}` : `/etablissements/${id}?photo=echec`)
+  redirect(
+    avecMessage(
+      `/etablissements/${id}`,
+      photoEnregistree ? 'etablissement_modifie' : 'image_etablissement_echec'
+    )
+  )
 }
 
 export async function supprimerEtablissement(
@@ -156,7 +166,7 @@ export async function supprimerEtablissement(
     }
   }
   revalidatePath('/etablissements')
-  redirect('/etablissements')
+  redirect(avecMessage('/etablissements', 'etablissement_supprime'))
 }
 
 export async function creerDepartement(

@@ -161,14 +161,16 @@ describe('actions enseignants : erreurs de la base', () => {
     })
 
     it('revient à la liste après une création sans photo', async () => {
-      await expect(creerEnseignant({}, formulaire())).rejects.toThrow('NEXT_REDIRECT /enseignants')
+      await expect(creerEnseignant({}, formulaire())).rejects.toThrow(
+        'NEXT_REDIRECT /enseignants?msg=enseignant_cree'
+      )
     })
 
     it('quitte le formulaire vers la fiche quand la photo échoue, sans second enregistrement possible', async () => {
       fsFactice.writeFile.mockRejectedValue(new Error('EACCES'))
 
       await expect(creerEnseignant({}, formulaire(SAISIE, PHOTO))).rejects.toThrow(
-        'NEXT_REDIRECT /enseignants/ens-1?photo=echec'
+        'NEXT_REDIRECT /enseignants/ens-1?msg=photo_enseignant_echec'
       )
       expect(prismaFactice.enseignant.create).toHaveBeenCalledTimes(1)
       expect(erreurConsole).toHaveBeenCalled()
@@ -176,7 +178,7 @@ describe('actions enseignants : erreurs de la base', () => {
 
     it('revient à la liste quand la photo est enregistrée', async () => {
       await expect(creerEnseignant({}, formulaire(SAISIE, PHOTO))).rejects.toThrow(
-        'NEXT_REDIRECT /enseignants'
+        'NEXT_REDIRECT /enseignants?msg=enseignant_cree'
       )
       expect(prismaFactice.enseignant.update).toHaveBeenCalledWith({
         where: { id: 'ens-1' },
@@ -217,7 +219,7 @@ describe('actions enseignants : erreurs de la base', () => {
       fsFactice.writeFile.mockRejectedValue(new Error('EACCES'))
 
       await expect(modifierEnseignant('ens-1', {}, formulaire(SAISIE, PHOTO))).rejects.toThrow(
-        'NEXT_REDIRECT /enseignants/ens-1?photo=echec'
+        'NEXT_REDIRECT /enseignants/ens-1?msg=photo_enseignant_echec'
       )
     })
 
@@ -246,7 +248,7 @@ describe('actions enseignants : erreurs de la base', () => {
 
     it('ouvre la fiche après une modification réussie', async () => {
       await expect(modifierEnseignant('ens-1', {}, formulaire())).rejects.toThrow(
-        'NEXT_REDIRECT /enseignants/ens-1'
+        'NEXT_REDIRECT /enseignants/ens-1?msg=enseignant_modifie'
       )
     })
   })
@@ -604,7 +606,7 @@ describe('actions enseignants : photos téléversées', () => {
       fsFactice.writeFile.mockRejectedValue(new Error('EACCES'))
 
       await expect(modifierEnseignant('ens-1', {}, formulaire(SAISIE, PHOTO))).rejects.toThrow(
-        'NEXT_REDIRECT /enseignants/ens-1?photo=echec'
+        'NEXT_REDIRECT /enseignants/ens-1?msg=photo_enseignant_echec'
       )
 
       expect(prismaFactice.enseignant.update).not.toHaveBeenCalledWith({

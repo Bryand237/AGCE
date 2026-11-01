@@ -103,6 +103,17 @@ ne ferme pas la fenêtre. Pour une signature ou une validation, `recapitulatif` 
 l'utilisateur ce qu'il vient de saisir (date, numéro, auteur) : c'est le dernier moment pour voir
 une faute de frappe qu'on ne pourra plus corriger. Jamais de mot de passe dans un récapitulatif.
 
+**Annoncer une réussite.** Le texte de la réussite vient toujours du serveur, jamais d'un
+paragraphe écrit dans le formulaire (il disparaît avec lui quand la page change) :
+
+- l'action se termine par `redirect()` : `redirect(avecMessage('/absences', 'absence_supprimee'))`.
+  Le code est ajouté à l'adresse (`?msg=…`) et son texte se trouve dans `lib/messages-flash.ts` ;
+  jamais de texte libre dans l'adresse. Ajouter un message = ajouter une ligne à ce tableau ;
+- l'action reste sur la page : elle renvoie `{ message, succes: true }` et le formulaire enveloppe
+  l'action dans `useReussiteNotifiee(…)` (voir `notifications.tsx`).
+
+Dans les deux cas, le formulaire n'affiche lui-même que les échecs (`<Alerte ton="erreur">`).
+
 **Ne pas empiler les avertissements.** Une action courante qui se défait facilement n'a pas besoin
 de confirmation : à force de demander, on obtient des clics machinaux, y compris sur les
 questions qui comptent.

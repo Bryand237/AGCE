@@ -1,5 +1,7 @@
 'use client'
 
+import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useActionState } from 'react'
 import { genererDecision, validerDecision, type EtatFormulaire } from '../../actions'
 import { useConfirmation } from '@/components/ui/confirmation'
@@ -20,11 +22,11 @@ export function BlocDecision({
   numeroDecision: string | null
 }) {
   const [etatGeneration, formActionGenerer, enGeneration] = useActionState(
-    genererDecision.bind(null, avancementId),
+    useReussiteNotifiee(genererDecision.bind(null, avancementId)),
     etatInitial
   )
   const [state, formActionValider, isPending] = useActionState(
-    validerDecision.bind(null, avancementId),
+    useReussiteNotifiee(validerDecision.bind(null, avancementId)),
     etatInitial
   )
   // Une décision signée porte son numéro et sa date : elle ne peut plus être régénérée.
@@ -78,12 +80,8 @@ export function BlocDecision({
               {enGeneration ? 'Génération...' : 'Régénérer le brouillon'}
             </button>
           </form>
-          {etatGeneration.message && (
-            <p
-              className={`text-sm ${etatGeneration.succes ? 'text-muted-foreground' : 'text-destructive'}`}
-            >
-              {etatGeneration.message}
-            </p>
+          {etatGeneration.message && !etatGeneration.succes && (
+            <Alerte ton="erreur">{etatGeneration.message}</Alerte>
           )}
         </div>
         <form
@@ -103,7 +101,7 @@ export function BlocDecision({
             Auteur de la validation
             <input name="auteurValidation" required className={classeChamp} />
           </label>
-          {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+          {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
           <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
             {isPending ? 'Enregistrement...' : 'Marquer signée'}
           </button>

@@ -1,7 +1,9 @@
 'use client'
 
 import { useActionState } from 'react'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { modifierIdentifiants, retablirIdentifiantsInitiaux, type EtatFormulaire } from './actions'
+import { Alerte } from '@/components/ui/alerte'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { classeBoutonDanger, classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
@@ -12,18 +14,20 @@ function Erreur({ state, champ }: { state: EtatFormulaire; champ: string }) {
   return message ? <p className="text-destructive text-sm">{message}</p> : null
 }
 
-/** Le message général : seulement quand aucun champ n'affiche déjà l'erreur. */
+/**
+ * Le message général d'échec : seulement quand aucun champ n'affiche déjà l'erreur. La réussite
+ * est annoncée par une notification (voir `useReussiteNotifiee`).
+ */
 function Message({ state }: { state: EtatFormulaire }) {
-  if (!state.message || state.errors) return null
-  return (
-    <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
-      {state.message}
-    </p>
-  )
+  if (!state.message || state.errors || state.succes) return null
+  return <Alerte ton="erreur">{state.message}</Alerte>
 }
 
 export function FormulaireIdentifiants({ nomUtilisateur }: { nomUtilisateur: string }) {
-  const [state, formAction, isPending] = useActionState(modifierIdentifiants, etatInitial)
+  const [state, formAction, isPending] = useActionState(
+    useReussiteNotifiee(modifierIdentifiants),
+    etatInitial
+  )
   return (
     // `key` : après un changement d'identifiant, le champ repart de la nouvelle valeur.
     <form key={nomUtilisateur} action={formAction} className="flex flex-col gap-4">

@@ -9,6 +9,7 @@ import { EnseignantSchema, TransfertSchema, RetraiteSchema } from '@/lib/validat
 import { erreurFinDeService } from '@/domain/enseignants/finDeService'
 import { erreurChangementStatut, type ChangementStatut } from '@/domain/enseignants/statut'
 import { enregistrerImage, lireImageTeleversee, supprimerImage } from '@/lib/televersement'
+import { avecMessage } from '@/lib/messages-flash'
 
 export type EtatFormulaire = {
   errors?: Record<string, string[]>
@@ -88,8 +89,12 @@ export async function creerEnseignant(
   }
 
   revalidatePath('/enseignants')
-  // Photo en échec : la fiche signale que la photo est à renvoyer (bandeau « photo=echec »).
-  redirect(photoEnregistree ? '/enseignants' : `/enseignants/${enseignantId}?photo=echec`)
+  // Photo en échec : la fiche s'ouvre avec l'avertissement « photo à renvoyer ».
+  redirect(
+    photoEnregistree
+      ? avecMessage('/enseignants', 'enseignant_cree')
+      : avecMessage(`/enseignants/${enseignantId}`, 'photo_enseignant_echec')
+  )
 }
 
 export async function modifierEnseignant(
@@ -156,7 +161,12 @@ export async function modifierEnseignant(
   }
 
   revalidatePath('/enseignants')
-  redirect(photoEnregistree ? `/enseignants/${id}` : `/enseignants/${id}?photo=echec`)
+  redirect(
+    avecMessage(
+      `/enseignants/${id}`,
+      photoEnregistree ? 'enseignant_modifie' : 'photo_enseignant_echec'
+    )
+  )
 }
 
 /**

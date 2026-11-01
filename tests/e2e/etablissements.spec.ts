@@ -13,6 +13,8 @@ test.describe('Établissements', () => {
     await page.getByLabel(/type/i).selectOption('ECOLE')
     await page.getByRole('button', { name: /enregistrer|créer/i }).click()
 
+    // L'action redirige avec un message (?msg=…) : la notification s'affiche, puis l'adresse est nettoyée.
+    await expect(page.getByText('Établissement ajouté.')).toBeVisible()
     await expect(page).toHaveURL('/etablissements')
     await page.getByPlaceholder(/rechercher/i).fill('ETPW')
     await page.getByRole('button', { name: /rechercher/i }).click()

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { exigerUtilisateur } from '@/lib/auth'
+import { avecMessage } from '@/lib/messages-flash'
 import { calculerProchainEchelon } from '@/domain/avancement/calculerProchainEchelon'
 import { proposerCandidats } from '@/domain/avancement/eligibilite'
 import { avertissementChevauchement } from '@/domain/avancement/chevauchement'
@@ -145,7 +146,7 @@ export async function creerRapport(
   })
 
   revalidatePath('/avancements')
-  redirect(`/avancements/${rapport.id}`)
+  redirect(avecMessage(`/avancements/${rapport.id}`, 'rapport_cree'))
 }
 
 export async function ajouterSelection(
@@ -416,7 +417,7 @@ export async function modifierSelection(
   })
 
   revalidatePath(`/avancements/${rapportId}`)
-  return { message: 'Position proposée mise à jour.' }
+  return { message: 'Position proposée mise à jour.', succes: true }
 }
 
 export async function retirerSelection(rapportId: string, enseignantId: string): Promise<void> {
@@ -514,7 +515,7 @@ export async function supprimerRapport(
   }
 
   revalidatePath('/avancements')
-  redirect('/avancements')
+  redirect(avecMessage('/avancements', 'rapport_supprime'))
 }
 
 export async function rejeterRapport(rapportId: string, formData: FormData): Promise<void> {
@@ -621,7 +622,7 @@ export async function validerRapport(
   if (refus) return refus
 
   revalidatePath('/avancements')
-  redirect(`/avancements/${rapportId}`)
+  redirect(avecMessage(`/avancements/${rapportId}`, 'rapport_valide'))
 }
 
 export async function genererDecision(
@@ -692,5 +693,5 @@ export async function validerDecision(
   })
   revalidatePath(`/avancements/${avancement.sessionId}/${avancementId}`)
   revalidatePath('/avancements')
-  return { message: 'Décision signée et régénérée.' }
+  return { message: 'Décision signée et régénérée.', succes: true }
 }

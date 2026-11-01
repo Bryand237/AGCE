@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import {
@@ -23,7 +24,7 @@ export function FormulaireTransfert({
   nomComplet?: string
 }) {
   const [state, formAction, isPending] = useActionState(
-    marquerTransfere.bind(null, enseignantId),
+    useReussiteNotifiee(marquerTransfere.bind(null, enseignantId)),
     etatInitial
   )
   const confirmation = useConfirmation({
@@ -73,7 +74,7 @@ export function FormulaireTransfert({
             <p className="text-destructive text-sm">{state.errors.lieuTransfert[0]}</p>
           )}
         </label>
-        {state.message && <Alerte ton={state.succes ? 'succes' : 'erreur'}>{state.message}</Alerte>}
+        {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
         <button
           type="submit"
           disabled={isPending}
@@ -98,7 +99,7 @@ export function FormulaireRetraite({
   nomComplet?: string
 }) {
   const [state, formAction, isPending] = useActionState(
-    marquerRetraite.bind(null, enseignantId),
+    useReussiteNotifiee(marquerRetraite.bind(null, enseignantId)),
     etatInitial
   )
   const confirmation = useConfirmation({
@@ -146,7 +147,7 @@ export function FormulaireRetraite({
             <p className="text-destructive text-sm">{state.errors.dateFinService[0]}</p>
           )}
         </label>
-        {state.message && <Alerte ton={state.succes ? 'succes' : 'erreur'}>{state.message}</Alerte>}
+        {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
         <button
           type="submit"
           disabled={isPending}
@@ -169,7 +170,7 @@ export function BoutonReactiver({
   nomComplet?: string
 }) {
   const [state, formAction, isPending] = useActionState(
-    reactiverEnseignant.bind(null, enseignantId),
+    useReussiteNotifiee(reactiverEnseignant.bind(null, enseignantId)),
     etatInitial
   )
   const confirmation = useConfirmation({
@@ -184,8 +185,8 @@ export function BoutonReactiver({
   return (
     <>
       <form action={formAction} onSubmit={confirmation.surEnvoi}>
-        {state.message && (
-          <Alerte ton={state.succes ? 'succes' : 'erreur'} className="mb-3">
+        {state.message && !state.succes && (
+          <Alerte ton="erreur" className="mb-3">
             {state.message}
           </Alerte>
         )}

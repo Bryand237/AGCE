@@ -11,6 +11,7 @@ import {
   RetourAbsenceSchema,
 } from '@/lib/validations/absence'
 import { erreursDeSaisie } from '@/lib/validations/champs'
+import { avecMessage } from '@/lib/messages-flash'
 import { calculerFinCongeMaternite } from '@/domain/absences/calculerFinCongeMaternite'
 import { erreurDateRetour } from '@/domain/absences/retourAbsence'
 import { erreurEtapeAbsence, type EtapeAbsence } from '@/domain/absences/etapesAbsence'
@@ -145,7 +146,7 @@ export async function creerAbsence(
   }
 
   revalidatePath('/absences')
-  redirect(`/absences/${absenceId}`)
+  redirect(avecMessage(`/absences/${absenceId}`, 'absence_creee'))
 }
 
 export async function validerAbsence(
@@ -266,7 +267,7 @@ export async function supprimerAbsence(
     }
   }
   revalidatePath('/absences')
-  redirect('/absences')
+  redirect(avecMessage('/absences', 'absence_supprimee'))
 }
 
 export async function genererAttestation(

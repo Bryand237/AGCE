@@ -12,6 +12,7 @@ import {
   type EtatFormulaire,
 } from './actions'
 import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { classeBoutonPrimaire, classeChamp, classeFormulaire } from '@/lib/ui-classes'
@@ -59,7 +60,7 @@ export function FormulaireValidationAbsence({
           </label>
         </>
       )}
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Validation...' : 'Valider'}
       </button>
@@ -102,7 +103,7 @@ export function FormulaireTerminerAbsence({
           Date de retour
           <input type="date" name="dateRetour" required className={classeChamp} />
         </label>
-        {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+        {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
         <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
           {isPending ? 'Enregistrement...' : 'Marquer terminé'}
         </button>
@@ -165,7 +166,7 @@ export function FormulaireModifierAbsence({
           <textarea name="motif" rows={3} defaultValue={motif ?? ''} className={classeChamp} />
         </label>
       )}
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : 'Enregistrer'}
       </button>
@@ -200,11 +201,11 @@ export function BlocAttestationAbsence({
   raisonGeneration?: string | null
 }) {
   const [etatGenerer, formActionGenerer, isPendingGenerer] = useActionState(
-    genererAttestation.bind(null, absenceId),
+    useReussiteNotifiee(genererAttestation.bind(null, absenceId)),
     etatInitial
   )
   const [state, formActionValider, isPending] = useActionState(
-    validerAttestation.bind(null, absenceId),
+    useReussiteNotifiee(validerAttestation.bind(null, absenceId)),
     etatInitial
   )
   // Une attestation signée fige l'absence : ni suppression, ni changement de dates ensuite.
@@ -232,10 +233,8 @@ export function BlocAttestationAbsence({
     if (raisonGeneration) return <p className="text-muted-foreground text-sm">{raisonGeneration}</p>
     return (
       <form action={formActionGenerer} className="flex flex-col gap-2">
-        {etatGenerer.message && (
-          <p className={`text-sm ${etatGenerer.succes ? 'text-primary' : 'text-destructive'}`}>
-            {etatGenerer.message}
-          </p>
+        {etatGenerer.message && !etatGenerer.succes && (
+          <Alerte ton="erreur">{etatGenerer.message}</Alerte>
         )}
         <button type="submit" disabled={isPendingGenerer} className={classeBoutonPrimaire}>
           {isPendingGenerer ? 'Génération...' : "Générer le brouillon d'attestation"}
@@ -281,11 +280,7 @@ export function BlocAttestationAbsence({
             Auteur de la validation
             <input name="auteurValidation" required className={classeChamp} />
           </label>
-          {state.message && (
-            <p className={`text-sm ${state.succes ? 'text-primary' : 'text-destructive'}`}>
-              {state.message}
-            </p>
-          )}
+          {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
           <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
             {isPending ? 'Enregistrement...' : 'Marquer signée'}
           </button>
