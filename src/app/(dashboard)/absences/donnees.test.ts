@@ -10,6 +10,7 @@ const { prismaFactice } = vi.hoisted(() => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    enseignant: { findMany: vi.fn() },
   },
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
@@ -18,6 +19,13 @@ const { recupererStatsAbsences, recupererAbsences } = await import('./donnees')
 
 const jour = (iso: string) => new Date(`${iso}T00:00:00.000Z`)
 const AUJOURDHUI = jour('2026-11-01')
+
+/** Les enseignants qui ont au moins une absence, tels que la recherche les lit. */
+const IDENTITES = [
+  { id: 'e-alice', nom: 'MBARGA', prenom: 'Alice Marie', matricule: '0652 125K' },
+  { id: 'e-nde', nom: 'NDÉ', prenom: 'Élise', matricule: 'B77' },
+  { id: 'e-mbala', nom: 'MBALA', prenom: 'Paul', matricule: 'C12' },
+]
 
 type Ligne = {
   id: string
@@ -277,13 +285,79 @@ describe('recupererAbsences', () => {
 
     it('applique la recherche aux deux lectures et ne modifie rien', async () => {
       simulerLaBase(melange)
+      prismaFactice.enseignant.findMany.mockResolvedValue(IDENTITES)
 
       await recupererAbsences({ tri: 'statut', recherche: 'mbala', jour: AUJOURDHUI })
 
       const premiere = prismaFactice.absence.findMany.mock.calls[0]![0]
-      expect(premiere.where.OR).toHaveLength(2)
+      expect(premiere.where).toEqual({ enseignantId: { in: ['e-mbala'] } })
       expect(prismaFactice.absence.update).not.toHaveBeenCalled()
       expect(prismaFactice.absence.updateMany).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('recherche libre — D6', () => {
+    beforeEach(() => {
+      prismaFactice.absence.count.mockResolvedValue(0)
+      prismaFactice.absence.findMany.mockResolvedValue([])
+      prismaFactice.enseignant.findMany.mockResolvedValue(IDENTITES)
+    })
+
+    /** Le filtre posé sur les absences : le même pour le total et pour la page. */
+    async function filtreDe(recherche: string | undefined) {
+      await recupererAbsences({ recherche, jour: AUJOURDHUI })
+      const duTotal = prismaFactice.absence.count.mock.calls[0]![0]!.where
+      const delaPage = prismaFactice.absence.findMany.mock.calls[0]![0]!.where
+      expect(delaPage).toEqual(duTotal)
+      return delaPage
+    }
+
+    it.each([
+      ['le nom', 'mbarga'],
+      ['le prénom', 'marie'],
+      ['le matricule', '125k'],
+      ['le matricule sans espace', '0652125K'],
+      ['le prénom puis le nom', 'Alice Mbarga'],
+      ['le nom puis le prénom', 'mbarga alice'],
+      ['des débuts de mots', 'MBA ali'],
+      ['sans tenir compte de la casse', 'MBARGA ALICE'],
+    ])('trouve l’enseignant par %s', async (_cas, recherche) => {
+      expect(await filtreDe(recherche)).toEqual({ enseignantId: { in: ['e-alice'] } })
+    })
+
+    it.each([
+      ['une saisie sans accent pour un nom accentué', 'nde', 'e-nde'],
+      ['une saisie accentuée pour un prénom accentué', 'ÉLISE', 'e-nde'],
+      ['une saisie sans accent pour un prénom accentué', 'elise nde', 'e-nde'],
+    ])('ignore les accents : %s', async (_cas, recherche, attendu) => {
+      expect(await filtreDe(recherche)).toEqual({ enseignantId: { in: [attendu] } })
+    })
+
+    it('exige que chaque mot se retrouve', async () => {
+      expect(await filtreDe('alice dupont')).toEqual({ enseignantId: { in: [] } })
+    })
+
+    it('garde tous les enseignants qui répondent, pas seulement le premier', async () => {
+      expect(await filtreDe('a')).toEqual({ enseignantId: { in: ['e-alice', 'e-mbala'] } })
+    })
+
+    it('ne lit que les enseignants qui ont au moins une absence', async () => {
+      await filtreDe('mbarga')
+
+      expect(prismaFactice.enseignant.findMany).toHaveBeenCalledWith({
+        where: { absences: { some: {} } },
+        select: { id: true, nom: true, prenom: true, matricule: true },
+      })
+    })
+
+    it.each([
+      ['absente', undefined],
+      ['vide', ''],
+      ['faite d’espaces', '   '],
+      ['faite de ponctuation', ' - . '],
+    ])('une recherche %s ne filtre rien et ne lit pas les enseignants', async (_cas, recherche) => {
+      expect(await filtreDe(recherche)).toEqual({})
+      expect(prismaFactice.enseignant.findMany).not.toHaveBeenCalled()
     })
   })
 })

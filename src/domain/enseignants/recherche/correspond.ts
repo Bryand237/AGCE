@@ -1,34 +1,25 @@
 import { debutDeJour } from '../../dates/jourCivil'
 import { dansPlage } from '../../dates/plage'
-import { motsNormalises, normaliserTexte } from '../../texte/normaliserTexte'
+import { contientTousLesMots } from '../../texte/contientTousLesMots'
 import type { DossierEnseignant } from '../dossier'
 import { critereEcheanceVide, plageDe } from './filtres'
 import type { CritereEcheance, FiltresEnseignants } from './filtres'
 import { correspondAuxAbsences } from './correspondAbsences'
+import { textesDIdentite } from './identite'
 import type { LigneRecherche } from './trier'
 
-/** Textes dans lesquels la recherche libre cherche chaque mot, sous leur forme de comparaison. */
-function textesRecherchables(dossier: DossierEnseignant): { champs: string[]; matricule: string } {
-  const matricule = normaliserTexte(dossier.matricule)
-  return {
-    champs: [
-      normaliserTexte(dossier.nom),
-      normaliserTexte(dossier.prenom),
-      matricule,
-      normaliserTexte(dossier.domaineRecherche ?? ''),
-      normaliserTexte(dossier.lieuNaissance),
-    ],
-    // « 0652125K » doit trouver « 0652 125K » : on cherche aussi dans le matricule sans espace.
-    matricule: matricule.replace(/ /g, ''),
-  }
-}
-
+/**
+ * La recherche libre de la liste des enseignants : l'identité (nom, prénom, matricule avec ou
+ * sans espace), le domaine de recherche et le lieu de naissance. Chaque mot de la saisie doit se
+ * retrouver quelque part : « Alice Mbarga » trouve Alice MBARGA. Même règle que la liste des
+ * absences, voir `contientTousLesMots`.
+ */
 function correspondALaRecherche(dossier: DossierEnseignant, recherche: string): boolean {
-  const mots = motsNormalises(recherche)
-  if (mots.length === 0) return true
-  const { champs, matricule } = textesRecherchables(dossier)
-  // Chaque mot doit se retrouver quelque part : « Alice Mbarga » trouve Alice MBARGA.
-  return mots.every((mot) => matricule.includes(mot) || champs.some((champ) => champ.includes(mot)))
+  return contientTousLesMots(recherche, [
+    ...textesDIdentite(dossier),
+    dossier.domaineRecherche ?? '',
+    dossier.lieuNaissance,
+  ])
 }
 
 /**

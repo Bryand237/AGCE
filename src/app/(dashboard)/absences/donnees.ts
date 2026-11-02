@@ -4,6 +4,8 @@ import { bornerPage } from '@/lib/pagination'
 import { effectifsParType } from '@/domain/absences/effectifsParType'
 import { RANG_STATUT, statutEffectif } from '@/domain/absences/statutEffectif'
 import { aujourdhui } from '@/domain/dates/jourCivil'
+import { identiteCorrespond } from '@/domain/enseignants/recherche/identite'
+import { recherchePeutRestreindre } from '@/domain/texte/contientTousLesMots'
 
 // Le statut « dépassé » n'est jamais écrit en base : il se déduit de la date de fin à chaque
 // lecture (voir statutEffectif). Une absence validée est « en période » ou « dépassée » selon que
@@ -71,6 +73,28 @@ const SELECTION_LISTE = {
 } as const
 
 /**
+ * Le filtre de la recherche libre : les absences des enseignants dont le nom, le prénom ou le
+ * matricule contient CHAQUE mot saisi, sans tenir compte de la casse ni des accents (voir
+ * contientTousLesMots). « Alice Mbarga », « mbarga alice » et « mba ali » trouvent les absences
+ * d'Alice MBARGA.
+ *
+ * La base ne sait comparer ni mots séparés ni accents (ILIKE ne les ignore pas) : on lit donc
+ * l'identité des seuls enseignants qui ont une absence (quelques centaines de lignes courtes),
+ * on les filtre avec la même règle que la liste des enseignants, et la requête des absences
+ * porte sur leurs identifiants. Aucune écriture, aucune extension de la base.
+ */
+async function filtreDeRecherche(recherche: string | undefined) {
+  const saisie = recherche ?? ''
+  if (!recherchePeutRestreindre(saisie)) return {}
+  const candidats = await prisma.enseignant.findMany({
+    where: { absences: { some: {} } },
+    select: { id: true, nom: true, prenom: true, matricule: true },
+  })
+  const ids = candidats.filter((e) => identiteCorrespond(e, saisie)).map((e) => e.id)
+  return { enseignantId: { in: ids } }
+}
+
+/**
  * Une page de la liste des absences. `page` est celle qu'on demande ; celle qui est renvoyée est
  * ramenée dans les limites (voir bornerPage). Le `statut` de chaque ligne est le statut EFFECTIF au jour
  * `jour` (voir statutEffectif), pas la valeur enregistrée : « Dépassé » apparaît dès que la fin
@@ -87,14 +111,7 @@ export async function recupererAbsences({
   tri?: 'grade' | 'statut'
   jour?: Date
 }) {
-  const where = recherche
-    ? {
-        OR: [
-          { enseignant: { nom: { contains: recherche, mode: 'insensitive' as const } } },
-          { enseignant: { matricule: { contains: recherche, mode: 'insensitive' as const } } },
-        ],
-      }
-    : {}
+  const where = await filtreDeRecherche(recherche)
 
   /**
    * Tri par statut EFFECTIF : la base ne peut pas trier sur une valeur calculée avec la date du

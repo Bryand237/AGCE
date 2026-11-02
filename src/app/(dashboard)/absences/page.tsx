@@ -119,7 +119,7 @@ export default async function PageAbsences({
           type="search"
           name="recherche"
           defaultValue={params.recherche}
-          placeholder="Rechercher par nom ou matricule..."
+          placeholder="Rechercher par nom, prénom ou matricule..."
           className="border-border bg-card focus:border-primary focus:ring-primary/20 min-w-[200px] flex-1 rounded-2xl border px-4 py-2.5 text-sm shadow-sm focus:ring-2 focus:outline-none"
         />
         <select

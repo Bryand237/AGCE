@@ -460,6 +460,30 @@ Deux tests (`src/app/pagination-des-pages.test.ts`) refusent le retour de `Numbe
 d'un `skip` calculé sans `bornerPage`. La liste des enseignants, elle, est filtrée et découpée en
 mémoire (`paginer`), avec la même règle.
 
+## Recherche dans les listes
+
+Le champ « Rechercher » des listes d'enseignants, d'absences et de rapports d'avancement suit une
+seule règle (`contientTousLesMots`, `src/domain/texte/`) : la saisie est découpée en mots, et
+**chaque mot doit se retrouver** dans l'un des textes de la ligne. L'ordre des mots ne compte pas,
+et un début de mot suffit : « Alice Mbarga », « mbarga alice » et « mba ali » trouvent tous
+Alice MBARGA. Casse, accents et ponctuation sont ignorés des deux côtés (« nde » trouve « NDÉ »,
+« 54eme » trouve « 54ème »). Une saisie vide, ou faite de ponctuation, ne filtre rien.
+
+- **Enseignants** : nom, prénom, matricule (avec ou sans espace), domaine de recherche, lieu de
+  naissance.
+- **Absences** : nom, prénom ou matricule de l'enseignant (`identiteCorrespond`). La base ne sait
+  comparer ni mots séparés ni accents : on lit l'identité des seuls enseignants qui ont une
+  absence, on les filtre avec la même règle, puis les absences sont lues par identifiant.
+- **Rapports d'avancement** : le numéro d'édition. Seule une date exacte `AAAA-MM-JJ` est lue
+  comme une date (les rapports dont la période contient ce jour) : « 54 », « 2026 » ou
+  « 2026-003 » étaient auparavant lus comme des dates par `new Date()` et ne trouvaient pas
+  l'édition.
+- **Établissements** : recherche sur le nom, par sous-chaîne (`contains`), sans ignorer les
+  accents. C'est la seule liste qui n'a pas encore la règle commune.
+
+Le test `src/app/recherche-des-pages.test.ts` refuse le retour de `contains: recherche` et de
+`new Date(recherche)` dans les lectures (l'établissement est une exception listée).
+
 ## Validation des saisies
 
 Chaque formulaire est validé côté serveur par un schéma zod
