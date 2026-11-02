@@ -484,6 +484,24 @@ Alice MBARGA. Casse, accents et ponctuation sont ignorés des deux côtés (« n
 Le test `src/app/recherche-des-pages.test.ts` refuse le retour de `contains: recherche` et de
 `new Date(recherche)` dans les lectures (l'établissement est une exception listée).
 
+## Transactions des rapports d'avancement
+
+Valider, modifier ou supprimer un rapport d'avancement écrit dans plusieurs tables à la fois : tout
+se fait dans une transaction, qui réussit en entier ou n'enregistre rien. Prisma annule par défaut
+une transaction au bout de **5 secondes**, requêtes comprises ; sur un rapport de plusieurs centaines
+de lignes, ou une base lente à répondre (premier démarrage, disque occupé), la validation pouvait
+échouer sur une page d'erreur.
+
+- **`OPTIONS_TRANSACTION`** (`src/lib/transactions.ts`) : 5 s d'attente d'une connexion libre, 30 s
+  de durée maximale. Chaque transaction interactive des actions la reçoit en second argument ;
+  `src/app/transactions-des-pages.test.ts` refuse une transaction qui l'oublie.
+- **Validation d'un rapport** : l'historique des avancements s'écrit en une seule requête
+  (`createMany`), et les enseignants écartés sont retirés du rapport en une seule requête ; seules
+  les fiches des enseignants, qui reçoivent chacune une position différente, s'écrivent une à une.
+- **Transaction expirée ou base en échec** : l'action répond par un message (« La validation a pris
+  trop de temps : rien n'a été modifié. Réessayez »), et non par une page d'erreur. Rien n'est
+  enregistré à moitié, le rapport reste un brouillon. La cause est écrite dans la console du serveur.
+
 ## Validation des saisies
 
 Chaque formulaire est validé côté serveur par un schéma zod

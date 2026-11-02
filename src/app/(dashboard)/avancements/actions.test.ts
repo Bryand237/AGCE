@@ -27,6 +27,7 @@ const { exigerUtilisateur, genererDecisionFactice, journal, prismaFactice, tx } 
       update: vi.fn(),
       updateMany: tracer('historique.updateMany'),
       create: vi.fn(),
+      createMany: vi.fn(),
       findFirst: vi.fn(),
     },
     sessionConseil: {
@@ -539,9 +540,9 @@ describe('validerRapport : sélections périmées', () => {
 
   /** Rien n'a été écrit : ni avancement, ni fiche, ni retrait de sélection, ni validation. */
   function rienNEstEcrit() {
-    expect(tx.historiqueAvancement.create).not.toHaveBeenCalled()
+    expect(tx.historiqueAvancement.createMany).not.toHaveBeenCalled()
     expect(tx.enseignant.update).not.toHaveBeenCalled()
-    expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
+    expect(tx.selectionAvancement.deleteMany).not.toHaveBeenCalled()
     expect(tx.sessionConseil.update).not.toHaveBeenCalled()
   }
 
@@ -559,12 +560,22 @@ describe('validerRapport : sélections périmées', () => {
       `NEXT_REDIRECT /avancements/${RAPPORT}?msg=rapport_valide`
     )
 
-    expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(2)
+    expect(tx.historiqueAvancement.createMany).toHaveBeenCalledTimes(1)
+    expect(tx.historiqueAvancement.createMany).toHaveBeenCalledWith({
+      data: [1, 2].map((n) => ({
+        enseignantId: `ens-${n}`,
+        sessionId: RAPPORT,
+        anciennePositionId: A2.id,
+        dateAncienEffet: ANCIEN_EFFET,
+        nouvellePositionId: A3.id,
+        dateNouvelEffet: PERIODE_FIN,
+      })),
+    })
     expect(tx.enseignant.update).toHaveBeenCalledWith({
       where: { id: 'ens-1' },
       data: { positionActuelleId: A3.id, grade: 'ASSISTANT', dateEffetEchelon: PERIODE_FIN },
     })
-    expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
+    expect(tx.selectionAvancement.deleteMany).not.toHaveBeenCalled()
     expect(tx.sessionConseil.update).toHaveBeenCalledWith({
       where: { id: RAPPORT },
       data: expect.objectContaining({ statut: 'VALIDE', auteurValidation: 'Le Recteur' }),
@@ -616,12 +627,14 @@ describe('validerRapport : sélections périmées', () => {
       `NEXT_REDIRECT /avancements/${RAPPORT}?msg=rapport_valide`
     )
 
-    expect(tx.historiqueAvancement.create).toHaveBeenCalledTimes(1)
-    expect(tx.historiqueAvancement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ enseignantId: 'ens-1', nouvellePositionId: A3.id }),
+    expect(tx.historiqueAvancement.createMany).toHaveBeenCalledTimes(1)
+    expect(tx.historiqueAvancement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ enseignantId: 'ens-1', nouvellePositionId: A3.id })],
     })
     expect(tx.enseignant.update).toHaveBeenCalledTimes(1)
-    expect(tx.selectionAvancement.delete).toHaveBeenCalledWith({ where: { id: 'sel-2' } })
+    expect(tx.selectionAvancement.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['sel-2'] } },
+    })
     expect(tx.sessionConseil.update).toHaveBeenCalledTimes(1)
   })
 
@@ -1242,5 +1255,251 @@ describe('genererDecision : brouillon et décision signée', () => {
     expect(etat.message).toMatch(/déjà signée/)
     expect(genererDecisionFactice).not.toHaveBeenCalled()
     expect(prismaFactice.historiqueAvancement.update).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// D7 : délais des transactions, une seule écriture pour l'historique, expiration signalée.
+
+describe('transactions des avancements : délais et expiration (D7)', () => {
+  const OPTIONS = { maxWait: 5000, timeout: 30000 }
+  /** L'erreur que Prisma lève quand une transaction interactive dépasse son délai. */
+  const expiration = () =>
+    Object.assign(new Error('Transaction already closed: timeout exceeded'), { code: 'P2028' })
+
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx))
+  })
+
+  /** Chacune des actions qui ouvrent une transaction, prête à être appelée. */
+  const ACTIONS: [string, () => Promise<unknown>][] = [
+    [
+      'validerRapport',
+      async () => {
+        tx.sessionConseil.findUnique.mockResolvedValue({
+          id: RAPPORT,
+          statut: 'BROUILLON',
+          periodeFin: PERIODE_FIN,
+          selections: [selectionAValider(1)],
+        })
+        await validerRapport(
+          RAPPORT,
+          {},
+          donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+        ).catch(() => undefined) // la réussite redirige
+      },
+    ],
+    [
+      'supprimerRapport',
+      async () => {
+        prismaFactice.sessionConseil.findUnique.mockResolvedValue(rapportBrouillon())
+        await supprimerRapport(RAPPORT, {}, new FormData()).catch(() => undefined)
+      },
+    ],
+    [
+      'retirerSelection',
+      async () => {
+        prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+          id: RAPPORT,
+          statut: 'BROUILLON',
+        })
+        prismaFactice.selectionAvancement.findUnique.mockResolvedValue({ id: 'sel-1' })
+        await retirerSelection(RAPPORT, 'ens-1')
+      },
+    ],
+    [
+      'modifierSelection',
+      async () => {
+        prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+          id: RAPPORT,
+          statut: 'BROUILLON',
+          periodeFin: PERIODE_FIN,
+        })
+        prismaFactice.selectionAvancement.findUnique.mockResolvedValue({
+          id: 'sel-1',
+          rapportId: RAPPORT,
+          enseignantId: 'ens-1',
+        })
+        prismaFactice.enseignant.findUnique.mockResolvedValue({
+          id: 'ens-1',
+          positionActuelleId: A2.id,
+          positionActuelle: A2,
+        })
+        prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+        await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+      },
+    ],
+    [
+      'mettreAJourRapport (rapport validé)',
+      async () => {
+        prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+          statut: 'VALIDE',
+          periodeDebut: new Date('2025-07-01'),
+          periodeFin: PERIODE_FIN,
+        })
+        tx.sessionConseil.findUnique.mockResolvedValue({ periodeFin: PERIODE_FIN, avancements: [] })
+        await mettreAJourRapport(
+          RAPPORT,
+          {},
+          donnees({ numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2025-12-31' })
+        )
+      },
+    ],
+  ]
+
+  it.each(ACTIONS)(
+    '%s ouvre sa transaction avec des délais plus larges que ceux de Prisma',
+    async (_nom, lancer) => {
+      await lancer()
+
+      expect(prismaFactice.$transaction).toHaveBeenCalledTimes(1)
+      expect(prismaFactice.$transaction).toHaveBeenCalledWith(expect.any(Function), OPTIONS)
+    }
+  )
+
+  describe('transaction expirée', () => {
+    beforeEach(() => {
+      prismaFactice.$transaction.mockRejectedValue(expiration())
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    it('validerRapport répond que la validation a pris trop de temps et que rien n’a été modifié', async () => {
+      const etat = await validerRapport(
+        RAPPORT,
+        {},
+        donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+      )
+
+      expect(etat.message).toMatch(/La validation a pris trop de temps/)
+      expect(etat.message).toMatch(/rien n’a été modifié/)
+      expect(etat.succes).toBeUndefined()
+    })
+
+    it('validerRapport ne redirige pas et ne rafraîchit rien', async () => {
+      const { revalidatePath } = await import('next/cache')
+      const { redirect } = await import('next/navigation')
+
+      await validerRapport(
+        RAPPORT,
+        {},
+        donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+      )
+
+      expect(redirect).not.toHaveBeenCalled()
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('modifierSelection répond que la modification a pris trop de temps', async () => {
+      prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+        id: RAPPORT,
+        statut: 'BROUILLON',
+        periodeFin: PERIODE_FIN,
+      })
+      prismaFactice.selectionAvancement.findUnique.mockResolvedValue({
+        id: 'sel-1',
+        rapportId: RAPPORT,
+        enseignantId: 'ens-1',
+      })
+      prismaFactice.enseignant.findUnique.mockResolvedValue({
+        id: 'ens-1',
+        positionActuelleId: A2.id,
+        positionActuelle: A2,
+      })
+      prismaFactice.echelonIndiciaire.findUnique.mockResolvedValue(A5)
+
+      const etat = await modifierSelection(RAPPORT, 'sel-1', {}, formulairePosition(A5.id))
+
+      expect(etat.message).toMatch(/La modification a pris trop de temps/)
+      expect(etat.succes).toBeUndefined()
+    })
+
+    it('mettreAJourRapport (rapport validé) répond que la modification a pris trop de temps', async () => {
+      prismaFactice.sessionConseil.findUnique.mockResolvedValue({
+        statut: 'VALIDE',
+        periodeDebut: new Date('2025-07-01'),
+        periodeFin: PERIODE_FIN,
+      })
+
+      const etat = await mettreAJourRapport(
+        RAPPORT,
+        {},
+        donnees({ numero: '55ème', periodeDebut: '2025-07-01', periodeFin: '2026-01-15' })
+      )
+
+      expect(etat.message).toMatch(/La modification a pris trop de temps/)
+      expect(etat.succes).toBeUndefined()
+    })
+  })
+
+  it('validerRapport traduit toute autre erreur de la base au lieu de planter la page', async () => {
+    prismaFactice.$transaction.mockRejectedValue(new Error('connexion perdue'))
+    const erreurConsole = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const etat = await validerRapport(
+      RAPPORT,
+      {},
+      donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+    )
+
+    expect(etat.message).toMatch(/erreur technique/i)
+    expect(etat.message).not.toMatch(/connexion perdue/)
+    expect(erreurConsole).toHaveBeenCalled()
+  })
+
+  describe('validerRapport sur un grand rapport', () => {
+    const N = 300
+
+    it('écrit tout l’historique en UNE seule requête, et une fiche par enseignant', async () => {
+      tx.sessionConseil.findUnique.mockResolvedValue({
+        id: RAPPORT,
+        statut: 'BROUILLON',
+        periodeFin: PERIODE_FIN,
+        selections: Array.from({ length: N }, (_, i) => selectionAValider(i + 1)),
+      })
+
+      await expect(
+        validerRapport(
+          RAPPORT,
+          {},
+          donnees({ dateValidation: '2026-01-10', auteurValidation: 'Le Recteur' })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(tx.historiqueAvancement.create).not.toHaveBeenCalled()
+      expect(tx.historiqueAvancement.createMany).toHaveBeenCalledTimes(1)
+      expect(tx.historiqueAvancement.createMany.mock.calls[0]![0].data).toHaveLength(N)
+      expect(tx.enseignant.update).toHaveBeenCalledTimes(N)
+    })
+
+    it('retire tous les exclus en une seule requête', async () => {
+      const exclus = Array.from({ length: 40 }, (_, i) =>
+        selectionAValider(i + 100, { statut: 'RETRAITE' })
+      )
+      tx.sessionConseil.findUnique.mockResolvedValue({
+        id: RAPPORT,
+        statut: 'BROUILLON',
+        periodeFin: PERIODE_FIN,
+        selections: [selectionAValider(1), ...exclus],
+      })
+
+      await expect(
+        validerRapport(
+          RAPPORT,
+          {},
+          donnees({
+            dateValidation: '2026-01-10',
+            auteurValidation: 'Le Recteur',
+            exclusionsConfirmees: exclus.map((e) => e.enseignantId).join(','),
+          })
+        )
+      ).rejects.toThrow('NEXT_REDIRECT')
+
+      expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
+      expect(tx.selectionAvancement.deleteMany).toHaveBeenCalledTimes(1)
+      expect(tx.selectionAvancement.deleteMany.mock.calls[0]![0].where.id.in).toHaveLength(40)
+    })
   })
 })

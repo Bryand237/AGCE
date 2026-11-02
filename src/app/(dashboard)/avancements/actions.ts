@@ -14,6 +14,7 @@ import { erreurModificationRapportValide } from '@/domain/avancement/rapportVali
 import { separerSelections } from '@/domain/avancement/selectionsAValider'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { messageErreur } from '@/lib/erreurs'
+import { OPTIONS_TRANSACTION } from '@/lib/transactions'
 import { genererDecisionAvancement } from '@/lib/documents/genererDecisionAvancement'
 import {
   MetadonneesSessionSchema,
@@ -37,6 +38,11 @@ export type EtatFormulaire = {
 
 const RAPPORT_INTROUVABLE = 'Rapport introuvable.'
 const INFORMATIONS_MISES_A_JOUR = 'Informations du rapport mises à jour.'
+// Transaction annulée parce qu'elle a duré trop longtemps (P2028) : tout est annulé en bloc.
+const VALIDATION_TROP_LONGUE =
+  'La validation a pris trop de temps : rien n’a été modifié. Réessayez ; si cela se reproduit, contactez le responsable technique.'
+const MODIFICATION_TROP_LONGUE =
+  'La modification a pris trop de temps : rien n’a été modifié. Réessayez.'
 
 async function chargerAvancementPourDecision(avancementId: string) {
   return prisma.historiqueAvancement.findUnique({
@@ -316,11 +322,14 @@ async function modifierRapportValide(
         message: `${INFORMATIONS_MISES_A_JOUR} La nouvelle date d’effet (${formaterDateCourte(saisie.periodeFin)}) a été reportée sur ${n} avancement${n > 1 ? 's' : ''}.`,
         succes: true,
       }
-    })
+    }, OPTIONS_TRANSACTION)
   } catch (erreur) {
     // La transaction est annulée en bloc : ni le rapport ni les dates n'ont changé.
     return {
-      message: messageErreur(erreur, 'mettreAJourRapport', { introuvable: RAPPORT_INTROUVABLE }),
+      message: messageErreur(erreur, 'mettreAJourRapport', {
+        introuvable: RAPPORT_INTROUVABLE,
+        delai: MODIFICATION_TROP_LONGUE,
+      }),
     }
   }
 
@@ -393,28 +402,38 @@ export async function modifierSelection(
   const incoherence = erreurPositionProposee(depart, position)
   if (incoherence) return { message: incoherence }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.selectionAvancement.update({
-      where: { id: selectionId },
-      data: { positionProposeeId },
-    })
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.selectionAvancement.update({
+        where: { id: selectionId },
+        data: { positionProposeeId },
+      })
 
-    if (historique) {
-      await tx.historiqueAvancement.update({
-        where: { id: historique.id },
-        data: { nouvellePositionId: positionProposeeId },
-      })
-      // Position et grade s'écrivent ensemble (voir le commentaire du modèle Enseignant).
-      await tx.enseignant.update({
-        where: { id: selection.enseignantId },
-        data: {
-          positionActuelleId: positionProposeeId,
-          grade: position.grade,
-          dateEffetEchelon: rapport.periodeFin,
-        },
-      })
+      if (historique) {
+        await tx.historiqueAvancement.update({
+          where: { id: historique.id },
+          data: { nouvellePositionId: positionProposeeId },
+        })
+        // Position et grade s'écrivent ensemble (voir le commentaire du modèle Enseignant).
+        await tx.enseignant.update({
+          where: { id: selection.enseignantId },
+          data: {
+            positionActuelleId: positionProposeeId,
+            grade: position.grade,
+            dateEffetEchelon: rapport.periodeFin,
+          },
+        })
+      }
+    }, OPTIONS_TRANSACTION)
+  } catch (erreur) {
+    // La transaction est annulée en bloc : ni la proposition ni la fiche n'ont changé.
+    return {
+      message: messageErreur(erreur, 'modifierSelection', {
+        introuvable: 'Cette sélection n’existe plus. Rechargez la page.',
+        delai: MODIFICATION_TROP_LONGUE,
+      }),
     }
-  })
+  }
 
   revalidatePath(`/avancements/${rapportId}`)
   return { message: 'Position proposée mise à jour.', succes: true }
@@ -459,7 +478,7 @@ export async function retirerSelection(rapportId: string, enseignantId: string):
     await tx.selectionAvancement.delete({
       where: { rapportId_enseignantId: { rapportId, enseignantId } },
     })
-  })
+  }, OPTIONS_TRANSACTION)
 
   revalidatePath(`/avancements/${rapportId}`)
 }
@@ -504,7 +523,7 @@ export async function supprimerRapport(
       await tx.selectionAvancement.deleteMany({ where: { rapportId } })
       await tx.historiqueAvancement.deleteMany({ where: { sessionId: rapportId } })
       await tx.sessionConseil.delete({ where: { id: rapportId } })
-    })
+    }, OPTIONS_TRANSACTION)
   } catch (erreur) {
     // La transaction est annulée en bloc : rien n'a été supprimé.
     console.error('supprimerRapport : échec de la suppression', erreur)
@@ -544,81 +563,98 @@ export async function validerRapport(
 
   // Les enseignants sont relus dans la transaction qui valide : les sélections datent de la
   // création du rapport et peuvent être périmées (voir selectionsAValider.ts).
-  const refus = await prisma.$transaction(async (tx): Promise<EtatFormulaire | null> => {
-    const rapport = await tx.sessionConseil.findUnique({
-      where: { id: rapportId },
-      include: {
-        selections: {
-          include: { enseignant: { include: { positionActuelle: true } }, positionProposee: true },
+  let refus: EtatFormulaire | null
+  try {
+    refus = await prisma.$transaction(async (tx): Promise<EtatFormulaire | null> => {
+      const rapport = await tx.sessionConseil.findUnique({
+        where: { id: rapportId },
+        include: {
+          selections: {
+            include: {
+              enseignant: { include: { positionActuelle: true } },
+              positionProposee: true,
+            },
+          },
         },
-      },
-    })
-    if (!rapport) return { message: 'Rapport introuvable.' }
-    if (rapport.statut === 'VALIDE') return { message: 'Ce rapport est déjà validé.' }
-    if (rapport.selections.length === 0) return { message: 'Aucun enseignant sélectionné.' }
+      })
+      if (!rapport) return { message: 'Rapport introuvable.' }
+      if (rapport.statut === 'VALIDE') return { message: 'Ce rapport est déjà validé.' }
+      if (rapport.selections.length === 0) return { message: 'Aucun enseignant sélectionné.' }
 
-    const { valides, perimees } = separerSelections(
-      rapport.selections.map((s) => ({
-        ligne: s,
-        statutEnseignant: s.enseignant.statut,
-        positionActuelle: s.enseignant.positionActuelle,
-        positionProposee: s.positionProposee,
+      const { valides, perimees } = separerSelections(
+        rapport.selections.map((s) => ({
+          ligne: s,
+          statutEnseignant: s.enseignant.statut,
+          positionActuelle: s.enseignant.positionActuelle,
+          positionProposee: s.positionProposee,
+        }))
+      )
+      const exclusions = perimees.map(({ ligne: s, motif }) => ({
+        enseignantId: s.enseignantId,
+        nom: `${s.enseignant.nom} ${s.enseignant.prenom}`,
+        matricule: s.enseignant.matricule,
+        motif,
       }))
-    )
-    const exclusions = perimees.map(({ ligne: s, motif }) => ({
-      enseignantId: s.enseignantId,
-      nom: `${s.enseignant.nom} ${s.enseignant.prenom}`,
-      matricule: s.enseignant.matricule,
-      motif,
-    }))
 
-    if (valides.length === 0) {
-      return {
-        message:
-          'Aucun enseignant de ce rapport ne peut plus avancer. Rien n’a été validé : retirez-les du rapport, ou rejetez-le.',
-        exclusions,
-        peutConfirmer: false,
+      if (valides.length === 0) {
+        return {
+          message:
+            'Aucun enseignant de ce rapport ne peut plus avancer. Rien n’a été validé : retirez-les du rapport, ou rejetez-le.',
+          exclusions,
+          peutConfirmer: false,
+        }
       }
-    }
-    // Aucune exclusion en silence : elles doivent avoir été montrées, puis confirmées.
-    if (exclusions.some((e) => !exclusionsConfirmees.has(e.enseignantId))) {
-      return {
-        message: `${exclusions.length} enseignant(s) ne peuvent plus avancer. Rien n’a encore été validé.`,
-        exclusions,
-        peutConfirmer: true,
+      // Aucune exclusion en silence : elles doivent avoir été montrées, puis confirmées.
+      if (exclusions.some((e) => !exclusionsConfirmees.has(e.enseignantId))) {
+        return {
+          message: `${exclusions.length} enseignant(s) ne peuvent plus avancer. Rien n’a encore été validé.`,
+          exclusions,
+          peutConfirmer: true,
+        }
       }
-    }
 
-    for (const { ligne: s } of valides) {
-      await tx.historiqueAvancement.create({
-        data: {
+      // Une seule écriture pour tout l'historique : une par enseignant allongeait la transaction
+      // d'autant d'allers-retours avec la base (voir OPTIONS_TRANSACTION). Les fiches, elles,
+      // reçoivent chacune une position différente et s'écrivent une à une.
+      await tx.historiqueAvancement.createMany({
+        data: valides.map(({ ligne: s }) => ({
           enseignantId: s.enseignantId,
           sessionId: rapport.id,
           anciennePositionId: s.enseignant.positionActuelleId,
           dateAncienEffet: s.enseignant.dateEffetEchelon,
           nouvellePositionId: s.positionProposeeId,
           dateNouvelEffet: rapport.periodeFin,
-        },
+        })),
       })
-      await tx.enseignant.update({
-        where: { id: s.enseignantId },
-        data: {
-          positionActuelleId: s.positionProposeeId,
-          grade: s.positionProposee.grade,
-          dateEffetEchelon: rapport.periodeFin,
-        },
+      for (const { ligne: s } of valides) {
+        await tx.enseignant.update({
+          where: { id: s.enseignantId },
+          data: {
+            positionActuelleId: s.positionProposeeId,
+            grade: s.positionProposee.grade,
+            dateEffetEchelon: rapport.periodeFin,
+          },
+        })
+      }
+      // Le rapport validé ne doit lister que les enseignants qui ont réellement avancé.
+      if (perimees.length > 0) {
+        await tx.selectionAvancement.deleteMany({
+          where: { id: { in: perimees.map(({ ligne: s }) => s.id) } },
+        })
+      }
+      await tx.sessionConseil.update({
+        where: { id: rapportId },
+        data: { statut: 'VALIDE', motifRejet: null, dateValidation, auteurValidation },
       })
+      return null
+    }, OPTIONS_TRANSACTION)
+  } catch (erreur) {
+    // La transaction est annulée en bloc : aucun avancement n'est enregistré, aucune fiche
+    // modifiée, le rapport reste un brouillon.
+    return {
+      message: messageErreur(erreur, 'validerRapport', { delai: VALIDATION_TROP_LONGUE }),
     }
-    // Le rapport validé ne doit lister que les enseignants qui ont réellement avancé.
-    for (const { ligne: s } of perimees) {
-      await tx.selectionAvancement.delete({ where: { id: s.id } })
-    }
-    await tx.sessionConseil.update({
-      where: { id: rapportId },
-      data: { statut: 'VALIDE', motifRejet: null, dateValidation, auteurValidation },
-    })
-    return null
-  })
+  }
   if (refus) return refus
 
   revalidatePath('/avancements')
