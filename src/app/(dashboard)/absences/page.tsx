@@ -14,6 +14,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { aujourdhui } from '@/domain/dates/jourCivil'
 import { lirePage } from '@/lib/pagination'
 
@@ -174,8 +175,7 @@ export default async function PageAbsences({
                     {LIBELLES_TYPE_ABSENCE[a.type]}
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
-                    {a.dateDebut.toLocaleDateString('fr-FR')} –{' '}
-                    {a.dateFin.toLocaleDateString('fr-FR')}
+                    {formaterDateCourte(a.dateDebut)} – {formaterDateCourte(a.dateFin)}
                   </td>
                   <td className="px-3 py-3">
                     <BadgeStatut statut={a.statut} />

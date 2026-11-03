@@ -9,12 +9,22 @@
  */
 
 /**
- * Le jour d'aujourd'hui, tel que l'utilisateur le lit sur son calendrier, ramené à minuit UTC
- * pour être comparable aux dates enregistrées. Le jour est celui du fuseau de la machine (celle
- * du service, au Cameroun) et non celui de l'UTC, qui retarde d'un jour entre minuit et 1 h.
+ * Le jour du calendrier de l'utilisateur pour un INSTANT (heure d'enregistrement d'une ligne,
+ * horodatage…), ramené à minuit UTC pour être comparable aux dates enregistrées. Le jour est celui
+ * du fuseau de la machine (celle du service, au Cameroun) et non celui de l'UTC, qui retarde d'un
+ * jour entre minuit et 1 h.
+ *
+ * C'est le SEUL endroit du code de l'application qui lit une date avec les accesseurs locaux
+ * (`src/dates-des-sources.test.ts` le vérifie). À réserver aux instants : une date saisie dans un
+ * champ date est déjà à minuit UTC et se lit en UTC.
  */
+export function jourLocalDe(instant: Date): Date {
+  return new Date(Date.UTC(instant.getFullYear(), instant.getMonth(), instant.getDate()))
+}
+
+/** Le jour d'aujourd'hui, à minuit UTC (voir `jourLocalDe`). */
 export function aujourdhui(maintenant: Date = new Date()): Date {
-  return new Date(Date.UTC(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate()))
+  return jourLocalDe(maintenant)
 }
 
 /** Minuit UTC du jour (UTC) de la date donnée. */

@@ -4,19 +4,14 @@ import { creerRapport, type EtatFormulaire } from '../actions'
 import { useActionConservee } from '@/lib/action-conservee'
 import { PageHeader } from '@/components/layout/page-header'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
+import { semestrePrecedent } from '@/domain/avancement/semestrePrecedent'
+import { aujourdhui } from '@/domain/dates/jourCivil'
 
 const etatInitial: EtatFormulaire = {}
 
-function semestrePrecedentParDefaut() {
-  const maintenant = new Date()
-  const annee = maintenant.getFullYear()
-  if (maintenant.getMonth() >= 6) return { debut: `${annee}-01-01`, fin: `${annee}-06-30` }
-  return { debut: `${annee - 1}-07-01`, fin: `${annee - 1}-12-31` }
-}
-
 export default function NouveauRapport() {
   const [state, surEnvoi, isPending] = useActionConservee(creerRapport, etatInitial)
-  const defaut = semestrePrecedentParDefaut()
+  const defaut = semestrePrecedent(aujourdhui())
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-8">

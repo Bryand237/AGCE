@@ -1499,7 +1499,11 @@ describe('transactions des avancements : délais et expiration (D7)', () => {
 
       expect(tx.selectionAvancement.delete).not.toHaveBeenCalled()
       expect(tx.selectionAvancement.deleteMany).toHaveBeenCalledTimes(1)
-      expect(tx.selectionAvancement.deleteMany.mock.calls[0]![0].where.id.in).toHaveLength(40)
+      // `tracer` fabrique un mock sans paramètre : on type l'appel lu, comme pour `update` plus haut.
+      const [appel] = tx.selectionAvancement.deleteMany.mock.calls as unknown as [
+        [{ where: { id: { in: string[] } } }],
+      ]
+      expect(appel[0].where.id.in).toHaveLength(40)
     })
   })
 })

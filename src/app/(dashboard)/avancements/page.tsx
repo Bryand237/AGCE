@@ -11,6 +11,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { lirePage } from '@/lib/pagination'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 
 export default async function PageAvancements({
   searchParams,
@@ -128,8 +129,7 @@ export default async function PageAvancements({
                     </Link>
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
-                    {r.periodeDebut.toLocaleDateString('fr-FR')} –{' '}
-                    {r.periodeFin.toLocaleDateString('fr-FR')}
+                    {formaterDateCourte(r.periodeDebut)} – {formaterDateCourte(r.periodeFin)}
                   </td>
                   <td className="px-3 py-3">
                     <span

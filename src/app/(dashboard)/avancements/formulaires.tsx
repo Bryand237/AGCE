@@ -26,17 +26,12 @@ import {
   classeFormulaire,
 } from '@/lib/ui-classes'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
+import { valeurChampDate } from '@/domain/dates/valeurChampDate'
 import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
 import { notesDecisionsDejaProduites } from '@/domain/avancement/decisionsDejaProduites'
 import { metadonneesManquantes } from '@/domain/avancement/metadonneesSessionCompletes'
 
 const etatInitial: EtatFormulaire = {}
-
-function formatDateInput(d: Date | string | null | undefined) {
-  if (!d) return ''
-  const date = typeof d === 'string' ? new Date(d) : d
-  return date.toISOString().slice(0, 10)
-}
 
 type MetadonneesSession = {
   referenceLoiFinances: string | null
@@ -115,7 +110,7 @@ export function FormulaireMetadonneesSession({
           <input
             type="date"
             name="dateSessionCU"
-            defaultValue={formatDateInput(metadonnees.dateSessionCU)}
+            defaultValue={valeurChampDate(metadonnees.dateSessionCU)}
             className={classeChamp}
           />
           {state.errors?.dateSessionCU && (
@@ -127,7 +122,7 @@ export function FormulaireMetadonneesSession({
           <input
             type="date"
             name="dateSessionCA"
-            defaultValue={formatDateInput(metadonnees.dateSessionCA)}
+            defaultValue={valeurChampDate(metadonnees.dateSessionCA)}
             className={classeChamp}
           />
           {state.errors?.dateSessionCA && (
@@ -140,7 +135,7 @@ export function FormulaireMetadonneesSession({
         <input
           type="date"
           name="dateSignatureDecisions"
-          defaultValue={formatDateInput(metadonnees.dateSignatureDecisions)}
+          defaultValue={valeurChampDate(metadonnees.dateSignatureDecisions)}
           className={classeChamp}
         />
         {state.errors?.dateSignatureDecisions && (
@@ -225,7 +220,7 @@ export function FormulaireModifierRapport({
             type="date"
             name="periodeDebut"
             required
-            defaultValue={formatDateInput(rapport.periodeDebut)}
+            defaultValue={valeurChampDate(rapport.periodeDebut)}
             className={classeChamp}
           />
         </label>
@@ -235,7 +230,7 @@ export function FormulaireModifierRapport({
             type="date"
             name="periodeFin"
             required
-            defaultValue={formatDateInput(rapport.periodeFin)}
+            defaultValue={valeurChampDate(rapport.periodeFin)}
             className={classeChamp}
           />
         </label>

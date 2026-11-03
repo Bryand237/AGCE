@@ -524,6 +524,32 @@ de lignes, ou une base lente à répondre (premier démarrage, disque occupé), 
   trop de temps : rien n'a été modifié. Réessayez »), et non par une page d'erreur. Rien n'est
   enregistré à moitié, le rapport reste un brouillon. La cause est écrite dans la console du serveur.
 
+## Dates et fuseaux horaires
+
+Une date saisie dans un champ date (naissance, prise de service, début d'absence…) est enregistrée à
+**minuit UTC**, et s'affiche et se calcule en UTC : le 1er janvier 1990 reste le 1er janvier 1990, quel
+que soit le fuseau de la machine qui fait tourner l'application. Avec les accesseurs « heure locale »
+de JavaScript (`getFullYear()`, `getDate()`, `toLocaleDateString()`…), la même date s'afficherait le
+31 décembre 1989 sur une machine réglée à New York, et une retraite ou une ancienneté pouvait se
+décaler d'un jour ou d'une année.
+
+- **Lire, écrire, calculer** : les fonctions de `src/domain/dates/` (`formaterDateCourte` →
+  « 02/11/2026 », `formaterDateMoisEnLettres` → « 2 novembre 2026 », `formaterDateLongue` → « 1er
+  novembre 2026 » des actes officiels, `valeurChampDate` → « 2026-11-02 » d'un champ date,
+  `ajouterAnnees`, `analyserDateIso`…). Les calculs de carrière (retraite, éligibilité, congé de
+  maternité, ancienneté, durée d'une absence) sont des fonctions pures de `src/domain`, testées sous
+  plusieurs fuseaux.
+- **« Aujourd'hui »** (`aujourdhui()`, `jourLocalDe()` dans `jourCivil.ts`) est le jour du calendrier de
+  l'utilisateur, celui du fuseau de la machine, et non celui de l'UTC, qui retarde d'un jour entre minuit
+  et 1 h à Douala. C'est **le seul endroit** qui lit l'heure locale. Un instant (l'heure à laquelle une
+  absence a été enregistrée, par exemple) s'affiche par `jourLocalDe(instant)`.
+- **Le conteneur Docker** est réglé sur `TZ=Africa/Douala` (`Dockerfile`), faute de quoi il serait en UTC.
+  Une installation lancée directement avec `npm run dev` ou `npm start` suit le fuseau de l'ordinateur.
+- **Garde** : `src/dates-des-sources.test.ts` fait échouer un fichier de `src` (hors tests) qui utilise un
+  accesseur local ou découpe `toISOString()` à la main ; `src/tests-independants-du-fuseau.test.ts` fait la
+  même chose pour les tests. Les calculs se vérifient sous trois fuseaux :
+  `TZ=UTC`, `TZ=Africa/Douala` et `TZ=America/New_York npm run test:run` donnent le même résultat.
+
 ## Validation des saisies
 
 Chaque formulaire est validé côté serveur par un schéma zod

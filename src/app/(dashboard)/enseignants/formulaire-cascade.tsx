@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { creerEnseignant, modifierEnseignant, type EtatFormulaire } from './actions'
 import { useActionConservee } from '@/lib/action-conservee'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
+import { valeurChampDate } from '@/domain/dates/valeurChampDate'
 
 type Etablissement = { id: string; nom: string; abreviation: string }
 type Departement = { id: string; nom: string; etablissementId: string }
@@ -46,10 +47,6 @@ type EnseignantExistant = {
 const etatInitial: EtatFormulaire = {}
 const classeChamp =
   'rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none'
-
-function formatDateInput(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
 
 function SectionFormulaire({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
@@ -189,7 +186,7 @@ export function FormulaireEnseignant({
               type="date"
               name="dateNaissance"
               required
-              defaultValue={enseignant ? formatDateInput(enseignant.dateNaissance) : undefined}
+              defaultValue={enseignant ? valeurChampDate(enseignant.dateNaissance) : undefined}
               className={classeChamp}
             />
             {state.errors?.dateNaissance && (
@@ -260,7 +257,7 @@ export function FormulaireEnseignant({
             type="date"
             name="datePriseService"
             required
-            defaultValue={enseignant ? formatDateInput(enseignant.datePriseService) : undefined}
+            defaultValue={enseignant ? valeurChampDate(enseignant.datePriseService) : undefined}
             className={classeChamp}
           />
           {state.errors?.datePriseService && (
@@ -445,7 +442,7 @@ export function FormulaireEnseignant({
             type="date"
             name="dateEffetEchelon"
             required
-            defaultValue={enseignant ? formatDateInput(enseignant.dateEffetEchelon) : undefined}
+            defaultValue={enseignant ? valeurChampDate(enseignant.dateEffetEchelon) : undefined}
             className={classeChamp}
           />
           {state.errors?.dateEffetEchelon && (

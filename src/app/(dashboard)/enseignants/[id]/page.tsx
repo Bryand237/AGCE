@@ -8,6 +8,10 @@ import { recupererGrilleEchelonIndiciaire } from '@/app/(dashboard)/avancements/
 import { formaterPosition } from '@/domain/avancement/formaterPosition'
 import { formaterPositionCompacte } from '@/domain/avancement/formaterPositionCompacte'
 import { calculerProchainAvancementTheorique } from '@/domain/avancement/calculerProchainAvancementTheorique'
+import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
+import { aujourdhui } from '@/domain/dates/jourCivil'
+import { valeurChampDate } from '@/domain/dates/valeurChampDate'
+import { ancienneteEnAnnees } from '@/domain/enseignants/anciennete'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { dateDeFinAffichee } from '@/domain/enseignants/statut'
 import {
@@ -17,20 +21,6 @@ import {
 } from '@/domain/enseignants/retraite'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { FormulaireTransfert, FormulaireRetraite, BoutonReactiver } from '../formulaires'
-
-function formatDate(d: Date) {
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function calculerAncienneteAnnees(datePriseService: Date): number {
-  const aujourdhui = new Date()
-  let annees = aujourdhui.getFullYear() - datePriseService.getFullYear()
-  const mois = aujourdhui.getMonth() - datePriseService.getMonth()
-  if (mois < 0 || (mois === 0 && aujourdhui.getDate() < datePriseService.getDate())) {
-    annees--
-  }
-  return Math.max(0, annees)
-}
 
 export default async function DetailEnseignant({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,7 +44,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
     grille
   )
 
-  const ancienneteAnnees = calculerAncienneteAnnees(enseignant.datePriseService)
+  const ancienneteAnnees = ancienneteEnAnnees(enseignant.datePriseService, aujourdhui())
 
   // La retraite prévue est un calcul pour un enseignant en activité ; pour un retraité ou un
   // transféré, la fiche montre la date de fin de service enregistrée.
@@ -79,8 +69,8 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
 
       {!eligibleRetraite && procheRetraite && (
         <Alerte ton="info">
-          Retraite prévue le <strong>{formatDate(retraitePrevue)}</strong> — dans les 2 prochaines
-          années.
+          Retraite prévue le <strong>{formaterDateMoisEnLettres(retraitePrevue)}</strong> — dans les
+          2 prochaines années.
         </Alerte>
       )}
 
@@ -129,7 +119,10 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
             </h2>
             <dl className="space-y-3 text-sm">
               <Item label="Sexe" valeur={enseignant.sexe === 'M' ? 'Masculin' : 'Féminin'} />
-              <Item label="Date de naissance" valeur={formatDate(enseignant.dateNaissance)} />
+              <Item
+                label="Date de naissance"
+                valeur={formaterDateMoisEnLettres(enseignant.dateNaissance)}
+              />
               <Item label="Lieu de naissance" valeur={enseignant.lieuNaissance} />
               <Item
                 label="Département d'origine"
@@ -166,11 +159,17 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
                 label="Position"
                 valeur={`${formaterPosition(enseignant.positionActuelle)} (indice ${enseignant.positionActuelle.indice})`}
               />
-              <Item label="Prise de service" valeur={formatDate(enseignant.datePriseService)} />
-              <Item label="Effet échelon" valeur={formatDate(enseignant.dateEffetEchelon)} />
+              <Item
+                label="Prise de service"
+                valeur={formaterDateMoisEnLettres(enseignant.datePriseService)}
+              />
+              <Item
+                label="Effet échelon"
+                valeur={formaterDateMoisEnLettres(enseignant.dateEffetEchelon)}
+              />
               <Item
                 label={dateDeFin.libelle}
-                valeur={dateDeFin.date ? formatDate(dateDeFin.date) : '—'}
+                valeur={dateDeFin.date ? formaterDateMoisEnLettres(dateDeFin.date) : '—'}
               />
               <Item label="Résident" valeur={enseignant.estResident ? 'Oui' : 'Non'} />
               <Item
@@ -193,7 +192,8 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
                   <strong>{formaterPositionCompacte(prochainAvancement.positionSuivante)}</strong>
                 </p>
                 <p className="text-muted-foreground">
-                  Éligible à partir du {formatDate(prochainAvancement.dateEligibilite)}
+                  Éligible à partir du{' '}
+                  {formaterDateMoisEnLettres(prochainAvancement.dateEligibilite)}
                 </p>
               </div>
             ) : (
@@ -234,7 +234,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
               <FormulaireRetraite
                 enseignantId={id}
                 nomComplet={nomComplet}
-                dateRetraitePrevue={retraitePrevue.toISOString().slice(0, 10)}
+                dateRetraitePrevue={valeurChampDate(retraitePrevue)}
               />
             </div>
           )}
@@ -245,7 +245,7 @@ export default async function DetailEnseignant({ params }: { params: Promise<{ i
               <p className="text-muted-foreground mb-4 text-sm">
                 Statut actuel : {enseignant.statut === 'TRANSFERE' ? 'Transféré' : 'Retraité'}
                 {enseignant.dateFinService &&
-                  ` — depuis le ${formatDate(enseignant.dateFinService)}`}
+                  ` — depuis le ${formaterDateMoisEnLettres(enseignant.dateFinService)}`}
                 {enseignant.statut === 'TRANSFERE' &&
                   enseignant.lieuTransfert &&
                   ` — destination : ${enseignant.lieuTransfert}`}

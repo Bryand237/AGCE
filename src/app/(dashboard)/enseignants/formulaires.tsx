@@ -5,6 +5,7 @@ import { Alerte } from '@/components/ui/alerte'
 import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
+import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
 import {
   marquerTransfere,
   marquerRetraite,
@@ -126,12 +127,7 @@ export function FormulaireRetraite({
         <p className="text-foreground text-sm font-semibold">Marquer comme retraité</p>
         {dateRetraitePrevue && (
           <p className="text-muted-foreground text-xs">
-            Retraite prévue le{' '}
-            {new Date(dateRetraitePrevue).toLocaleDateString('fr-FR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
+            Retraite prévue le {formaterDateMoisEnLettres(new Date(dateRetraitePrevue))}
           </p>
         )}
         <label className="flex flex-col gap-1 text-sm">

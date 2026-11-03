@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { recupererAvancementDetail } from '../../donnees'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { formaterPosition } from '@/domain/avancement/formaterPosition'
 import { BlocDecision } from './formulaires'
 
@@ -31,7 +32,7 @@ export default async function DetailAvancement({
           {formaterPosition(avancement.anciennePosition)} (indice {avancement.anciennePosition.indice})
           {' → '}
           {formaterPosition(avancement.nouvellePosition)} (indice {avancement.nouvellePosition.indice}),
-          pour compter du {avancement.dateNouvelEffet.toLocaleDateString('fr-FR')}
+          pour compter du {formaterDateCourte(avancement.dateNouvelEffet)}
         </p>
       </div>
 

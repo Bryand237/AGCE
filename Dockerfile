@@ -22,6 +22,10 @@ RUN npm run build
 FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Fuseau du service : « aujourd'hui » (période proposée à un nouveau rapport, statut des absences,
+# ancienneté) est le jour du calendrier de l'utilisateur. Sans cette ligne, le conteneur est en UTC
+# et croit qu'on est encore la veille entre minuit et 1 h, heure de Douala.
+ENV TZ=Africa/Douala
 
 # Chromium (PDF des listes et des rapports) : installé DANS cette étape finale, avec ses
 # bibliothèques système et des polices qui rendent les accents. Un « playwright install --with-deps »

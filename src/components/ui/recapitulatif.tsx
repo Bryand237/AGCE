@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
+import { analyserDateIso } from '@/domain/dates/jourCivil'
 
 /**
  * « 2 novembre 2026 » à partir de la valeur d'un champ date (« 2026-11-02 »). Lecture à la main,
@@ -6,17 +8,8 @@ import type { ReactNode } from 'react'
  * l'afficher un jour trop tôt selon le fuseau de l'ordinateur.
  */
 export function dateEnClair(valeur: FormDataEntryValue | null | undefined): string {
-  const texte = typeof valeur === 'string' ? valeur : ''
-  const morceaux = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texte)
-  if (!morceaux) return '—'
-  const [, annee, mois, jour] = morceaux
-  const date = new Date(Date.UTC(Number(annee), Number(mois) - 1, Number(jour)))
-  return date.toLocaleDateString('fr-FR', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const date = analyserDateIso(typeof valeur === 'string' ? valeur : '')
+  return date ? formaterDateMoisEnLettres(date) : '—'
 }
 
 /** Texte saisi, sans espaces autour ; « — » quand le champ est vide. */

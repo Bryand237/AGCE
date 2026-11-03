@@ -7,7 +7,9 @@ const DUREE_CONGE_MATERNITE_JOURS = 98 // 14 semaines — ajustez si la règle e
  * vaut un défaut raisonnable et ajustable qu'un blocage sur une inconnue.
  */
 export function calculerFinCongeMaternite(dateDebut: Date): Date {
+  // En UTC, comme toutes les dates : avec setDate()/getDate() (heure locale), un changement
+  // d'heure légale entre les deux dates ramenait le résultat à 23 h UTC, la veille (audit D8).
   const dateFin = new Date(dateDebut)
-  dateFin.setDate(dateFin.getDate() + DUREE_CONGE_MATERNITE_JOURS)
+  dateFin.setUTCDate(dateFin.getUTCDate() + DUREE_CONGE_MATERNITE_JOURS)
   return dateFin
 }

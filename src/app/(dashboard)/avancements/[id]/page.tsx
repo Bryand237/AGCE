@@ -7,6 +7,7 @@ import {
   recupererRapportDetail,
 } from '../donnees'
 import { retirerSelection } from '../actions'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
 import { positionsProposables } from '@/domain/avancement/positionProposee'
 import { metadonneesManquantes } from '@/domain/avancement/metadonneesSessionCompletes'
@@ -55,10 +56,9 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
         </Link>
       </div>
       <p className="text-muted-foreground mt-1 text-sm">
-        {rapport.periodeDebut.toLocaleDateString('fr-FR')} –{' '}
-        {rapport.periodeFin.toLocaleDateString('fr-FR')} ·{' '}
+        {formaterDateCourte(rapport.periodeDebut)} – {formaterDateCourte(rapport.periodeFin)} ·{' '}
         {rapport.statut === 'VALIDE'
-          ? `Validé le ${rapport.dateValidation?.toLocaleDateString('fr-FR')} par ${rapport.auteurValidation}`
+          ? `Validé le ${rapport.dateValidation ? formaterDateCourte(rapport.dateValidation) : '—'} par ${rapport.auteurValidation}`
           : 'Non validé'}
       </p>
       {rapport.motifRejet && (

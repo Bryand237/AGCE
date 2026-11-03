@@ -6,6 +6,7 @@ import { recupererAbsenceDetail } from '../../donnees'
 import { FormulaireModifierAbsence } from '../../formulaires'
 import { classeFormulaire } from '@/lib/ui-classes'
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
+import { valeurChampDate } from '@/domain/dates/valeurChampDate'
 
 export default async function ModifierAbsencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -42,8 +43,8 @@ export default async function ModifierAbsencePage({ params }: { params: Promise<
           <FormulaireModifierAbsence
             absenceId={id}
             type={absence.type}
-            dateDebut={absence.dateDebut.toISOString().slice(0, 10)}
-            dateFin={absence.dateFin.toISOString().slice(0, 10)}
+            dateDebut={valeurChampDate(absence.dateDebut)}
+            dateFin={valeurChampDate(absence.dateFin)}
             motif={absence.motif}
           />
         )}

@@ -17,7 +17,9 @@ import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { presentationAttestation } from '@/domain/absences/presentationAttestation'
 import { statutEffectif } from '@/domain/absences/statutEffectif'
-import { aujourdhui } from '@/domain/dates/jourCivil'
+import { dureeEnJours, nombreDeJoursRestants } from '@/domain/absences/duree'
+import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
+import { aujourdhui, jourLocalDe } from '@/domain/dates/jourCivil'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -40,26 +42,6 @@ const STYLES_STATUT: Record<string, string> = {
   TERMINE: 'bg-muted text-muted-foreground ring-border',
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function calculerDureeJours(debut: Date, fin: Date): number {
-  const msParJour = 1000 * 60 * 60 * 24
-  return Math.max(1, Math.round((fin.getTime() - debut.getTime()) / msParJour) + 1)
-}
-
-function calculerJoursRestants(fin: Date): number {
-  const aujourdhui = new Date()
-  aujourdhui.setHours(0, 0, 0, 0)
-  const finNormalisee = new Date(fin)
-  finNormalisee.setHours(0, 0, 0, 0)
-  return Math.max(
-    0,
-    Math.round((finNormalisee.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24))
-  )
-}
-
 export default async function DetailAbsence({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const absence = await recupererAbsenceDetail(id)
@@ -68,9 +50,11 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   // « Dépassé » se déduit de la date de fin à chaque affichage, il n'est pas lu dans la base
   // (voir statutEffectif) : la fiche est juste même si personne n'a ouvert la liste.
   const statut = statutEffectif(absence, aujourdhui())
-  const dureeJours = calculerDureeJours(absence.dateDebut, absence.dateFin)
+  const dureeJours = dureeEnJours(absence.dateDebut, absence.dateFin)
   const joursRestants =
-    statut === 'EN_PERIODE' || statut === 'DEPASSE' ? calculerJoursRestants(absence.dateFin) : null
+    statut === 'EN_PERIODE' || statut === 'DEPASSE'
+      ? nombreDeJoursRestants(absence.dateFin, aujourdhui())
+      : null
   const { enseignant } = absence
 
   // Les boutons suivent les règles que le serveur impose de toute façon (etapesAbsence.ts) :
@@ -87,7 +71,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
     mission && absence.statutAttestation === null ? erreurDetailsMission(absence.motif) : undefined
   const signature =
     absence.statutAttestation === 'VALIDEE' && absence.dateValidationAttestation
-      ? `Signée le ${formatDate(absence.dateValidationAttestation)}${absence.auteurValidationAttestation ? ` (${absence.auteurValidationAttestation})` : ''}`
+      ? `Signée le ${formaterDateMoisEnLettres(absence.dateValidationAttestation)}${absence.auteurValidationAttestation ? ` (${absence.auteurValidationAttestation})` : ''}`
       : null
 
   return (
@@ -174,12 +158,12 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               {LIBELLES_TYPE_ABSENCE[absence.type]}
             </h2>
             <p className="text-foreground text-sm">
-              Du <strong>{formatDate(absence.dateDebut)}</strong> au{' '}
-              <strong>{formatDate(absence.dateFin)}</strong>
+              Du <strong>{formaterDateMoisEnLettres(absence.dateDebut)}</strong> au{' '}
+              <strong>{formaterDateMoisEnLettres(absence.dateFin)}</strong>
             </p>
             {absence.dateRetour && (
               <p className="text-muted-foreground mt-1 text-sm">
-                Retour enregistré le {formatDate(absence.dateRetour)}
+                Retour enregistré le {formaterDateMoisEnLettres(absence.dateRetour)}
               </p>
             )}
           </section>
@@ -219,8 +203,8 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
               <Item label="Type" valeur={LIBELLES_TYPE_ABSENCE[absence.type]} />
               <Item label="Statut" valeur={LIBELLES_STATUT[statut] ?? statut} />
-              <Item label="Date de début" valeur={formatDate(absence.dateDebut)} />
-              <Item label="Date de fin" valeur={formatDate(absence.dateFin)} />
+              <Item label="Date de début" valeur={formaterDateMoisEnLettres(absence.dateDebut)} />
+              <Item label="Date de fin" valeur={formaterDateMoisEnLettres(absence.dateFin)} />
               {mission ? (
                 <>
                   <Item label="Établissement d'accueil" valeur={mission.lieuAccueil || '—'} />
@@ -229,23 +213,29 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               ) : (
                 <Item label="Motif" valeur={absence.motif ?? '—'} multiligne />
               )}
-              <Item label="Enregistrée le" valeur={formatDate(absence.createdAt)} />
+              <Item
+                label="Enregistrée le"
+                valeur={formaterDateMoisEnLettres(jourLocalDe(absence.createdAt))}
+              />
               {absence.dateValidation && (
                 <Item
                   label="Validée le"
-                  valeur={`${formatDate(absence.dateValidation)}${absence.auteurValidation ? ` (${absence.auteurValidation})` : ''}`}
+                  valeur={`${formaterDateMoisEnLettres(absence.dateValidation)}${absence.auteurValidation ? ` (${absence.auteurValidation})` : ''}`}
                 />
               )}
               {absence.referenceCorrespondance && (
                 <Item label="Réf. correspondance" valeur={absence.referenceCorrespondance} />
               )}
               {absence.dateCorrespondance && (
-                <Item label="Date correspondance" valeur={formatDate(absence.dateCorrespondance)} />
+                <Item
+                  label="Date correspondance"
+                  valeur={formaterDateMoisEnLettres(absence.dateCorrespondance)}
+                />
               )}
               {absence.dateDemandeInteressee && (
                 <Item
                   label="Demande intéressée"
-                  valeur={formatDate(absence.dateDemandeInteressee)}
+                  valeur={formaterDateMoisEnLettres(absence.dateDemandeInteressee)}
                 />
               )}
               {absence.numeroDecision && (
@@ -300,7 +290,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
           {statut === 'TERMINE' && absence.dateRetour && (
             <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
               <p className="text-muted-foreground text-sm">
-                Retour enregistré le {formatDate(absence.dateRetour)}.
+                Retour enregistré le {formaterDateMoisEnLettres(absence.dateRetour)}.
               </p>
             </div>
           )}

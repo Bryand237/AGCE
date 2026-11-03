@@ -7,6 +7,7 @@ import {
   debutDeJour,
   dernierJourDAnnee,
   formaterDateIso,
+  jourLocalDe,
   premierJourDAnnee,
 } from './jourCivil'
 
@@ -27,6 +28,23 @@ describe('aujourdhui', () => {
   it('garde le jour local juste avant minuit', () => {
     const presDeMinuit = new Date(2026, 9, 21, 23, 59, 59)
     expect(aujourdhui(presDeMinuit).toISOString()).toBe('2026-10-21T00:00:00.000Z')
+  })
+})
+
+describe('jourLocalDe', () => {
+  it('donne le jour du calendrier local d’un instant, à minuit UTC', () => {
+    // Construit avec les accesseurs locaux : le test ne dépend pas du fuseau de la machine.
+    const instant = new Date(2026, 10, 3, 0, 20, 0)
+    expect(jourLocalDe(instant).toISOString()).toBe('2026-11-03T00:00:00.000Z')
+    expect(jourLocalDe(new Date(2026, 10, 3, 23, 40, 0)).toISOString()).toBe(
+      '2026-11-03T00:00:00.000Z'
+    )
+  })
+
+  it('aujourdhui() en est le cas particulier de l’instant présent', () => {
+    expect(aujourdhui(new Date(2026, 5, 9, 8, 0, 0)).getTime()).toBe(
+      jourLocalDe(new Date(2026, 5, 9, 8, 0, 0)).getTime()
+    )
   })
 })
 

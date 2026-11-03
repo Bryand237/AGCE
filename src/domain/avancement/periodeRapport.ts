@@ -1,3 +1,4 @@
+import { formaterDateIso } from '../dates/jourCivil'
 import { blocageRapportValide, type BlocageRapportValide } from './rapportValideModifiable'
 
 /**
@@ -5,7 +6,7 @@ import { blocageRapportValide, type BlocageRapportValide } from './rapportValide
  * `formaterDateCourte`) : on compare donc le jour UTC, sans se laisser tromper par une heure.
  */
 export function memeJour(a: Date, b: Date): boolean {
-  return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10)
+  return formaterDateIso(a) === formaterDateIso(b)
 }
 
 export type AvancementDuRapport = {
