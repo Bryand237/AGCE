@@ -135,6 +135,28 @@ Déjà présents dans le `package.json` fourni (rien à ajouter à la main) :
 }
 ```
 
+### Tests : unitaires et de bout en bout
+
+- **`npm run test:run`** (Vitest) : les règles métier et les actions, sans base ni navigateur. Ces tests
+  ne dépendent **pas du fuseau horaire** de la machine : les dates sont stockées à minuit UTC et lues avec
+  `getUTC…()` / `toISOString()`. `src/tests-independants-du-fuseau.test.ts` refuse, dans les tests, un
+  accesseur « heure locale » (`getFullYear()`, `getDate()`, `toLocaleDateString()`…). Contrôle :
+  `TZ=America/New_York npm run test:run` doit donner le même résultat que sans `TZ`.
+- **`npm run test:e2e`** (Playwright) : les parcours complets dans un vrai navigateur, contre
+  l'application construite et lancée par le test lui-même. **Ces tests ÉCRIVENT dans la base de
+  `DATABASE_URL`** (enseignants, absences, rapports de test) : les lancer sur une base jetable (celle de
+  la CI, ou une copie restaurée depuis une sauvegarde), **jamais sur la base de l'installation**. Ils ne
+  se rejouent pas deux fois sur la même base.
+  - Les fenêtres de confirmation (marquer une attestation signée, valider un rapport…) se valident avec
+    `confirmer(page, /libellé du bouton/i)` (`tests/e2e/helpers.ts`), qui attend aussi leur fermeture.
+  - Les listes déroulantes d'un formulaire se pilotent par leur identifiant (`#grade`) ou leur nom
+    (`select[name="sexe"]`), pas par `getByLabel` : le libellé d'une liste englobe le texte de ses options.
+  - `workers: 4` dans `playwright.config.ts` : chaque test se connecte avec le même compte, et la
+    connexion est refusée au-delà de 5 essais en 5 minutes (voir « Page de connexion »).
+- **CI** (`.github/workflows/ci.yml`) : le travail `verification` enchaîne lint, types, tests unitaires et
+  de bout en bout sur une base PostgreSQL jetable ; le travail `image-docker` construit l'image
+  (`docker build`), pour qu'un `Dockerfile` cassé se voie avant le déploiement.
+
 ## Contrôle d'accès
 
 Toutes les pages et tous les téléchargements (liste des enseignants,

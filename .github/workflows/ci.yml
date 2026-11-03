@@ -59,3 +59,14 @@ jobs:
 
       - name: Tests end-to-end (Playwright)
         run: npm run test:e2e
+
+  # L'image de production se construit à part : un Dockerfile cassé (étape de build, dépendance
+  # système) ne se voyait qu'au déploiement. Le travail ne lance pas le conteneur : il n'y a pas de
+  # base à lui donner ici.
+  image-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construction de l'image
+        run: docker build -t agce:ci .

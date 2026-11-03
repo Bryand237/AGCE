@@ -28,16 +28,16 @@ describe('calculerAgeRetraite', () => {
 describe('calculerDateRetraitePrevue', () => {
   it('ajoute l’âge de retraite du grade à la date de naissance', () => {
     const date = calculerDateRetraitePrevue(new Date('1970-03-15'), 'CHARGE_DE_COURS')
-    expect(date.getFullYear()).toBe(2030)
-    expect(date.getMonth()).toBe(2) // mars, index 0
-    expect(date.getDate()).toBe(15)
+    // Les dates sont enregistrées à minuit UTC : on les lit en UTC. Les accesseurs locaux
+    // (getDate…) rendaient la veille sur une machine réglée à l'ouest de l'UTC (audit C8).
+    expect(date.toISOString()).toBe('2030-03-15T00:00:00.000Z')
   })
 
   it('recule de 5 ans si le grade passe de Chargé de Cours à Maître de Conférences', () => {
     const naissance = new Date('1970-03-15')
     const dateEnCC = calculerDateRetraitePrevue(naissance, 'CHARGE_DE_COURS')
     const dateEnMC = calculerDateRetraitePrevue(naissance, 'MAITRE_DE_CONFERENCES')
-    expect(dateEnMC.getFullYear() - dateEnCC.getFullYear()).toBe(5)
+    expect(dateEnMC.getUTCFullYear() - dateEnCC.getUTCFullYear()).toBe(5)
   })
 })
 

@@ -4,6 +4,10 @@ import { Pool } from 'pg'
 import type { Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 
+// ATTENTION : ces tests ÉCRIVENT dans la base désignée par DATABASE_URL (enseignants, absences,
+// rapports de test). Ne jamais la faire pointer vers la base du propriétaire : utiliser une base
+// jetable (celle de la CI) ou une copie restaurée depuis une sauvegarde. Ils ne se rejouent pas
+// deux fois sur la même base (matricules, abréviations et éditions de test uniques).
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 export const prismaTest = new PrismaClient({ adapter: new PrismaPg(pool) })
 
@@ -56,4 +60,17 @@ export async function creerEnseignantTest(departementId: string, matricule: stri
       dateEffetEchelon: new Date('2023-11-26'),
     },
   })
+}
+
+/**
+ * Confirme la fenêtre « Êtes-vous sûr ? » (rôle `alertdialog`) qui s'ouvre avant une action qui
+ * ne se défait pas : signer une attestation ou une décision, enregistrer un retour, valider un
+ * rapport. Le bouton du formulaire n'envoie plus directement : il ouvre la fenêtre, et c'est son
+ * bouton de confirmation (`libelle`) qui envoie. On le cherche DANS la fenêtre : le formulaire
+ * derrière porte parfois le même libellé (« Marquer signée »).
+ */
+export async function confirmer(page: Page, libelle: RegExp) {
+  const fenetre = page.getByRole('alertdialog')
+  await fenetre.getByRole('button', { name: libelle }).click()
+  await expect(fenetre).toBeHidden()
 }

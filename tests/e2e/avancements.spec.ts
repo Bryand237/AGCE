@@ -1,7 +1,17 @@
 import { test, expect } from '@playwright/test'
-import { creerEtablissementTest, creerDepartementTest, creerEnseignantTest, seConnecter } from './helpers'
+import {
+  confirmer,
+  creerEtablissementTest,
+  creerDepartementTest,
+  creerEnseignantTest,
+  seConnecter,
+} from './helpers'
 
 test.describe('Avancements', () => {
+  // Dans l'ordre, l'un après l'autre : le premier valide son rapport, et un second brouillon sur
+  // la même période (proposée par défaut) ferait apparaître l'avertissement de chevauchement.
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeAll(async () => {
     const etab = await creerEtablissementTest()
     const dep = await creerDepartementTest(etab.id)
@@ -12,7 +22,9 @@ test.describe('Avancements', () => {
     await seConnecter(page)
   })
 
-  test('création du rapport, sélection automatique, validation, puis génération de la décision', async ({ page }) => {
+  test('création du rapport, sélection automatique, validation, puis génération de la décision', async ({
+    page,
+  }) => {
     await page.goto('/avancements/nouveau')
     await page.getByLabel(/édition/i).fill('99ème')
     await page.getByRole('button', { name: /générer la sélection/i }).click()
@@ -20,21 +32,34 @@ test.describe('Avancements', () => {
     // Redirigé vers la page du rapport nouvellement créé
     await expect(page.getByRole('heading', { name: /rapport 99ème/i })).toBeVisible()
 
-    await page.getByLabel(/date de validation/i).first().fill('2026-07-15')
-    await page.getByLabel(/auteur de la validation/i).first().fill('Le Recteur')
+    await page
+      .getByLabel(/date de validation/i)
+      .first()
+      .fill('2026-07-15')
+    await page
+      .getByLabel(/auteur de la validation/i)
+      .first()
+      .fill('Le Recteur')
     await page.getByRole('button', { name: /^valider$/i }).click()
+    // Valider ne se défait pas : une fenêtre demande confirmation avant d'envoyer.
+    await confirmer(page, /valider le rapport/i)
 
     await expect(page.getByText(/validé le/i)).toBeVisible()
 
-    // Ouvre le premier avancement listé et génère sa décision
-    await page.getByRole('link', { name: /mbarga|dupont/i }).first().click();
-    await page.getByRole('button', { name: /générer le brouillon/i }).click();
-    await expect(page.getByText(/télécharger le brouillon/i)).toBeVisible();
+    // Ouvre la décision du premier avancement listé (le lien porte « Générer la décision », pas
+    // le nom de l'enseignant, qui est un simple texte de la ligne) et génère son brouillon.
+    await page
+      .getByRole('link', { name: /générer la décision/i })
+      .first()
+      .click()
+    await page.getByRole('button', { name: /générer le brouillon/i }).click()
+    await expect(page.getByText(/télécharger le brouillon/i)).toBeVisible()
 
     await page.getByLabel(/numéro de décision/i).fill('0000456')
     await page.getByLabel(/date de validation/i).fill('2026-07-16')
     await page.getByLabel(/auteur de la validation/i).fill('Le Recteur')
     await page.getByRole('button', { name: /marquer signée/i }).click()
+    await confirmer(page, /^marquer signée$/i)
 
     await expect(page.getByText(/décision n°0000456/i)).toBeVisible()
   })
