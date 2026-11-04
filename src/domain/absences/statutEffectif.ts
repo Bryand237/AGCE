@@ -32,6 +32,14 @@ export function statutEffectif(
     : 'EN_PERIODE'
 }
 
+/** Les statuts d'une absence, tels qu'ils s'écrivent à l'écran. */
+export const LIBELLES_STATUT_ABSENCE: Record<StatutAbsence, string> = {
+  EN_ATTENTE: 'En attente',
+  EN_PERIODE: 'En période',
+  DEPASSE: 'Dépassé',
+  TERMINE: 'Terminé',
+}
+
 /** Ordre du tri par statut : ce qui attend une action d'abord, le terminé en dernier. */
 export const RANG_STATUT: Record<StatutAbsence, number> = {
   EN_ATTENTE: 0,

@@ -9,13 +9,9 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { lirePage } from '@/lib/pagination'
+import { LIBELLES_TYPE_ETABLISSEMENT } from '@/domain/etablissements/typeEtablissement'
 
 type Recherche = { page?: string; recherche?: string; tri?: 'asc' | 'desc' }
-
-const LIBELLES_TYPE: Record<string, string> = {
-  ECOLE: 'École',
-  FACULTE: 'Faculté',
-}
 
 function construireLien(params: Recherche, page: number) {
   const sp = new URLSearchParams()
@@ -167,7 +163,7 @@ export default async function PageEtablissements({
                     </Link>
                   </td>
                   <td className="text-muted-foreground px-3 py-3">{e.abreviation}</td>
-                  <td className="px-3 py-3">{LIBELLES_TYPE[e.type] ?? e.type}</td>
+                  <td className="px-3 py-3">{LIBELLES_TYPE_ETABLISSEMENT[e.type] ?? e.type}</td>
                   <td className="text-muted-foreground px-3 py-3">{e._count.departements}</td>
                   <td className="text-muted-foreground px-3 py-3">{e.nombreEnseignants}</td>
                   <td className="px-4 py-3 text-right">

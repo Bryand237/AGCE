@@ -16,13 +16,7 @@ import {
   identifiantsInitiaux,
   motDePasseCorrect,
 } from '@/lib/comptes/identifiants'
-
-export type EtatFormulaire = {
-  errors?: Record<string, string[]>
-  message?: string
-  /** Vrai quand `message` annonce une réussite (et non une erreur). */
-  succes?: boolean
-}
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const MOT_DE_PASSE_INCORRECT = 'Le mot de passe actuel est incorrect.'
 const COMPTE_DISPARU = "Ce compte n'existe plus : reconnectez-vous."

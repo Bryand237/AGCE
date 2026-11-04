@@ -15,15 +15,10 @@ import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
+import { LIBELLES_STATUT_ABSENCE } from '@/domain/absences/statutEffectif'
+import type { StatutAbsence } from '@/domain/enseignants/dossier'
 import { aujourdhui } from '@/domain/dates/jourCivil'
 import { lirePage } from '@/lib/pagination'
-
-const LIBELLES_STATUT: Record<string, string> = {
-  EN_ATTENTE: 'En attente',
-  EN_PERIODE: 'En période',
-  DEPASSE: 'Dépassé',
-  TERMINE: 'Terminé',
-}
 
 export default async function PageAbsences({
   searchParams,
@@ -214,7 +209,7 @@ export default async function PageAbsences({
   )
 }
 
-function BadgeStatut({ statut }: { statut: string }) {
+function BadgeStatut({ statut }: { statut: StatutAbsence }) {
   const styles: Record<string, string> = {
     EN_ATTENTE: 'bg-amber-50 text-amber-700 ring-amber-100',
     EN_PERIODE: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
@@ -225,7 +220,7 @@ function BadgeStatut({ statut }: { statut: string }) {
     <span
       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[statut] ?? 'bg-muted text-muted-foreground'}`}
     >
-      {LIBELLES_STATUT[statut] ?? statut}
+      {LIBELLES_STATUT_ABSENCE[statut] ?? statut}
     </span>
   )
 }

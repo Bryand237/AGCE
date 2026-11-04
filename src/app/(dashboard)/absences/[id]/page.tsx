@@ -16,19 +16,12 @@ import { erreurDetailsMission, lireMotifMission } from '@/domain/absences/motifM
 import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
 import { presentationAttestation } from '@/domain/absences/presentationAttestation'
-import { statutEffectif } from '@/domain/absences/statutEffectif'
+import { LIBELLES_STATUT_ABSENCE, statutEffectif } from '@/domain/absences/statutEffectif'
 import { dureeEnJours, nombreDeJoursRestants } from '@/domain/absences/duree'
 import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
 import { aujourdhui, jourLocalDe } from '@/domain/dates/jourCivil'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
-
-const LIBELLES_STATUT: Record<string, string> = {
-  EN_ATTENTE: 'En attente',
-  EN_PERIODE: 'En période',
-  DEPASSE: 'Dépassé',
-  TERMINE: 'Terminé',
-}
 
 const LIBELLES_ATTESTATION: Record<string, string> = {
   EN_ATTENTE: 'Brouillon, non signée',
@@ -107,7 +100,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STYLES_STATUT[statut]}`}
             >
-              {LIBELLES_STATUT[statut]}
+              {LIBELLES_STATUT_ABSENCE[statut]}
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {!refusModification && (
@@ -202,7 +195,7 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
             <h2 className="text-foreground mb-4 text-sm font-bold">Détails de l&apos;absence</h2>
             <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
               <Item label="Type" valeur={LIBELLES_TYPE_ABSENCE[absence.type]} />
-              <Item label="Statut" valeur={LIBELLES_STATUT[statut] ?? statut} />
+              <Item label="Statut" valeur={LIBELLES_STATUT_ABSENCE[statut] ?? statut} />
               <Item label="Date de début" valeur={formaterDateMoisEnLettres(absence.dateDebut)} />
               <Item label="Date de fin" valeur={formaterDateMoisEnLettres(absence.dateFin)} />
               {mission ? (

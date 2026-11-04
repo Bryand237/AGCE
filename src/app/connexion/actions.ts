@@ -9,8 +9,7 @@ import { cleLimite, limiteConnexions, messageBlocage } from '@/lib/connexion/lim
 import { verifierMotDePasse } from '@/lib/connexion/mot-de-passe'
 import { purgerSessionsExpirees } from '@/lib/connexion/sessions'
 import { SaisieConnexionSchema } from '@/lib/validations/connexion'
-
-export type EtatFormulaire = { message?: string }
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const DUREE_SESSION_HEURES = 12
 const DUREE_SESSION_SOUVENIR_HEURES = 24 * 30

@@ -1,6 +1,7 @@
 'use client'
 
-import { seConnecter, type EtatFormulaire } from './actions'
+import { seConnecter } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import { Alerte } from '@/components/ui/alerte'
 import { useActionConservee } from '@/lib/action-conservee'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'

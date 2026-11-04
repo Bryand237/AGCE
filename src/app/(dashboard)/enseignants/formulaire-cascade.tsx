@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
-import { creerEnseignant, modifierEnseignant, type EtatFormulaire } from './actions'
+import { creerEnseignant, modifierEnseignant } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import { useActionConservee } from '@/lib/action-conservee'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { valeurChampDate } from '@/domain/dates/valeurChampDate'

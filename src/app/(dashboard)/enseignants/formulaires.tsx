@@ -6,12 +6,8 @@ import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
-import {
-  marquerTransfere,
-  marquerRetraite,
-  reactiverEnseignant,
-  type EtatFormulaire,
-} from './actions'
+import { marquerTransfere, marquerRetraite, reactiverEnseignant } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const etatInitial: EtatFormulaire = {}
 const classeChamp = 'rounded-xl border border-border bg-background px-3 py-2 text-sm'

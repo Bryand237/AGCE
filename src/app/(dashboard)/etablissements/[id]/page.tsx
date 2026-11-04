@@ -6,11 +6,7 @@ import { recupererEtablissementParIdPaged } from '../donnees'
 import { FormulaireDepartement, BoutonSupprimerEtablissement } from '../formulaires'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { lirePage } from '@/lib/pagination'
-
-const LIBELLES_TYPE: Record<string, string> = {
-  ECOLE: 'École',
-  FACULTE: 'Faculté',
-}
+import { LIBELLES_TYPE_ETABLISSEMENT } from '@/domain/etablissements/typeEtablissement'
 
 export default async function DetailEtablissement({
   params,
@@ -63,7 +59,9 @@ export default async function DetailEtablissement({
             <div className="space-y-1">
               <h1 className="text-foreground text-xl font-bold">{etablissement.nom}</h1>
               <p className="text-muted-foreground text-sm">{etablissement.abreviation}</p>
-              <p className="text-muted-foreground text-sm">{LIBELLES_TYPE[etablissement.type]}</p>
+              <p className="text-muted-foreground text-sm">
+                {LIBELLES_TYPE_ETABLISSEMENT[etablissement.type]}
+              </p>
             </div>
             <Link
               href={`/etablissements/${id}/modifier`}
@@ -79,7 +77,10 @@ export default async function DetailEtablissement({
               Vue d&apos;ensemble
             </h2>
             <dl className="space-y-3 text-sm">
-              <Item label="Type" valeur={LIBELLES_TYPE[etablissement.type] ?? etablissement.type} />
+              <Item
+                label="Type"
+                valeur={LIBELLES_TYPE_ETABLISSEMENT[etablissement.type] ?? etablissement.type}
+              />
               <Item label="Abréviation" valeur={etablissement.abreviation} />
               <Item label="Départements" valeur={String(etablissement._count.departements)} />
               <Item label="Enseignants" valeur={String(totalEnseignants)} />

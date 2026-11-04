@@ -1,5 +1,7 @@
+import type { TypeEtablissement } from './typeEtablissement'
+
 /** "Doyen" pour une faculté, "Directeur" pour une école — utilisé dans
  * la correspondance administrative citée par les attestations. */
-export function titreResponsable(type: 'ECOLE' | 'FACULTE'): string {
+export function titreResponsable(type: TypeEtablissement): string {
   return type === 'FACULTE' ? 'Doyen' : 'Directeur'
 }

@@ -11,8 +11,8 @@ import {
   modifierEtablissement,
   creerDepartement,
   supprimerEtablissement,
-  type EtatFormulaire,
 } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import {
   classeBoutonDanger,
   classeBoutonPrimaire,
@@ -20,6 +20,11 @@ import {
   classeFormulaire,
 } from '@/lib/ui-classes'
 import { useActionConservee } from '@/lib/action-conservee'
+import {
+  LIBELLES_TYPE_ETABLISSEMENT,
+  TYPES_ETABLISSEMENT,
+  type TypeEtablissement,
+} from '@/domain/etablissements/typeEtablissement'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -27,7 +32,7 @@ type EtablissementExistant = {
   id: string
   nom: string
   abreviation: string
-  type: 'ECOLE' | 'FACULTE'
+  type: TypeEtablissement
   photoUrl?: string | null
 }
 
@@ -72,8 +77,11 @@ export function FormulaireEtablissement({
           className={classeChamp}
         >
           <option value="">Choisir un type</option>
-          <option value="ECOLE">École</option>
-          <option value="FACULTE">Faculté</option>
+          {TYPES_ETABLISSEMENT.map((type) => (
+            <option key={type} value={type}>
+              {LIBELLES_TYPE_ETABLISSEMENT[type]}
+            </option>
+          ))}
         </select>
         {state.errors?.type && <p className="text-destructive text-sm">{state.errors.type[0]}</p>}
       </label>

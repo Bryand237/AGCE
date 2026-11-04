@@ -2,7 +2,8 @@
 
 import { useActionState } from 'react'
 import { useReussiteNotifiee } from '@/components/ui/notifications'
-import { modifierIdentifiants, retablirIdentifiantsInitiaux, type EtatFormulaire } from './actions'
+import { modifierIdentifiants, retablirIdentifiantsInitiaux } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import { Alerte } from '@/components/ui/alerte'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { classeBoutonDanger, classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'

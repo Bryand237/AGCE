@@ -462,6 +462,13 @@ Règle de dépendance : `app` peut importer `domain` et `lib`. `domain` ne
 doit jamais importer `lib/prisma` ni quoi que ce soit de React — c'est
 ce qui le garde testable sans base de données ni navigateur.
 
+**Une définition par chose.** Ce qui sert à plusieurs écrans s'écrit une fois et s'importe : le type
+d'état des formulaires (`EtatFormulaire`, `src/lib/formulaires.ts` ; les rapports d'avancement
+l'étendent par `EtatFormulaireAvancement`), les libellés des types et des statuts d'absence, des types
+d'établissement, et les fonctions de date (`src/domain/dates`). `src/definitions-uniques.test.ts` fait
+échouer une nouvelle copie : importer l'original plutôt que le recopier. Pour ajouter un élément à ce
+contrôle, l'ajouter à la liste `UNIQUES` du test.
+
 ## Listes paginées
 
 Les listes de la base (absences, rapports d'avancement, établissements, départements d'un

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { creerAbsence, type EtatFormulaire } from './actions'
+import { creerAbsence } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import { useActionConservee } from '@/lib/action-conservee'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 import { ChampsMission } from './champs-mission'

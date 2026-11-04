@@ -22,12 +22,10 @@ import {
   ValidationDecisionSchema,
 } from '@/lib/validations/avancement'
 import { erreursDeSaisie } from '@/lib/validations/champs'
+import type { EtatFormulaire } from '@/lib/formulaires'
 
-export type EtatFormulaire = {
-  errors?: Record<string, string[]>
-  message?: string
-  /** Vrai quand `message` annonce une réussite (et non une erreur). */
-  succes?: boolean
+/** L'état commun des formulaires, plus ce dont les rapports d'avancement ont besoin en plus. */
+export type EtatFormulaireAvancement = EtatFormulaire & {
   /** Sélections qui ne peuvent plus avancer, à montrer à l'utilisateur avant de valider. */
   exclusions?: { enseignantId: string; nom: string; matricule: string; motif: string }[]
   /** Vrai quand l'utilisateur peut valider quand même, sans les enseignants de `exclusions`. */
@@ -53,9 +51,9 @@ async function chargerAvancementPourDecision(avancementId: string) {
 
 export async function mettreAJourMetadonneesSession(
   rapportId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const parsed = MetadonneesSessionSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return erreursDeSaisie(parsed.error)
@@ -91,9 +89,9 @@ async function brouillonsChevauchants(periodeDebut: Date, periodeFin: Date, sauf
 }
 
 export async function creerRapport(
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return erreursDeSaisie(parsed.error)
@@ -157,9 +155,9 @@ export async function creerRapport(
 
 export async function ajouterSelection(
   rapportId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const enseignantId = formData.get('enseignantId') as string
   if (!enseignantId) {
@@ -206,9 +204,9 @@ export async function ajouterSelection(
  */
 export async function mettreAJourRapport(
   rapportId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const parsed = RapportSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return erreursDeSaisie(parsed.error)
@@ -265,8 +263,8 @@ export async function mettreAJourRapport(
 async function modifierRapportValide(
   rapportId: string,
   saisie: { numero: string; periodeDebut: Date; periodeFin: Date }
-): Promise<EtatFormulaire> {
-  let etat: EtatFormulaire
+): Promise<EtatFormulaireAvancement> {
+  let etat: EtatFormulaireAvancement
   try {
     // Tout se lit et s'écrit dans la même transaction : la vérification (décisions, positions)
     // porte sur l'état exact que la propagation va modifier.
@@ -343,9 +341,9 @@ async function modifierRapportValide(
 export async function modifierSelection(
   rapportId: string,
   selectionId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const positionProposeeId = formData.get('positionProposeeId') as string
   if (!positionProposeeId) {
@@ -485,9 +483,9 @@ export async function retirerSelection(rapportId: string, enseignantId: string):
 
 export async function supprimerRapport(
   rapportId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   _formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const rapport = await prisma.sessionConseil.findUnique({
     where: { id: rapportId },
@@ -546,9 +544,9 @@ export async function rejeterRapport(rapportId: string, formData: FormData): Pro
 
 export async function validerRapport(
   rapportId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const dateValidation = new Date(formData.get('dateValidation') as string)
   const auteurValidation = formData.get('auteurValidation') as string
@@ -563,9 +561,9 @@ export async function validerRapport(
 
   // Les enseignants sont relus dans la transaction qui valide : les sélections datent de la
   // création du rapport et peuvent être périmées (voir selectionsAValider.ts).
-  let refus: EtatFormulaire | null
+  let refus: EtatFormulaireAvancement | null
   try {
-    refus = await prisma.$transaction(async (tx): Promise<EtatFormulaire | null> => {
+    refus = await prisma.$transaction(async (tx): Promise<EtatFormulaireAvancement | null> => {
       const rapport = await tx.sessionConseil.findUnique({
         where: { id: rapportId },
         include: {
@@ -663,8 +661,8 @@ export async function validerRapport(
 
 export async function genererDecision(
   avancementId: string,
-  _prevState: EtatFormulaire
-): Promise<EtatFormulaire> {
+  _prevState: EtatFormulaireAvancement
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const avancement = await chargerAvancementPourDecision(avancementId)
   if (!avancement?.session) return { message: 'Avancement ou session introuvable.' }
@@ -694,9 +692,9 @@ export async function genererDecision(
 
 export async function validerDecision(
   avancementId: string,
-  _prevState: EtatFormulaire,
+  _prevState: EtatFormulaireAvancement,
   formData: FormData
-): Promise<EtatFormulaire> {
+): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
   const parsed = ValidationDecisionSchema.safeParse(Object.fromEntries(formData))
   // Le formulaire n'affiche qu'une ligne d'erreur : le premier message y est joint.

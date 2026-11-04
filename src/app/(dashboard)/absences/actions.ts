@@ -17,13 +17,7 @@ import { erreurDateRetour } from '@/domain/absences/retourAbsence'
 import { erreurEtapeAbsence, type EtapeAbsence } from '@/domain/absences/etapesAbsence'
 import { erreurDetailsMission, motifAEnregistrer } from '@/domain/absences/motifMission'
 import { genererAttestationAbsence } from '@/lib/documents/genererAttestationAbsence'
-
-export type EtatFormulaire = {
-  errors?: Record<string, string[]>
-  message?: string
-  /** Vrai quand `message` annonce une réussite (et non une erreur). */
-  succes?: boolean
-}
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const ABSENCE_DISPARUE =
   "Cette absence n'existe plus (elle a peut-être été supprimée). Rechargez la liste des absences."

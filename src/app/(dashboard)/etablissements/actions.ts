@@ -8,13 +8,7 @@ import { analyserErreur, messageErreur } from '@/lib/erreurs'
 import { EtablissementSchema, DepartementSchema } from '@/lib/validations/etablissement'
 import { enregistrerImage, lireImageTeleversee, supprimerImage } from '@/lib/televersement'
 import { avecMessage } from '@/lib/messages-flash'
-
-export type EtatFormulaire = {
-  errors?: Record<string, string[]>
-  message?: string
-  /** Vrai quand `message` annonce une réussite (et non une erreur). */
-  succes?: boolean
-}
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const ABREVIATION_DEJA_UTILISEE = 'Cette abréviation est déjà utilisée par un autre établissement.'
 const ETABLISSEMENT_DISPARU =

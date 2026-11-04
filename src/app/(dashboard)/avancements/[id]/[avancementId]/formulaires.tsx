@@ -3,12 +3,12 @@
 import { Alerte } from '@/components/ui/alerte'
 import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useActionState } from 'react'
-import { genererDecision, validerDecision, type EtatFormulaire } from '../../actions'
+import { genererDecision, validerDecision, type EtatFormulaireAvancement } from '../../actions'
 import { useConfirmation } from '@/components/ui/confirmation'
 import { Recapitulatif, dateEnClair, texteEnClair } from '@/components/ui/recapitulatif'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 
-const etatInitial: EtatFormulaire = {}
+const etatInitial: EtatFormulaireAvancement = {}
 
 export function BlocDecision({
   id,

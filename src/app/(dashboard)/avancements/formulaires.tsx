@@ -17,7 +17,7 @@ import {
   rejeterRapport,
   mettreAJourMetadonneesSession,
   mettreAJourRapport,
-  type EtatFormulaire,
+  type EtatFormulaireAvancement,
 } from './actions'
 import {
   classeBoutonDanger,
@@ -31,7 +31,7 @@ import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseE
 import { notesDecisionsDejaProduites } from '@/domain/avancement/decisionsDejaProduites'
 import { metadonneesManquantes } from '@/domain/avancement/metadonneesSessionCompletes'
 
-const etatInitial: EtatFormulaire = {}
+const etatInitial: EtatFormulaireAvancement = {}
 
 type MetadonneesSession = {
   referenceLoiFinances: string | null

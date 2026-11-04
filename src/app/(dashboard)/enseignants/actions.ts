@@ -10,13 +10,7 @@ import { erreurFinDeService } from '@/domain/enseignants/finDeService'
 import { erreurChangementStatut, type ChangementStatut } from '@/domain/enseignants/statut'
 import { enregistrerImage, lireImageTeleversee, supprimerImage } from '@/lib/televersement'
 import { avecMessage } from '@/lib/messages-flash'
-
-export type EtatFormulaire = {
-  errors?: Record<string, string[]>
-  message?: string
-  /** Vrai quand `message` annonce une réussite (et non une erreur). */
-  succes?: boolean
-}
+import type { EtatFormulaire } from '@/lib/formulaires'
 
 const ENSEIGNANT_DISPARU =
   "Cet enseignant n'existe plus (il a peut-être été supprimé). Rechargez la liste des enseignants."

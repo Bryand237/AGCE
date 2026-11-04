@@ -9,8 +9,8 @@ import {
   supprimerAbsence,
   genererAttestation,
   validerAttestation,
-  type EtatFormulaire,
 } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import { Alerte } from '@/components/ui/alerte'
 import { useReussiteNotifiee } from '@/components/ui/notifications'
 import { useConfirmation } from '@/components/ui/confirmation'

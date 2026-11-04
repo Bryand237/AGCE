@@ -1,13 +1,13 @@
 'use client'
 
-import { creerRapport, type EtatFormulaire } from '../actions'
+import { creerRapport, type EtatFormulaireAvancement } from '../actions'
 import { useActionConservee } from '@/lib/action-conservee'
 import { PageHeader } from '@/components/layout/page-header'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
 import { semestrePrecedent } from '@/domain/avancement/semestrePrecedent'
 import { aujourdhui } from '@/domain/dates/jourCivil'
 
-const etatInitial: EtatFormulaire = {}
+const etatInitial: EtatFormulaireAvancement = {}
 
 export default function NouveauRapport() {
   const [state, surEnvoi, isPending] = useActionConservee(creerRapport, etatInitial)

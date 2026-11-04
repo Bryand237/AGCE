@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import './champs'
+import { TYPES_ETABLISSEMENT } from '@/domain/etablissements/typeEtablissement'
 
 export const EtablissementSchema = z.object({
   nom: z.string().trim().min(2, 'Le nom est obligatoire'),
@@ -9,7 +10,7 @@ export const EtablissementSchema = z.object({
     .min(2, "L'abréviation est obligatoire")
     .max(15, "L'abréviation ne doit pas dépasser 15 caractères")
     .transform((v) => v.toUpperCase()),
-  type: z.enum(['ECOLE', 'FACULTE'], {
+  type: z.enum(TYPES_ETABLISSEMENT, {
     message: 'Le type doit être École ou Faculté',
   }),
 })
