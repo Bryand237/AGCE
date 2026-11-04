@@ -44,7 +44,7 @@ const { exigerUtilisateur, genererDecisionFactice, journal, prismaFactice, tx } 
       update: vi.fn(),
       updateMany: vi.fn(),
     },
-    selectionAvancement: { findUnique: vi.fn() },
+    selectionAvancement: { findUnique: vi.fn(), upsert: vi.fn() },
     echelonIndiciaire: { findUnique: vi.fn(), findMany: vi.fn() },
     enseignant: { findUnique: vi.fn(), findMany: vi.fn() },
     historiqueAvancement: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
@@ -75,11 +75,13 @@ vi.mock('@/lib/documents/genererDecisionAvancement', () => ({
 }))
 
 const {
+  ajouterSelection,
   creerRapport,
   genererDecision,
   mettreAJourMetadonneesSession,
   mettreAJourRapport,
   modifierSelection,
+  rejeterRapport,
   retirerSelection,
   supprimerRapport,
   validerDecision,
@@ -679,15 +681,143 @@ describe('validerRapport : sélections périmées', () => {
     rienNEstEcrit()
   })
 
-  it('exige la date et l’auteur avant de lire quoi que ce soit', async () => {
+  it('exige la date et l’auteur avant de lire quoi que ce soit, et dit lequel manque', async () => {
     const etat = await validerRapport(
       RAPPORT,
       {},
       donnees({ dateValidation: '', auteurValidation: '' })
     )
 
-    expect(etat.message).toBe('Date et auteur de la validation sont obligatoires.')
+    expect(etat.message).toBe('La date de validation est invalide ou absente.')
+    expect(Object.keys(etat.errors ?? {}).sort()).toEqual(['auteurValidation', 'dateValidation'])
     expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+
+  it.each<[string, Record<string, string>, string]>([
+    ['la date est absente', { auteurValidation: 'Le Recteur' }, 'dateValidation'],
+    [
+      'la date est illisible',
+      { dateValidation: 'demain', auteurValidation: 'Le Recteur' },
+      'dateValidation',
+    ],
+    ['l’auteur est absent', { dateValidation: '2026-01-10' }, 'auteurValidation'],
+    [
+      'l’auteur est réduit à des espaces',
+      { dateValidation: '2026-01-10', auteurValidation: '   ' },
+      'auteurValidation',
+    ],
+  ])('refuse sans rien lire quand %s', async (_cas, valeurs, champ) => {
+    // Une date absente devenait le 1er janvier 1970 au lieu d'être refusée.
+    const etat = await validerRapport(RAPPORT, {}, donnees(valeurs))
+
+    expect(Object.keys(etat.errors ?? {})).toEqual([champ])
+    expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('ignore les identifiants vides et les espaces dans la liste des exclusions confirmées', async () => {
+    // ens-2 est retraité : la confirmation « ens-2 » (écrite avec des espaces et une virgule
+    // en trop) doit être comprise comme la liste [ens-2], donc suffire.
+    rapportAvec([selectionAValider(1), selectionAValider(2, { statut: 'RETRAITE' })])
+
+    await expect(valider({ exclusionsConfirmees: ' ens-2 ,, ' })).rejects.toThrow(
+      `NEXT_REDIRECT /avancements/${RAPPORT}?msg=rapport_valide`
+    )
+
+    expect(tx.selectionAvancement.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['sel-2'] } },
+    })
+  })
+
+  it('traite l’absence de liste comme « aucune exclusion confirmée »', async () => {
+    rapportAvec([selectionAValider(1), selectionAValider(2, { statut: 'RETRAITE' })])
+
+    const etat = await valider()
+
+    expect(etat.exclusions?.map((e) => e.enseignantId)).toEqual(['ens-2'])
+    rienNEstEcrit()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// E4 : ajout d'une sélection et rejet d'un rapport lisent leur saisie par un schéma.
+
+describe('ajouterSelection : saisie', () => {
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+  })
+
+  it.each<[string, Record<string, string>]>([
+    ['aucun enseignant n’est choisi', { enseignantId: '' }],
+    ['le champ est absent', {}],
+    ['l’identifiant est réduit à des espaces', { enseignantId: '  ' }],
+  ])('refuse avec un message précis quand %s', async (_cas, valeurs) => {
+    const etat = await ajouterSelection(RAPPORT, {}, donnees(valeurs))
+
+    expect(etat.message).toBe('Veuillez sélectionner un enseignant.')
+    expect(Object.keys(etat.errors ?? {})).toEqual(['enseignantId'])
+    expect(prismaFactice.enseignant.findUnique).not.toHaveBeenCalled()
+    expect(prismaFactice.selectionAvancement.upsert).not.toHaveBeenCalled()
+  })
+
+  it('un fichier envoyé à la place de l’identifiant n’est pas pris pour un identifiant', async () => {
+    const formData = new FormData()
+    formData.set('enseignantId', new File(['x'], 'x.txt'))
+
+    const etat = await ajouterSelection(RAPPORT, {}, formData)
+
+    expect(etat.message).toBe('Veuillez sélectionner un enseignant.')
+    expect(prismaFactice.enseignant.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('modifierSelection : saisie', () => {
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+  })
+
+  it.each<[string, Record<string, string>]>([
+    ['aucune position n’est choisie', { positionProposeeId: '' }],
+    ['le champ est absent', {}],
+  ])('refuse sans rien lire quand %s', async (_cas, valeurs) => {
+    const etat = await modifierSelection(RAPPORT, 'sel-1', {}, donnees(valeurs))
+
+    expect(etat.message).toBe('Veuillez choisir une position proposée valide.')
+    expect(Object.keys(etat.errors ?? {})).toEqual(['positionProposeeId'])
+    expect(prismaFactice.selectionAvancement.findUnique).not.toHaveBeenCalled()
+    expect(prismaFactice.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('rejeterRapport : motif', () => {
+  beforeEach(() => {
+    journal.length = 0
+    vi.clearAllMocks()
+    exigerUtilisateur.mockResolvedValue({ id: 'u-1' })
+    prismaFactice.sessionConseil.update.mockResolvedValue({})
+  })
+
+  it('enregistre le motif saisi, sans les espaces autour', async () => {
+    await rejeterRapport(RAPPORT, donnees({ motif: '  Pièces manquantes  ' }))
+
+    expect(prismaFactice.sessionConseil.update).toHaveBeenCalledWith({
+      where: { id: RAPPORT },
+      data: { motifRejet: 'Pièces manquantes' },
+    })
+  })
+
+  it.each<[string, Record<string, string>]>([
+    ['le motif est vide', { motif: '' }],
+    ['le motif est réduit à des espaces', { motif: '   ' }],
+    ['le champ est absent', {}],
+  ])('n’enregistre rien quand %s', async (_cas, valeurs) => {
+    // Avant : un motif absent était enregistré tel quel (null) et effaçait le motif existant.
+    await rejeterRapport(RAPPORT, donnees(valeurs))
+
+    expect(prismaFactice.sessionConseil.update).not.toHaveBeenCalled()
   })
 })
 

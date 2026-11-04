@@ -145,7 +145,7 @@ export async function modifierEnseignant(
       const url = await enregistrerImage('enseignants', id, image)
       await prisma.enseignant.update({ where: { id }, data: { photoUrl: url } })
       await supprimerImage(ancienneUrl)
-    } else if ((formData.get('removePhoto') as string | null) === 'on' && ancienneUrl) {
+    } else if (formData.get('removePhoto') === 'on' && ancienneUrl) {
       await prisma.enseignant.update({ where: { id }, data: { photoUrl: null } })
       await supprimerImage(ancienneUrl)
     }

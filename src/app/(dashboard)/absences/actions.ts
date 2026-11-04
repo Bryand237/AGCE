@@ -9,6 +9,8 @@ import {
   AbsenceSchema,
   ModificationAbsenceSchema,
   RetourAbsenceSchema,
+  ValidationAbsenceSchema,
+  ValidationAttestationSchema,
 } from '@/lib/validations/absence'
 import { erreursDeSaisie } from '@/lib/validations/champs'
 import { avecMessage } from '@/lib/messages-flash'
@@ -149,11 +151,15 @@ export async function validerAbsence(
   formData: FormData
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
-  const dateValidation = new Date(formData.get('dateValidation') as string)
-  const auteurValidation = formData.get('auteurValidation') as string
-  if (isNaN(dateValidation.getTime()) || !auteurValidation) {
-    return { message: 'Date et auteur de la validation sont obligatoires.' }
-  }
+  const saisie = ValidationAbsenceSchema.safeParse(Object.fromEntries(formData))
+  if (!saisie.success) return erreursDeSaisie(saisie.error)
+  const {
+    dateValidation,
+    auteurValidation,
+    referenceCorrespondance,
+    dateCorrespondance,
+    dateDemandeInteressee,
+  } = saisie.data
 
   try {
     const lecture = await lireEtape(absenceId, 'valider')
@@ -166,13 +172,9 @@ export async function validerAbsence(
         statut: 'EN_PERIODE',
         dateValidation,
         auteurValidation,
-        referenceCorrespondance: (formData.get('referenceCorrespondance') as string) || null,
-        dateCorrespondance: formData.get('dateCorrespondance')
-          ? new Date(formData.get('dateCorrespondance') as string)
-          : null,
-        dateDemandeInteressee: formData.get('dateDemandeInteressee')
-          ? new Date(formData.get('dateDemandeInteressee') as string)
-          : null,
+        referenceCorrespondance,
+        dateCorrespondance,
+        dateDemandeInteressee,
       },
     })
   } catch (erreur) {
@@ -306,12 +308,9 @@ export async function validerAttestation(
 ): Promise<EtatFormulaire> {
   await exigerUtilisateur()
   // Le numéro est imprimé sur l'attestation : il est enregistré tel qu'il y figurera.
-  const numeroDecision = String(formData.get('numeroDecision') ?? '').trim()
-  const dateValidation = new Date(formData.get('dateValidation') as string)
-  const auteurValidation = formData.get('auteurValidation') as string
-  if (!numeroDecision || isNaN(dateValidation.getTime()) || !auteurValidation) {
-    return { message: 'Numéro, date et auteur sont tous obligatoires.' }
-  }
+  const saisie = ValidationAttestationSchema.safeParse(Object.fromEntries(formData))
+  if (!saisie.success) return erreursDeSaisie(saisie.error)
+  const { numeroDecision, dateValidation, auteurValidation } = saisie.data
 
   try {
     const absence = await lireAbsenceComplete(absenceId)

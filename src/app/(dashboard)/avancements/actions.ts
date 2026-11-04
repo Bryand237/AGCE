@@ -21,6 +21,12 @@ import {
   RapportSchema,
   ValidationDecisionSchema,
 } from '@/lib/validations/avancement'
+import {
+  PositionProposeeSchema,
+  RejetRapportSchema,
+  SelectionEnseignantSchema,
+  ValidationRapportSchema,
+} from '@/lib/validations/rapport-avancement'
 import { erreursDeSaisie } from '@/lib/validations/champs'
 import type { EtatFormulaire } from '@/lib/formulaires'
 
@@ -159,10 +165,9 @@ export async function ajouterSelection(
   formData: FormData
 ): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
-  const enseignantId = formData.get('enseignantId') as string
-  if (!enseignantId) {
-    return { message: 'Veuillez sélectionner un enseignant.' }
-  }
+  const saisie = SelectionEnseignantSchema.safeParse(Object.fromEntries(formData))
+  if (!saisie.success) return erreursDeSaisie(saisie.error)
+  const { enseignantId } = saisie.data
 
   const enseignant = await prisma.enseignant.findUnique({
     where: { id: enseignantId },
@@ -345,10 +350,9 @@ export async function modifierSelection(
   formData: FormData
 ): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
-  const positionProposeeId = formData.get('positionProposeeId') as string
-  if (!positionProposeeId) {
-    return { message: 'Veuillez choisir une position proposée valide.' }
-  }
+  const saisie = PositionProposeeSchema.safeParse(Object.fromEntries(formData))
+  if (!saisie.success) return erreursDeSaisie(saisie.error)
+  const { positionProposeeId } = saisie.data
 
   const [rapport, selection] = await Promise.all([
     prisma.sessionConseil.findUnique({ where: { id: rapportId } }),
@@ -537,8 +541,13 @@ export async function supprimerRapport(
 
 export async function rejeterRapport(rapportId: string, formData: FormData): Promise<void> {
   await exigerUtilisateur()
-  const motif = formData.get('motif') as string
-  await prisma.sessionConseil.update({ where: { id: rapportId }, data: { motifRejet: motif } })
+  const saisie = RejetRapportSchema.safeParse(Object.fromEntries(formData))
+  // Le champ est obligatoire dans le formulaire : sans motif lisible, rien n'est enregistré.
+  if (!saisie.success) return
+  await prisma.sessionConseil.update({
+    where: { id: rapportId },
+    data: { motifRejet: saisie.data.motif },
+  })
   revalidatePath(`/avancements/${rapportId}`)
 }
 
@@ -548,16 +557,12 @@ export async function validerRapport(
   formData: FormData
 ): Promise<EtatFormulaireAvancement> {
   await exigerUtilisateur()
-  const dateValidation = new Date(formData.get('dateValidation') as string)
-  const auteurValidation = formData.get('auteurValidation') as string
-  if (isNaN(dateValidation.getTime()) || !auteurValidation) {
-    return { message: 'Date et auteur de la validation sont obligatoires.' }
-  }
+  const saisie = ValidationRapportSchema.safeParse(Object.fromEntries(formData))
+  if (!saisie.success) return erreursDeSaisie(saisie.error)
+  const { dateValidation, auteurValidation } = saisie.data
 
   // Enseignants que l'utilisateur a déjà vus dans la liste d'exclusion et accepté de laisser de côté.
-  const exclusionsConfirmees = new Set(
-    ((formData.get('exclusionsConfirmees') as string | null) ?? '').split(',').filter(Boolean)
-  )
+  const exclusionsConfirmees = new Set(saisie.data.exclusionsConfirmees)
 
   // Les enseignants sont relus dans la transaction qui valide : les sélections datent de la
   // création du rapport et peuvent être périmées (voir selectionsAValider.ts).

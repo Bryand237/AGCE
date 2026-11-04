@@ -115,7 +115,7 @@ export async function modifierEtablissement(
       const url = await enregistrerImage('etablissements', id, image)
       await prisma.etablissement.update({ where: { id }, data: { photoUrl: url } })
       await supprimerImage(ancienneUrl)
-    } else if ((formData.get('removePhoto') as string | null) === 'on' && ancienneUrl) {
+    } else if (formData.get('removePhoto') === 'on' && ancienneUrl) {
       await prisma.etablissement.update({ where: { id }, data: { photoUrl: null } })
       await supprimerImage(ancienneUrl)
     }

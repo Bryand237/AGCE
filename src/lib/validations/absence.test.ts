@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AbsenceSchema, ModificationAbsenceSchema } from './absence'
+import { z } from 'zod'
+import {
+  AbsenceSchema,
+  ModificationAbsenceSchema,
+  ValidationAbsenceSchema,
+  ValidationAttestationSchema,
+} from './absence'
 import { TYPES_ABSENCE_SAISISSABLES } from '@/domain/absences/typesAbsence'
 
 function absence(surcharge: Record<string, unknown> = {}) {
@@ -13,10 +19,7 @@ function absence(surcharge: Record<string, unknown> = {}) {
   }
 }
 
-function erreurs(
-  schema: typeof AbsenceSchema | typeof ModificationAbsenceSchema,
-  entree: unknown
-): Record<string, string[] | undefined> {
+function erreurs(schema: z.ZodTypeAny, entree: unknown): Record<string, string[] | undefined> {
   const resultat = schema.safeParse(entree)
   return resultat.success ? {} : resultat.error.flatten().fieldErrors
 }
@@ -111,6 +114,102 @@ describe('ModificationAbsenceSchema', () => {
     expect(erreurs(ModificationAbsenceSchema, { dateDebut: '', dateFin: '', motif: '' })).toEqual({
       dateDebut: ['La date de début est invalide ou absente.'],
       dateFin: ['La date de fin est invalide ou absente.'],
+    })
+  })
+})
+
+describe('ValidationAbsenceSchema', () => {
+  const complete = { dateValidation: '2026-10-01', auteurValidation: 'Le Recteur' }
+
+  it('accepte la validation sans courrier : les champs facultatifs valent null', () => {
+    const resultat = ValidationAbsenceSchema.safeParse(complete)
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data).toEqual({
+        dateValidation: new Date('2026-10-01'),
+        auteurValidation: 'Le Recteur',
+        referenceCorrespondance: null,
+        dateCorrespondance: null,
+        dateDemandeInteressee: null,
+      })
+    }
+  })
+
+  it('traite des champs vides comme absents', () => {
+    const resultat = ValidationAbsenceSchema.safeParse({
+      ...complete,
+      referenceCorrespondance: '   ',
+      dateCorrespondance: '',
+      dateDemandeInteressee: '',
+    })
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data.referenceCorrespondance).toBeNull()
+      expect(resultat.data.dateCorrespondance).toBeNull()
+      expect(resultat.data.dateDemandeInteressee).toBeNull()
+    }
+  })
+
+  it('lit le courrier saisi : référence sans espaces, dates à minuit UTC', () => {
+    const resultat = ValidationAbsenceSchema.safeParse({
+      ...complete,
+      referenceCorrespondance: ' N° 26-114 ',
+      dateCorrespondance: '2026-05-05',
+      dateDemandeInteressee: '2026-04-20',
+    })
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data.referenceCorrespondance).toBe('N° 26-114')
+      expect(resultat.data.dateCorrespondance).toEqual(new Date('2026-05-05'))
+      expect(resultat.data.dateDemandeInteressee).toEqual(new Date('2026-04-20'))
+    }
+  })
+
+  it('nomme chaque champ obligatoire manquant (champs absents de la requête compris)', () => {
+    expect(erreurs(ValidationAbsenceSchema, {})).toEqual({
+      dateValidation: ['La date de validation est invalide ou absente.'],
+      auteurValidation: ["L'auteur de la validation est obligatoire"],
+    })
+  })
+
+  it('refuse une date de courrier illisible au lieu de l’ignorer', () => {
+    expect(
+      erreurs(ValidationAbsenceSchema, { ...complete, dateCorrespondance: 'le 5 mai' })
+    ).toEqual({ dateCorrespondance: ['La date de la correspondance est invalide ou absente.'] })
+    expect(
+      erreurs(ValidationAbsenceSchema, { ...complete, dateDemandeInteressee: 'hier' })
+    ).toEqual({
+      dateDemandeInteressee: ["La date de la demande de l'intéressé(e) est invalide ou absente."],
+    })
+  })
+})
+
+describe('ValidationAttestationSchema', () => {
+  it('accepte une attestation complète et retire les espaces autour du numéro et de l’auteur', () => {
+    const resultat = ValidationAttestationSchema.safeParse({
+      numeroDecision: ' 12/26 ',
+      dateValidation: '2026-10-01',
+      auteurValidation: ' Le Recteur ',
+    })
+
+    expect(resultat.success).toBe(true)
+    if (resultat.success) {
+      expect(resultat.data).toEqual({
+        numeroDecision: '12/26',
+        dateValidation: new Date('2026-10-01'),
+        auteurValidation: 'Le Recteur',
+      })
+    }
+  })
+
+  it('nomme chaque champ manquant, y compris quand la requête ne le contient pas', () => {
+    expect(erreurs(ValidationAttestationSchema, {})).toEqual({
+      numeroDecision: ['Le numéro de décision est obligatoire'],
+      dateValidation: ['La date de validation est invalide ou absente.'],
+      auteurValidation: ["L'auteur de la validation est obligatoire"],
     })
   })
 })

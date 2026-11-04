@@ -580,6 +580,17 @@ Chaque formulaire est validé côté serveur par un schéma zod
   non antérieure au début. Une faute de frappe sur l'année (2099 pour 1999)
   fausserait l'âge de retraite et l'éligibilité à l'avancement.
 
+- **Une action serveur lit sa saisie par un schéma, jamais par `formData.get(…) as string`.**
+  `FormData.get()` renvoie `null` quand le champ manque et un fichier quand un fichier arrive à
+  la place d'un texte : forcer le type ne change rien à l'exécution. Un champ absent devenait
+  « null » en base, et `new Date(null)` donnait le 1er janvier 1970, qui passe un contrôle
+  `isNaN`. On écrit `Schema.safeParse(Object.fromEntries(formData))`, puis
+  `return erreursDeSaisie(saisie.error)` : l'écran reçoit le champ fautif et son message.
+  Briques : `date()` (obligatoire), `dateFacultative()` (vide ou absente → `undefined`, illisible
+  → refusée), `texteObligatoire()`, `videEnNull()`. Seules les comparaisons
+  (`formData.get('removePhoto') === 'on'`) restent permises hors schéma.
+  `src/saisies-des-actions.test.ts` échoue si une action ou une route y revient.
+
 Aucun âge minimal à la prise de service n'est imposé : c'est une règle à
 confirmer avec le client.
 

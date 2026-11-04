@@ -56,7 +56,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     marges: MARGES_RAPPORT,
   })
 
-  return new NextResponse(pdf as unknown as BodyInit, {
+  return new NextResponse(new Uint8Array(pdf), {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${nomFichierRapport(rapport.numero)}"`,

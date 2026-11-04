@@ -442,7 +442,52 @@ describe('actions absences : erreurs de la base', () => {
         })
       )
 
-      expect(etat.message).toMatch(/obligatoires/)
+      expect(etat.message).toBe('Le numéro de décision est obligatoire')
+      expect(etat.errors).toEqual({ numeroDecision: ['Le numéro de décision est obligatoire'] })
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it.each<[string, Record<string, string>, string]>([
+      [
+        'la date manque',
+        { numeroDecision: '12/26', auteurValidation: 'Le Recteur' },
+        'dateValidation',
+      ],
+      [
+        'la date est illisible',
+        { numeroDecision: '12/26', dateValidation: 'demain', auteurValidation: 'Le Recteur' },
+        'dateValidation',
+      ],
+      [
+        'l’auteur manque',
+        { numeroDecision: '12/26', dateValidation: '2026-10-01' },
+        'auteurValidation',
+      ],
+      [
+        'l’auteur est réduit à des espaces',
+        { numeroDecision: '12/26', dateValidation: '2026-10-01', auteurValidation: '  ' },
+        'auteurValidation',
+      ],
+    ])('refuse sans rien lire ni signer quand %s', async (_cas, valeurs, champ) => {
+      absenceEn(CONGE_AVEC_BROUILLON)
+
+      const etat = await validerAttestation('abs-1', {}, formulaire(valeurs))
+
+      expect(Object.keys(etat.errors ?? {})).toEqual([champ])
+      expect(prismaFactice.absence.findUnique).not.toHaveBeenCalled()
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('ne prend pas un fichier pour un numéro', async () => {
+      absenceEn(CONGE_AVEC_BROUILLON)
+      const donnees = new FormData()
+      donnees.set('numeroDecision', new File(['12/26'], 'numero.txt'))
+      donnees.set('dateValidation', '2026-10-01')
+      donnees.set('auteurValidation', 'Le Recteur')
+
+      const etat = await validerAttestation('abs-1', {}, donnees)
+
+      expect(etat.message).toBe('Le numéro de décision est obligatoire')
       expect(prismaFactice.absence.update).not.toHaveBeenCalled()
     })
 
@@ -485,6 +530,91 @@ describe('actions absences : erreurs de la base', () => {
       const parametres = genererAttestationAbsence.mock.calls[0]![1]
       expect(parametres.numeroDecision).toBeUndefined()
       expect(parametres.dateSignature).toBeUndefined()
+    })
+  })
+
+  describe('validerAbsence : la saisie est contrôlée avant toute lecture', () => {
+    const complete = { dateValidation: '2026-10-01', auteurValidation: 'Le Recteur' }
+
+    it.each<[string, Record<string, string>, string]>([
+      ['la date manque', { auteurValidation: 'Le Recteur' }, 'dateValidation'],
+      ['la date est illisible', { ...complete, dateValidation: 'demain' }, 'dateValidation'],
+      ['l’auteur manque', { dateValidation: '2026-10-01' }, 'auteurValidation'],
+      [
+        'l’auteur est réduit à des espaces',
+        { ...complete, auteurValidation: '  ' },
+        'auteurValidation',
+      ],
+      [
+        'la date de correspondance est illisible',
+        { ...complete, dateCorrespondance: '31/12/2026' },
+        'dateCorrespondance',
+      ],
+      [
+        'la date de demande est illisible',
+        { ...complete, dateDemandeInteressee: 'hier' },
+        'dateDemandeInteressee',
+      ],
+    ])('refuse sans rien enregistrer quand %s', async (_cas, valeurs, champ) => {
+      absenceEn({ statut: 'EN_ATTENTE' })
+
+      const etat = await validerAbsence('abs-1', {}, formulaire(valeurs))
+
+      // Une date absente devenait le 1er janvier 1970 (new Date(null)) et passait le contrôle.
+      expect(Object.keys(etat.errors ?? {})).toEqual([champ])
+      expect(etat.message).toBeTruthy()
+      expect(prismaFactice.absence.findUnique).not.toHaveBeenCalled()
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    })
+
+    it('enregistre l’auteur sans espaces et la correspondance saisie', async () => {
+      absenceEn({ statut: 'EN_ATTENTE' })
+
+      await validerAbsence(
+        'abs-1',
+        {},
+        formulaire({
+          ...complete,
+          auteurValidation: ' Le Recteur ',
+          referenceCorrespondance: ' N° 26-114 ',
+          dateCorrespondance: '2026-05-05',
+          dateDemandeInteressee: '2026-04-20',
+        })
+      )
+
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: {
+          statut: 'EN_PERIODE',
+          dateValidation: new Date('2026-10-01'),
+          auteurValidation: 'Le Recteur',
+          referenceCorrespondance: 'N° 26-114',
+          dateCorrespondance: new Date('2026-05-05'),
+          dateDemandeInteressee: new Date('2026-04-20'),
+        },
+      })
+    })
+
+    it('une correspondance laissée vide ou absente s’enregistre comme rien (null)', async () => {
+      absenceEn({ statut: 'EN_ATTENTE' })
+
+      await validerAbsence(
+        'abs-1',
+        {},
+        formulaire({ ...complete, referenceCorrespondance: '', dateCorrespondance: '' })
+      )
+
+      expect(prismaFactice.absence.update).toHaveBeenCalledWith({
+        where: { id: 'abs-1' },
+        data: {
+          statut: 'EN_PERIODE',
+          dateValidation: new Date('2026-10-01'),
+          auteurValidation: 'Le Recteur',
+          referenceCorrespondance: null,
+          dateCorrespondance: null,
+          dateDemandeInteressee: null,
+        },
+      })
     })
   })
 

@@ -20,10 +20,22 @@ export const date = (libelle: string) =>
   )
 
 /**
+ * Date facultative : laissée vide ou absente, elle vaut `undefined` ; saisie, elle doit être
+ * lisible (une date incompréhensible est refusée, jamais ignorée).
+ */
+export const dateFacultative = (libelle: string) =>
+  z.preprocess((v) => (v === '' ? undefined : v), date(libelle).optional())
+
+/**
  * Texte obligatoire. Les espaces autour sont retirés AVANT le contrôle : une saisie réduite
  * à des espaces est refusée, au lieu d'être enregistrée comme un nom « vide ».
+ *
+ * Le même message sert quand le champ est vide, ABSENT de la requête ou n'est pas un texte (un
+ * fichier envoyé à la place) : sans cela, un champ absent répondait « Ce champ est obligatoire »,
+ * sans dire lequel.
  */
-export const texteObligatoire = (message: string) => z.string().trim().min(1, message)
+export const texteObligatoire = (message: string) =>
+  z.string({ required_error: message, invalid_type_error: message }).trim().min(1, message)
 
 /**
  * Ce qu'on enregistre pour un champ facultatif d'après ce que le formulaire a envoyé :

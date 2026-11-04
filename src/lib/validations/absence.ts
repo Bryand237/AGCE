@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { date, texteObligatoire } from './champs'
+import { date, dateFacultative, texteObligatoire } from './champs'
 import { TYPES_ABSENCE_SAISISSABLES } from '@/domain/absences/typesAbsence'
 
 const FIN_AVANT_DEBUT = 'La date de fin ne peut pas précéder la date de début.'
@@ -47,4 +47,29 @@ export const ModificationAbsenceSchema = z
 /** Retour d'une absence. La comparaison avec le début de l'absence se fait dans l'action. */
 export const RetourAbsenceSchema = z.object({
   dateRetour: date('La date de retour'),
+})
+
+/**
+ * Validation d'une absence : date et auteur obligatoires, courrier de correspondance facultatif.
+ * Un champ facultatif laissé vide ou absent s'enregistre comme « rien » (`null`).
+ */
+export const ValidationAbsenceSchema = z.object({
+  dateValidation: date('La date de validation'),
+  auteurValidation: texteObligatoire("L'auteur de la validation est obligatoire"),
+  referenceCorrespondance: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => v || null),
+  dateCorrespondance: dateFacultative('La date de la correspondance').transform((v) => v ?? null),
+  dateDemandeInteressee: dateFacultative("La date de la demande de l'intéressé(e)").transform(
+    (v) => v ?? null
+  ),
+})
+
+/** Signature de l'attestation : le numéro est imprimé, il est enregistré tel qu'il y figurera. */
+export const ValidationAttestationSchema = z.object({
+  numeroDecision: texteObligatoire('Le numéro de décision est obligatoire'),
+  dateValidation: date('La date de validation'),
+  auteurValidation: texteObligatoire("L'auteur de la validation est obligatoire"),
 })
