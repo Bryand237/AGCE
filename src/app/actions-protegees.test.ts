@@ -63,7 +63,6 @@ vi.mock('@/lib/documents/genererDecisionAvancement', () => ({ genererDecisionAva
 const modulesDActions = {
   absences: await import('./(dashboard)/absences/actions'),
   avancements: await import('./(dashboard)/avancements/actions'),
-  dashboard: await import('./(dashboard)/dashboard/actions'),
   enseignants: await import('./(dashboard)/enseignants/actions'),
   etablissements: await import('./(dashboard)/etablissements/actions'),
 }
@@ -100,7 +99,6 @@ describe('actions serveur : la garde est présente dans les sources', () => {
       expect.arrayContaining([
         'app/(dashboard)/absences/actions.ts',
         'app/(dashboard)/avancements/actions.ts',
-        'app/(dashboard)/dashboard/actions.ts',
         'app/(dashboard)/enseignants/actions.ts',
         'app/(dashboard)/etablissements/actions.ts',
         'app/connexion/actions.ts',
@@ -183,8 +181,8 @@ describe('actions serveur : sans session valide, rien ne s’exécute', () => {
     cookieDeSession.valeur = undefined
   })
 
-  it('couvre bien les actions des cinq fichiers (le test ne passe pas à vide)', () => {
-    expect(actions.length).toBeGreaterThanOrEqual(31)
+  it('couvre bien les actions des quatre fichiers (le test ne passe pas à vide)', () => {
+    expect(actions.length).toBeGreaterThanOrEqual(27)
   })
 
   describe.each(SANS_SESSION_VALIDE)('%s', (_cas, preparer) => {
@@ -218,11 +216,5 @@ describe('actions serveur : avec une session valide, elles s’exécutent normal
       modulesDActions.absences.supprimerAbsence('abs-1', {}, new FormData())
     ).rejects.toThrow('NEXT_REDIRECT /absences')
     expect(accesBase).toContain('absence.findUnique')
-  })
-
-  it('les données du tableau de bord sont lues', async () => {
-    await modulesDActions.dashboard.getRepartitionParRegion()
-
-    expect(accesBase.length).toBeGreaterThan(0)
   })
 })
