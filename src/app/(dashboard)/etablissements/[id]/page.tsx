@@ -5,11 +5,8 @@ import { ArrowLeft, Building2, Layers, Pencil, Users } from 'lucide-react'
 import { recupererEtablissementParIdPaged } from '../donnees'
 import { FormulaireDepartement, BoutonSupprimerEtablissement } from '../formulaires'
 import { StatCard } from '@/components/dashboard/stat-card'
-
-const LIBELLES_TYPE: Record<string, string> = {
-  ECOLE: 'École',
-  FACULTE: 'Faculté',
-}
+import { lirePage } from '@/lib/pagination'
+import { LIBELLES_TYPE_ETABLISSEMENT } from '@/domain/etablissements/typeEtablissement'
 
 export default async function DetailEtablissement({
   params,
@@ -20,12 +17,12 @@ export default async function DetailEtablissement({
 }) {
   const { id } = await params
   const sp = await searchParams
-  const page = Number(sp.page ?? 1)
+  const pageDemandee = lirePage(sp.page)
 
-  const data = await recupererEtablissementParIdPaged(id, page, 10)
+  const data = await recupererEtablissementParIdPaged(id, pageDemandee, 10)
   if (!data) notFound()
 
-  const { etablissement, departements, total, totalPages, totalEnseignants } = data
+  const { etablissement, departements, page, total, totalPages, totalEnseignants } = data
 
   const moyenneParDept =
     etablissement._count.departements > 0
@@ -62,7 +59,9 @@ export default async function DetailEtablissement({
             <div className="space-y-1">
               <h1 className="text-foreground text-xl font-bold">{etablissement.nom}</h1>
               <p className="text-muted-foreground text-sm">{etablissement.abreviation}</p>
-              <p className="text-muted-foreground text-sm">{LIBELLES_TYPE[etablissement.type]}</p>
+              <p className="text-muted-foreground text-sm">
+                {LIBELLES_TYPE_ETABLISSEMENT[etablissement.type]}
+              </p>
             </div>
             <Link
               href={`/etablissements/${id}/modifier`}
@@ -78,7 +77,10 @@ export default async function DetailEtablissement({
               Vue d&apos;ensemble
             </h2>
             <dl className="space-y-3 text-sm">
-              <Item label="Type" valeur={LIBELLES_TYPE[etablissement.type] ?? etablissement.type} />
+              <Item
+                label="Type"
+                valeur={LIBELLES_TYPE_ETABLISSEMENT[etablissement.type] ?? etablissement.type}
+              />
               <Item label="Abréviation" valeur={etablissement.abreviation} />
               <Item label="Départements" valeur={String(etablissement._count.departements)} />
               <Item label="Enseignants" valeur={String(totalEnseignants)} />
@@ -182,7 +184,7 @@ export default async function DetailEtablissement({
               <FormulaireDepartement etablissementId={id} />
             </div>
             <div className="border-border bg-card flex items-start rounded-2xl border p-6 shadow-sm">
-              <BoutonSupprimerEtablissement id={id} />
+              <BoutonSupprimerEtablissement id={id} nom={`« ${etablissement.nom} »`} />
             </div>
           </div>
         </div>

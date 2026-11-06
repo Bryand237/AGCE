@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { TAILLE_PAGE } from '@/lib/constantes'
+import { bornerPage } from '@/lib/pagination'
 
 type ParametresListe = {
   page?: number
@@ -20,27 +20,29 @@ export async function recupererEtablissements({
 }: ParametresListe) {
   const where = recherche ? { nom: { contains: recherche, mode: 'insensitive' as const } } : {}
 
-  const [etablissements, total] = await Promise.all([
-    prisma.etablissement.findMany({
-      where,
-      orderBy: { type: tri },
-      skip: (page - 1) * TAILLE_PAGE,
-      take: TAILLE_PAGE,
-      include: {
-        departements: { select: { _count: { select: { enseignants: true } } } },
-        _count: { select: { departements: true } },
-      },
-    }),
-    prisma.etablissement.count({ where }),
-  ])
+  // Le total d'abord : la page demandée est ramenée dans les limites avant d'être lue.
+  const total = await prisma.etablissement.count({ where })
+  const pagination = bornerPage(page, total)
+  const etablissements = await prisma.etablissement.findMany({
+    where,
+    // Peu de types distincts : sans le nom puis l'identifiant, des dizaines de lignes sont
+    // « égales » et leur ordre peut changer d'une page à l'autre.
+    orderBy: [{ type: tri }, { nom: 'asc' }, { id: 'asc' }],
+    skip: pagination.skip,
+    take: pagination.take,
+    include: {
+      departements: { select: { _count: { select: { enseignants: true } } } },
+      _count: { select: { departements: true } },
+    },
+  })
 
   return {
     etablissements: etablissements.map((e) => ({
       ...e,
       nombreEnseignants: e.departements.reduce((somme, d) => somme + d._count.enseignants, 0),
     })),
-    page,
-    totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)),
+    page: pagination.page,
+    totalPages: pagination.totalPages,
     total,
   }
 }
@@ -90,24 +92,25 @@ export async function recupererEtablissementParIdPaged(id: string, page = 1, pag
 
   if (!etablissement) return null
 
-  const [departements, total, totalEnseignants] = await Promise.all([
-    prisma.departement.findMany({
-      where: { etablissementId: id },
-      orderBy: { nom: 'asc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: { _count: { select: { enseignants: true } } },
-    }),
+  const [total, totalEnseignants] = await Promise.all([
     prisma.departement.count({ where: { etablissementId: id } }),
     prisma.enseignant.count({ where: { departement: { etablissementId: id } } }),
   ])
+  const pagination = bornerPage(page, total, pageSize)
+  const departements = await prisma.departement.findMany({
+    where: { etablissementId: id },
+    orderBy: [{ nom: 'asc' }, { id: 'asc' }],
+    skip: pagination.skip,
+    take: pagination.take,
+    include: { _count: { select: { enseignants: true } } },
+  })
 
   return {
     etablissement,
     departements,
     totalEnseignants,
-    page,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    page: pagination.page,
+    totalPages: pagination.totalPages,
     total,
   }
 }

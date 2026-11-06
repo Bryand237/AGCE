@@ -2,19 +2,29 @@
 
 import { useActionState } from 'react'
 import Image from 'next/image'
+import { Trash2 } from 'lucide-react'
+import { Alerte } from '@/components/ui/alerte'
+import { useReussiteNotifiee } from '@/components/ui/notifications'
+import { useConfirmation } from '@/components/ui/confirmation'
 import {
   creerEtablissement,
   modifierEtablissement,
   creerDepartement,
   supprimerEtablissement,
-  type EtatFormulaire,
 } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
 import {
   classeBoutonDanger,
   classeBoutonPrimaire,
   classeChamp,
   classeFormulaire,
 } from '@/lib/ui-classes'
+import { useActionConservee } from '@/lib/action-conservee'
+import {
+  LIBELLES_TYPE_ETABLISSEMENT,
+  TYPES_ETABLISSEMENT,
+  type TypeEtablissement,
+} from '@/domain/etablissements/typeEtablissement'
 
 const etatInitial: EtatFormulaire = {}
 
@@ -22,7 +32,7 @@ type EtablissementExistant = {
   id: string
   nom: string
   abreviation: string
-  type: 'ECOLE' | 'FACULTE'
+  type: TypeEtablissement
   photoUrl?: string | null
 }
 
@@ -35,10 +45,10 @@ export function FormulaireEtablissement({
 }) {
   const actionServeur =
     action === 'creer' ? creerEtablissement : modifierEtablissement.bind(null, etablissement!.id)
-  const [state, formAction, isPending] = useActionState(actionServeur, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(actionServeur, etatInitial)
 
   return (
-    <form action={formAction} className="flex max-w-lg flex-col gap-4">
+    <form method="post" onSubmit={surEnvoi} className="flex max-w-lg flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
         Nom
         <input name="nom" required defaultValue={etablissement?.nom} className={classeChamp} />
@@ -67,15 +77,23 @@ export function FormulaireEtablissement({
           className={classeChamp}
         >
           <option value="">Choisir un type</option>
-          <option value="ECOLE">École</option>
-          <option value="FACULTE">Faculté</option>
+          {TYPES_ETABLISSEMENT.map((type) => (
+            <option key={type} value={type}>
+              {LIBELLES_TYPE_ETABLISSEMENT[type]}
+            </option>
+          ))}
         </select>
         {state.errors?.type && <p className="text-destructive text-sm">{state.errors.type[0]}</p>}
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
         Logo / image (facultatif)
-        <input name="photo" type="file" accept="image/*" className={classeChamp} />
+        <input
+          name="photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={classeChamp}
+        />
         {etablissement?.photoUrl && (
           <div className="mt-2 flex items-center gap-3">
             <Image
@@ -92,7 +110,7 @@ export function FormulaireEtablissement({
         )}
       </label>
 
-      {state.message && <p className="text-destructive text-sm">{state.message}</p>}
+      {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
 
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Enregistrement...' : action === 'creer' ? 'Créer' : 'Enregistrer'}
@@ -102,7 +120,10 @@ export function FormulaireEtablissement({
 }
 
 export function FormulaireDepartement({ etablissementId }: { etablissementId: string }) {
-  const [state, formAction, isPending] = useActionState(creerDepartement, etatInitial)
+  const [state, formAction, isPending] = useActionState(
+    useReussiteNotifiee(creerDepartement),
+    etatInitial
+  )
 
   return (
     <form action={formAction} className={classeFormulaire}>
@@ -123,13 +144,7 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
         )}
       </label>
 
-      {state.message && (
-        <p
-          className={`text-sm ${state.message === 'Département ajouté.' ? 'text-primary' : 'text-destructive'}`}
-        >
-          {state.message}
-        </p>
-      )}
+      {state.message && !state.succes && <Alerte ton="erreur">{state.message}</Alerte>}
 
       <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
         {isPending ? 'Ajout...' : 'Ajouter le département'}
@@ -138,26 +153,42 @@ export function FormulaireDepartement({ etablissementId }: { etablissementId: st
   )
 }
 
-export function BoutonSupprimerEtablissement({ id }: { id: string }) {
+export function BoutonSupprimerEtablissement({
+  id,
+  nom = 'cet établissement',
+}: {
+  id: string
+  /** Nom de l'établissement : rend la question de confirmation précise. */
+  nom?: string
+}) {
   const [state, formAction, isPending] = useActionState(
     supprimerEtablissement.bind(null, id),
     etatInitial
   )
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    if (!confirm('Supprimer définitivement cet établissement ?')) e.preventDefault()
-  }
+  const confirmation = useConfirmation({
+    titre: `Supprimer définitivement ${nom} ?`,
+    description:
+      "L'établissement sera retiré de la liste. Cette action est irréversible ; elle est refusée tant que des départements lui sont rattachés.",
+    libelleConfirmer: "Supprimer l'établissement",
+    libelleEnCours: 'Suppression…',
+    ton: 'danger',
+    icone: Trash2,
+    enCours: isPending,
+  })
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit}
-      className="border-destructive/20 bg-destructive/5 rounded-2xl border p-5"
-    >
-      {state.message && <p className="text-destructive mb-2 text-sm">{state.message}</p>}
-      <button type="submit" disabled={isPending} className={classeBoutonDanger}>
-        {isPending ? 'Suppression...' : "Supprimer l'établissement"}
-      </button>
-    </form>
+    <>
+      <form
+        action={formAction}
+        onSubmit={confirmation.surEnvoi}
+        className="border-destructive/20 bg-destructive/5 flex flex-col gap-3 rounded-2xl border p-5"
+      >
+        {state.message && <Alerte ton="erreur">{state.message}</Alerte>}
+        <button type="submit" disabled={isPending} className={classeBoutonDanger}>
+          {isPending ? 'Suppression...' : "Supprimer l'établissement"}
+        </button>
+      </form>
+      {confirmation.dialogue}
+    </>
   )
 }

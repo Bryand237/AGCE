@@ -1,0 +1,363 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// La base est simulée : on vérifie ce que la lecture demande et ce qu'elle renvoie, et surtout
+// qu'elle n'écrit rien.
+const { prismaFactice } = vi.hoisted(() => ({
+  prismaFactice: {
+    absence: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    enseignant: { findMany: vi.fn() },
+  },
+}))
+vi.mock('@/lib/prisma', () => ({ prisma: prismaFactice }))
+
+const { recupererStatsAbsences, recupererAbsences } = await import('./donnees')
+
+const jour = (iso: string) => new Date(`${iso}T00:00:00.000Z`)
+const AUJOURDHUI = jour('2026-11-01')
+
+/** Les enseignants qui ont au moins une absence, tels que la recherche les lit. */
+const IDENTITES = [
+  { id: 'e-alice', nom: 'MBARGA', prenom: 'Alice Marie', matricule: '0652 125K' },
+  { id: 'e-nde', nom: 'NDÉ', prenom: 'Élise', matricule: 'B77' },
+  { id: 'e-mbala', nom: 'MBALA', prenom: 'Paul', matricule: 'C12' },
+]
+
+type Ligne = {
+  id: string
+  statut: 'EN_ATTENTE' | 'EN_PERIODE' | 'DEPASSE' | 'TERMINE'
+  dateDebut: Date
+  dateFin: Date
+}
+
+const ligne = (id: string, statut: Ligne['statut'], debut: string, fin: string): Ligne => ({
+  id,
+  statut,
+  dateDebut: jour(debut),
+  dateFin: jour(fin),
+})
+
+/** Ce que la liste affiche pour une ligne (les colonnes de SELECTION_LISTE). */
+const detail = (l: Ligne) => ({
+  ...l,
+  type: 'MISSION',
+  enseignant: { id: `e-${l.id}`, nom: 'NOM', prenom: 'Prénom', matricule: `M-${l.id}` },
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('recupererStatsAbsences', () => {
+  beforeEach(() => {
+    prismaFactice.absence.count.mockResolvedValue(0)
+  })
+
+  it('compte les absences en période et dépassées d’après la date de fin, au jour donné', async () => {
+    await recupererStatsAbsences(AUJOURDHUI)
+
+    const filtres = prismaFactice.absence.count.mock.calls.map(([appel]) => appel?.where)
+    // Validées (en période ou dépassées dans la base) et fin encore à venir ou atteinte…
+    expect(filtres).toContainEqual({
+      statut: { in: ['EN_PERIODE', 'DEPASSE'] },
+      dateFin: { gte: AUJOURDHUI },
+    })
+    // … ou fin passée.
+    expect(filtres).toContainEqual({
+      statut: { in: ['EN_PERIODE', 'DEPASSE'] },
+      dateFin: { lt: AUJOURDHUI },
+    })
+    expect(filtres).toContainEqual({ statut: 'EN_ATTENTE' })
+  })
+
+  it('renvoie les quatre compteurs', async () => {
+    // Ordre des appels : total, en attente, en période, dépassées.
+    prismaFactice.absence.count
+      .mockResolvedValueOnce(12)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(2)
+
+    expect(await recupererStatsAbsences(AUJOURDHUI)).toEqual({
+      total: 12,
+      enAttente: 3,
+      enPeriode: 5,
+      depasse: 2,
+    })
+  })
+
+  it('n’écrit rien en base', async () => {
+    await recupererStatsAbsences(AUJOURDHUI)
+
+    expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+    expect(prismaFactice.absence.updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('recupererAbsences', () => {
+  it('affiche « dépassé » pour une absence validée dont la fin est passée, sans écriture', async () => {
+    const enRetard = ligne('a1', 'EN_PERIODE', '2026-10-01', '2026-10-20')
+    prismaFactice.absence.findMany.mockResolvedValue([detail(enRetard)])
+    prismaFactice.absence.count.mockResolvedValue(1)
+
+    const { absences } = await recupererAbsences({ jour: AUJOURDHUI })
+
+    expect(absences.map((a) => a.statut)).toEqual(['DEPASSE'])
+    expect(prismaFactice.absence.updateMany).not.toHaveBeenCalled()
+    expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+  })
+
+  it('garde « en période » le dernier jour, et relit une ancienne valeur « dépassé » d’après les dates', async () => {
+    prismaFactice.absence.findMany.mockResolvedValue([
+      detail(ligne('dernier-jour', 'EN_PERIODE', '2026-10-20', '2026-11-01')),
+      detail(ligne('repoussee', 'DEPASSE', '2026-10-01', '2026-12-01')),
+      detail(ligne('attente', 'EN_ATTENTE', '2026-10-01', '2026-10-05')),
+      detail(ligne('terminee', 'TERMINE', '2026-09-01', '2026-09-05')),
+    ])
+    prismaFactice.absence.count.mockResolvedValue(4)
+
+    const { absences } = await recupererAbsences({ jour: AUJOURDHUI })
+
+    expect(absences.map((a) => [a.id, a.statut])).toEqual([
+      ['dernier-jour', 'EN_PERIODE'],
+      ['repoussee', 'EN_PERIODE'],
+      ['attente', 'EN_ATTENTE'],
+      ['terminee', 'TERMINE'],
+    ])
+  })
+
+  describe('pagination et ordre', () => {
+    beforeEach(() => {
+      prismaFactice.absence.findMany.mockResolvedValue([])
+    })
+
+    /** Les arguments de la lecture de la page (l'unique findMany du tri par colonne). */
+    const lecture = () => prismaFactice.absence.findMany.mock.calls[0]![0]
+
+    it('lit une seule page, du plus récent au plus ancien, avec l’identifiant pour départager', async () => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page, totalPages } = await recupererAbsences({ page: 2, jour: AUJOURDHUI })
+
+      expect(prismaFactice.absence.findMany).toHaveBeenCalledTimes(1)
+      expect(lecture()).toEqual(
+        expect.objectContaining({
+          orderBy: [{ dateDebut: 'desc' }, { id: 'asc' }],
+          skip: 20,
+          take: 20,
+        })
+      )
+      expect([page, totalPages]).toEqual([2, 3])
+    })
+
+    it('départage aussi le tri par grade : nom, prénom, puis date et identifiant', async () => {
+      prismaFactice.absence.count.mockResolvedValue(5)
+
+      await recupererAbsences({ tri: 'grade', jour: AUJOURDHUI })
+
+      expect(lecture().orderBy).toEqual([
+        { enseignant: { grade: 'asc' } },
+        { enseignant: { nom: 'asc' } },
+        { enseignant: { prenom: 'asc' } },
+        { dateDebut: 'desc' },
+        { id: 'asc' },
+      ])
+    })
+
+    it('ramène une page trop grande à la dernière, au lieu d’un tableau vide', async () => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page, totalPages } = await recupererAbsences({ page: 999, jour: AUJOURDHUI })
+
+      expect(lecture()).toEqual(expect.objectContaining({ skip: 40, take: 20 }))
+      expect([page, totalPages]).toEqual([3, 3])
+    })
+
+    it.each([0, -3, 0.4, Number.NaN])('ne passe jamais %s à skip', async (demandee) => {
+      prismaFactice.absence.count.mockResolvedValue(45)
+
+      const { page } = await recupererAbsences({ page: demandee, jour: AUJOURDHUI })
+
+      expect(lecture()).toEqual(expect.objectContaining({ skip: 0 }))
+      expect(page).toBe(1)
+    })
+
+    it('lit le total avant la page : c’est lui qui borne la page demandée', async () => {
+      prismaFactice.absence.count.mockResolvedValue(0)
+
+      const { page, totalPages } = await recupererAbsences({ page: 7, jour: AUJOURDHUI })
+
+      expect(prismaFactice.absence.count.mock.invocationCallOrder[0]).toBeLessThan(
+        prismaFactice.absence.findMany.mock.invocationCallOrder[0]!
+      )
+      expect([page, totalPages]).toEqual([1, 1])
+    })
+  })
+
+  describe('tri par statut', () => {
+    // Un melange où l'ordre enregistré (enum de la base) et l'ordre effectif diffèrent :
+    // « retard » est enregistrée EN_PERIODE mais sa fin est passée.
+    const melange = [
+      ligne('terminee', 'TERMINE', '2026-09-01', '2026-09-05'),
+      ligne('retard', 'EN_PERIODE', '2026-10-29', '2026-10-30'),
+      ligne('attente', 'EN_ATTENTE', '2026-10-25', '2026-11-10'),
+      ligne('en-cours', 'EN_PERIODE', '2026-10-28', '2026-11-05'),
+      ligne('ancien-depasse', 'DEPASSE', '2026-08-01', '2026-08-15'),
+    ]
+
+    /** findMany : d'abord les colonnes de tri (toute la sélection), puis le détail des lignes demandées. */
+    function simulerLaBase(lignes: Ligne[]) {
+      prismaFactice.absence.findMany.mockImplementation(
+        async (demande: { where?: { id?: { in: string[] } } }) => {
+          const ids = demande.where?.id?.in
+          if (!ids) return lignes
+          // La base ne garantit pas l'ordre d'un « in » : on le renverse exprès.
+          return lignes
+            .filter((l) => ids.includes(l.id))
+            .map(detail)
+            .reverse()
+        }
+      )
+    }
+
+    it('range par statut EFFECTIF : en attente, en période, dépassées, terminées', async () => {
+      simulerLaBase(melange)
+
+      const { absences } = await recupererAbsences({ tri: 'statut', jour: AUJOURDHUI })
+
+      expect(absences.map((a) => [a.id, a.statut])).toEqual([
+        ['attente', 'EN_ATTENTE'],
+        ['en-cours', 'EN_PERIODE'],
+        // Dans un même statut, les plus récentes d'abord.
+        ['retard', 'DEPASSE'],
+        ['ancien-depasse', 'DEPASSE'],
+        ['terminee', 'TERMINE'],
+      ])
+    })
+
+    it('ne charge en détail que les lignes de la page demandée', async () => {
+      const beaucoup = Array.from({ length: 25 }, (_, n) =>
+        ligne(`a${String(n).padStart(2, '0')}`, 'EN_PERIODE', '2026-10-01', '2026-11-20')
+      )
+      simulerLaBase(beaucoup)
+
+      const { absences, totalPages } = await recupererAbsences({
+        tri: 'statut',
+        page: 2,
+        jour: AUJOURDHUI,
+      })
+
+      expect(absences).toHaveLength(5)
+      expect(totalPages).toBe(2)
+      const demandeDetail = prismaFactice.absence.findMany.mock.calls[1]![0]
+      expect(demandeDetail.where.id.in).toHaveLength(5)
+    })
+
+    it('ramène une page trop grande à la dernière', async () => {
+      const beaucoup = Array.from({ length: 25 }, (_, n) =>
+        ligne(`a${String(n).padStart(2, '0')}`, 'EN_PERIODE', '2026-10-01', '2026-11-20')
+      )
+      simulerLaBase(beaucoup)
+
+      const { absences, page, totalPages } = await recupererAbsences({
+        tri: 'statut',
+        page: 999,
+        jour: AUJOURDHUI,
+      })
+
+      expect([page, totalPages, absences.length]).toEqual([2, 2, 5])
+    })
+
+    it('départage les statuts égaux et les dates égales par l’identifiant : l’ordre est stable', async () => {
+      simulerLaBase([
+        ligne('b', 'EN_PERIODE', '2026-10-01', '2026-11-20'),
+        ligne('a', 'EN_PERIODE', '2026-10-01', '2026-11-20'),
+      ])
+
+      const { absences } = await recupererAbsences({ tri: 'statut', jour: AUJOURDHUI })
+
+      expect(absences.map((a) => a.id)).toEqual(['a', 'b'])
+    })
+
+    it('applique la recherche aux deux lectures et ne modifie rien', async () => {
+      simulerLaBase(melange)
+      prismaFactice.enseignant.findMany.mockResolvedValue(IDENTITES)
+
+      await recupererAbsences({ tri: 'statut', recherche: 'mbala', jour: AUJOURDHUI })
+
+      const premiere = prismaFactice.absence.findMany.mock.calls[0]![0]
+      expect(premiere.where).toEqual({ enseignantId: { in: ['e-mbala'] } })
+      expect(prismaFactice.absence.update).not.toHaveBeenCalled()
+      expect(prismaFactice.absence.updateMany).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('recherche libre — D6', () => {
+    beforeEach(() => {
+      prismaFactice.absence.count.mockResolvedValue(0)
+      prismaFactice.absence.findMany.mockResolvedValue([])
+      prismaFactice.enseignant.findMany.mockResolvedValue(IDENTITES)
+    })
+
+    /** Le filtre posé sur les absences : le même pour le total et pour la page. */
+    async function filtreDe(recherche: string | undefined) {
+      await recupererAbsences({ recherche, jour: AUJOURDHUI })
+      const duTotal = prismaFactice.absence.count.mock.calls[0]![0]!.where
+      const delaPage = prismaFactice.absence.findMany.mock.calls[0]![0]!.where
+      expect(delaPage).toEqual(duTotal)
+      return delaPage
+    }
+
+    it.each([
+      ['le nom', 'mbarga'],
+      ['le prénom', 'marie'],
+      ['le matricule', '125k'],
+      ['le matricule sans espace', '0652125K'],
+      ['le prénom puis le nom', 'Alice Mbarga'],
+      ['le nom puis le prénom', 'mbarga alice'],
+      ['des débuts de mots', 'MBA ali'],
+      ['sans tenir compte de la casse', 'MBARGA ALICE'],
+    ])('trouve l’enseignant par %s', async (_cas, recherche) => {
+      expect(await filtreDe(recherche)).toEqual({ enseignantId: { in: ['e-alice'] } })
+    })
+
+    it.each([
+      ['une saisie sans accent pour un nom accentué', 'nde', 'e-nde'],
+      ['une saisie accentuée pour un prénom accentué', 'ÉLISE', 'e-nde'],
+      ['une saisie sans accent pour un prénom accentué', 'elise nde', 'e-nde'],
+    ])('ignore les accents : %s', async (_cas, recherche, attendu) => {
+      expect(await filtreDe(recherche)).toEqual({ enseignantId: { in: [attendu] } })
+    })
+
+    it('exige que chaque mot se retrouve', async () => {
+      expect(await filtreDe('alice dupont')).toEqual({ enseignantId: { in: [] } })
+    })
+
+    it('garde tous les enseignants qui répondent, pas seulement le premier', async () => {
+      expect(await filtreDe('a')).toEqual({ enseignantId: { in: ['e-alice', 'e-mbala'] } })
+    })
+
+    it('ne lit que les enseignants qui ont au moins une absence', async () => {
+      await filtreDe('mbarga')
+
+      expect(prismaFactice.enseignant.findMany).toHaveBeenCalledWith({
+        where: { absences: { some: {} } },
+        select: { id: true, nom: true, prenom: true, matricule: true },
+      })
+    })
+
+    it.each([
+      ['absente', undefined],
+      ['vide', ''],
+      ['faite d’espaces', '   '],
+      ['faite de ponctuation', ' - . '],
+    ])('une recherche %s ne filtre rien et ne lit pas les enseignants', async (_cas, recherche) => {
+      expect(await filtreDe(recherche)).toEqual({})
+      expect(prismaFactice.enseignant.findMany).not.toHaveBeenCalled()
+    })
+  })
+})

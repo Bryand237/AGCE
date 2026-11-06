@@ -1,3 +1,5 @@
+import { ajouterAnnees } from '../dates/jourCivil'
+
 const AGE_RETRAITE_PAR_GRADE: Record<string, number> = {
   ASSISTANT: 55,
   CHARGE_DE_COURS: 60,
@@ -24,10 +26,10 @@ export function calculerAgeRetraite(grade: string): number {
  * jamais à l'écriture.
  */
 export function calculerDateRetraitePrevue(dateNaissance: Date, grade: string): Date {
-  const age = calculerAgeRetraite(grade)
-  const date = new Date(dateNaissance)
-  date.setFullYear(date.getFullYear() + age)
-  return date
+  // Calcul en UTC (voir jourCivil.ts) : les dates sont enregistrées à minuit UTC, et setFullYear
+  // (heure locale) les décalait d'un jour quand le fuseau change d'heure légale entre la
+  // naissance et la retraite.
+  return ajouterAnnees(dateNaissance, calculerAgeRetraite(grade))
 }
 
 export function estEligibleRetraite(
@@ -49,7 +51,6 @@ export function estProcheRetraite(
   aujourdhui: Date = new Date()
 ): boolean {
   const dateRetraite = calculerDateRetraitePrevue(dateNaissance, grade)
-  const dansNAns = new Date(aujourdhui)
-  dansNAns.setFullYear(dansNAns.getFullYear() + seuilAnnees)
+  const dansNAns = ajouterAnnees(aujourdhui, seuilAnnees)
   return dateRetraite > aujourdhui && dateRetraite <= dansNAns
 }

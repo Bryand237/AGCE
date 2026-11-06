@@ -11,5 +11,9 @@ export const classeBoutonSecondaire =
 export const classeBoutonDanger =
   'inline-flex items-center justify-center gap-2 rounded-2xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10'
 
+/** Bouton plein, réservé à la confirmation d'une action destructrice (dans une fenêtre). */
+export const classeBoutonDangerPlein =
+  'inline-flex items-center justify-center gap-2 rounded-2xl bg-destructive px-4 py-2.5 text-sm font-medium text-destructive-foreground shadow-sm hover:opacity-90 disabled:opacity-50'
+
 export const classeCarte = 'rounded-2xl border border-border bg-card shadow-sm'
 export const classeFormulaire = `${classeCarte} flex flex-col gap-4 p-6`

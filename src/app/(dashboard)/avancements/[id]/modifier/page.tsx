@@ -1,11 +1,12 @@
-'use server'
-
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { recupererGrilleEchelonIndiciaire, recupererRapportDetail } from '../../donnees'
 import { FormulaireModifierRapport, FormulaireModifierSelection } from '../../formulaires'
 import { classeFormulaire } from '@/lib/ui-classes'
+import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
+import { positionsProposables } from '@/domain/avancement/positionProposee'
+import { erreurModificationRapportValide } from '@/domain/avancement/rapportValideModifiable'
 
 export default async function ModifierRapportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -14,7 +15,8 @@ export default async function ModifierRapportPage({ params }: { params: Promise<
     recupererGrilleEchelonIndiciaire(),
   ])
 
-  if (!rapport || rapport.statut !== 'VALIDE') notFound()
+  if (!rapport) notFound()
+  const valide = rapport.statut === 'VALIDE'
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
@@ -35,6 +37,7 @@ export default async function ModifierRapportPage({ params }: { params: Promise<
 
       <section className={classeFormulaire}>
         <FormulaireModifierRapport
+          valide={valide}
           rapport={{
             id: rapport.id,
             numero: rapport.numero,
@@ -44,35 +47,53 @@ export default async function ModifierRapportPage({ params }: { params: Promise<
         />
       </section>
 
-      <section className={classeFormulaire}>
-        <h2 className="text-foreground text-lg font-semibold">Modifier la position proposée</h2>
-        <p className="text-muted-foreground mb-4 text-sm">
-          Si l’enseignant doit sauter plusieurs positions, mettez à jour sa proposition ici.
-        </p>
-        <div className="grid gap-4">
-          {rapport.selections.map((selection) => (
-            <div key={selection.id} className="border-border bg-card rounded-2xl border p-4">
-              <h3 className="text-foreground mb-2 text-sm font-semibold">
-                {selection.enseignant.nom} {selection.enseignant.prenom} —{' '}
-                {selection.enseignant.matricule}
-              </h3>
-              <p className="text-muted-foreground mb-3 text-sm">
-                Position actuelle :{' '}
-                {selection.enseignant.positionActuelle.classe != null &&
-                selection.enseignant.positionActuelle.echelon != null
-                  ? `${selection.enseignant.positionActuelle.classe}C/${selection.enseignant.positionActuelle.echelon}E/${selection.enseignant.positionActuelle.indice}`
-                  : `—/${selection.enseignant.positionActuelle.indice}`}
-              </p>
-              <FormulaireModifierSelection
-                rapportId={id}
-                selectionId={selection.id}
-                positionProposeeId={selection.positionProposee.id}
-                grille={grille}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Dans un brouillon, les positions se modifient depuis la page du rapport. */}
+      {valide && (
+        <section className={classeFormulaire}>
+          <h2 className="text-foreground text-lg font-semibold">Modifier la position proposée</h2>
+          <p className="text-muted-foreground mb-4 text-sm">
+            Si l’enseignant doit sauter plusieurs positions, mettez à jour sa proposition ici.
+          </p>
+          <div className="grid gap-4">
+            {rapport.selections.map((selection) => {
+              // La fiche porte déjà la position issue du rapport : l'avancement se juge à partir
+              // de la position d'AVANT, relevée dans l'historique.
+              const avancement = rapport.avancements.find(
+                (a) => a.enseignant.id === selection.enseignantId
+              )
+              const refus = avancement
+                ? erreurModificationRapportValide({
+                    statutDecision: avancement.statutDecision,
+                    positionActuelleId: selection.enseignant.positionActuelle.id,
+                    nouvellePositionId: avancement.nouvellePosition.id,
+                  })
+                : "L'historique de cet avancement est introuvable."
+              return (
+                <div key={selection.id} className="border-border bg-card rounded-2xl border p-4">
+                  <h3 className="text-foreground mb-2 text-sm font-semibold">
+                    {selection.enseignant.nom} {selection.enseignant.prenom} —{' '}
+                    {selection.enseignant.matricule}
+                  </h3>
+                  <p className="text-muted-foreground mb-3 text-sm">
+                    Position actuelle :{' '}
+                    {formaterClasseEchelonIndice(selection.enseignant.positionActuelle)}
+                  </p>
+                  {refus || !avancement ? (
+                    <p className="text-muted-foreground text-sm">{refus}</p>
+                  ) : (
+                    <FormulaireModifierSelection
+                      rapportId={id}
+                      selectionId={selection.id}
+                      positionProposeeId={selection.positionProposee.id}
+                      grille={positionsProposables(grille, avancement.anciennePosition)}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

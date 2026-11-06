@@ -14,6 +14,18 @@ describe('formaterClasseEchelonIndice', () => {
     ).toBe('2C/4E/940')
   })
 
+  it('formate un Assistant (échelon sans classe) : « 1E/465 », jamais « —/465 »', () => {
+    const assistant = (echelon: number, indice: number) => ({
+      grade: 'ASSISTANT' as const,
+      classe: null,
+      echelon,
+      indice,
+      sousCategorie: null,
+    })
+    expect(formaterClasseEchelonIndice(assistant(1, 465))).toBe('1E/465')
+    expect(formaterClasseEchelonIndice(assistant(2, 665))).toBe('2E/665')
+  })
+
   it('formate les paliers sans classe/échelon numérotés', () => {
     expect(
       formaterClasseEchelonIndice({

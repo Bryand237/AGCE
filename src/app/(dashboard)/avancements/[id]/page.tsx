@@ -7,7 +7,10 @@ import {
   recupererRapportDetail,
 } from '../donnees'
 import { retirerSelection } from '../actions'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
 import { formaterClasseEchelonIndice } from '@/domain/avancement/formaterClasseEchelonIndice'
+import { positionsProposables } from '@/domain/avancement/positionProposee'
+import { metadonneesManquantes } from '@/domain/avancement/metadonneesSessionCompletes'
 import {
   FormulaireAjouterEnseignant,
   FormulaireModifierSelection,
@@ -26,11 +29,11 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
   if (!rapport) notFound()
 
   const estModifiable = rapport.statut !== 'VALIDE'
-  const metadonneesRenseignees =
-    rapport.referenceLoiFinances &&
-    rapport.referenceCirculaire &&
-    rapport.dateSessionCU &&
-    rapport.dateSessionCA
+  const manquantes = metadonneesManquantes(rapport)
+  const decisions = {
+    enAttente: rapport.avancements.filter((a) => a.statutDecision === 'EN_ATTENTE').length,
+    signees: rapport.avancements.filter((a) => a.statutDecision === 'VALIDEE').length,
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
@@ -45,20 +48,17 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
           </Link>
           <h1 className="text-foreground text-2xl font-bold">Rapport {rapport.numero}</h1>
         </div>
-        {rapport.statut === 'VALIDE' && (
-          <Link
-            href={`/avancements/${id}/modifier`}
-            className="border-border bg-card text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium shadow-sm"
-          >
-            Modifier le rapport
-          </Link>
-        )}
+        <Link
+          href={`/avancements/${id}/modifier`}
+          className="border-border bg-card text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium shadow-sm"
+        >
+          Modifier le rapport
+        </Link>
       </div>
       <p className="text-muted-foreground mt-1 text-sm">
-        {rapport.periodeDebut.toLocaleDateString('fr-FR')} –{' '}
-        {rapport.periodeFin.toLocaleDateString('fr-FR')} ·{' '}
+        {formaterDateCourte(rapport.periodeDebut)} – {formaterDateCourte(rapport.periodeFin)} ·{' '}
         {rapport.statut === 'VALIDE'
-          ? `Validé le ${rapport.dateValidation?.toLocaleDateString('fr-FR')} par ${rapport.auteurValidation}`
+          ? `Validé le ${rapport.dateValidation ? formaterDateCourte(rapport.dateValidation) : '—'} par ${rapport.auteurValidation}`
           : 'Non validé'}
       </p>
       {rapport.motifRejet && (
@@ -66,10 +66,11 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
           Rejeté précédemment : {rapport.motifRejet}
         </p>
       )}
-      {estModifiable && !metadonneesRenseignees && (
+      {manquantes.length > 0 && (
         <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Renseignez les métadonnées du conseil avant de générer les décisions individuelles (sinon
-          les mentions « Vu ; » et « session du ; » resteront vides).
+          Métadonnées du conseil incomplètes : il manque {manquantes.join(', ')}. Renseignez-les
+          avant de générer les décisions individuelles (sinon les mentions « Vu ; » et « session du
+          ; » resteront vides) ; vous pouvez le faire à tout moment, même après la validation.
         </p>
       )}
 
@@ -86,11 +87,7 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
         </a>
       </div>
 
-      <FormulaireMetadonneesSession
-        rapportId={id}
-        metadonnees={rapport}
-        lectureSeule={!estModifiable}
-      />
+      <FormulaireMetadonneesSession rapportId={id} metadonnees={rapport} decisions={decisions} />
 
       <div className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
         <table className="w-full text-sm">
@@ -133,7 +130,7 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
                           rapportId={id}
                           selectionId={s.id}
                           positionProposeeId={s.positionProposee.id}
-                          grille={grille}
+                          grille={positionsProposables(grille, s.enseignant.positionActuelle)}
                         />
                       </div>
                     )}
@@ -195,10 +192,18 @@ export default async function DetailRapport({ params }: { params: Promise<{ id: 
       {estModifiable && (
         <>
           <FormulaireAjouterEnseignant rapportId={id} enseignants={enseignantsActifs} />
-          <BlocValiderOuRejeter rapportId={id} />
+          <BlocValiderOuRejeter
+            rapportId={id}
+            numero={rapport.numero}
+            nombreSelections={rapport.selections.length}
+          />
           <div className="border-border bg-card rounded-2xl border p-4 shadow-sm">
             <p className="text-foreground text-sm font-semibold">Actions de rapport</p>
-            <FormulaireSupprimerRapport rapportId={id} />
+            <FormulaireSupprimerRapport
+              rapportId={id}
+              numero={rapport.numero}
+              nombreSelections={rapport.selections.length}
+            />
           </div>
         </>
       )}

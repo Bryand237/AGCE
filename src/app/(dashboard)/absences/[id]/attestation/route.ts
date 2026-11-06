@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { refuserSiNonConnecte } from '@/lib/auth'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const refus = await refuserSiNonConnecte()
+  if (refus) return refus
+
   const { id } = await params
   const absence = await prisma.absence.findUnique({
     where: { id },

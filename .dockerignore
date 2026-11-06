@@ -10,3 +10,5 @@ docker-compose.yml
 tests
 coverage
 playwright-report
+backups
+restauration_fichiers

@@ -9,64 +9,8 @@ import {
   recupererEffectifsParGrade,
 } from '@/lib/statistiques/effectifs'
 import { formaterPosition } from '@/domain/avancement/formaterPosition'
-import { TAILLE_PAGE } from '@/lib/constantes'
 
 export { recupererEffectifsParEtablissement, recupererEffectifsParGrade }
-
-type ParametresListe = {
-  page?: number
-  recherche?: string
-  triGrade?: 'asc' | 'desc'
-  triStatut?: 'asc' | 'desc'
-}
-
-export async function recupererEnseignants({
-  page = 1,
-  recherche,
-  triGrade,
-  triStatut,
-}: ParametresListe) {
-  const where = recherche
-    ? {
-        OR: [
-          { nom: { contains: recherche, mode: 'insensitive' as const } },
-          { prenom: { contains: recherche, mode: 'insensitive' as const } },
-          { matricule: { contains: recherche, mode: 'insensitive' as const } },
-        ],
-      }
-    : {}
-
-  const orderBy = triGrade
-    ? { grade: triGrade }
-    : triStatut
-      ? { statut: triStatut }
-      : { nom: 'asc' as const }
-
-  const [enseignants, total] = await Promise.all([
-    prisma.enseignant.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * TAILLE_PAGE,
-      take: TAILLE_PAGE,
-      include: { departement: { include: { etablissement: true } } },
-    }),
-    prisma.enseignant.count({ where }),
-  ])
-
-  // "Année de retraite" : jamais stockée, toujours recalculée à la lecture
-  // (voir src/domain/enseignants/retraite.ts).
-  const avecRetraitePrevue = enseignants.map((e) => ({
-    ...e,
-    anneeRetraitePrevue: calculerDateRetraitePrevue(e.dateNaissance, e.grade).getFullYear(),
-  }))
-
-  return {
-    enseignants: avecRetraitePrevue,
-    page,
-    totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)),
-    total,
-  }
-}
 
 export async function recupererStatsEnseignants() {
   const [total, actifs, transferes, retraites] = await Promise.all([

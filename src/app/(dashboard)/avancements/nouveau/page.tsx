@@ -1,22 +1,17 @@
 'use client'
 
-import { useActionState } from 'react'
-import { creerRapport, type EtatFormulaire } from '../actions'
+import { creerRapport, type EtatFormulaireAvancement } from '../actions'
+import { useActionConservee } from '@/lib/action-conservee'
 import { PageHeader } from '@/components/layout/page-header'
 import { classeBoutonPrimaire, classeChamp } from '@/lib/ui-classes'
+import { semestrePrecedent } from '@/domain/avancement/semestrePrecedent'
+import { aujourdhui } from '@/domain/dates/jourCivil'
 
-const etatInitial: EtatFormulaire = {}
-
-function semestrePrecedentParDefaut() {
-  const maintenant = new Date()
-  const annee = maintenant.getFullYear()
-  if (maintenant.getMonth() >= 6) return { debut: `${annee}-01-01`, fin: `${annee}-06-30` }
-  return { debut: `${annee - 1}-07-01`, fin: `${annee - 1}-12-31` }
-}
+const etatInitial: EtatFormulaireAvancement = {}
 
 export default function NouveauRapport() {
-  const [state, formAction, isPending] = useActionState(creerRapport, etatInitial)
-  const defaut = semestrePrecedentParDefaut()
+  const [state, surEnvoi, isPending] = useActionConservee(creerRapport, etatInitial)
+  const defaut = semestrePrecedent(aujourdhui())
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-8">
@@ -24,7 +19,11 @@ export default function NouveauRapport() {
         title="Nouveau rapport d'avancement"
         description="Générer la sélection automatique pour une session"
       />
-      <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <form
+        method="post"
+        onSubmit={surEnvoi}
+        className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+      >
         <div className="flex max-w-lg flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             Édition (numéro de session)
@@ -42,6 +41,19 @@ export default function NouveauRapport() {
           <button type="submit" disabled={isPending} className={classeBoutonPrimaire}>
             {isPending ? 'Génération...' : 'Générer la sélection'}
           </button>
+          {/* Après l'avertissement de chevauchement. « Générer la sélection » ci-dessus
+              revérifie la période (si elle a été modifiée) ; celui-ci passe outre. */}
+          {state.confirmationRequise && (
+            <button
+              type="submit"
+              name="confirmerChevauchement"
+              value="oui"
+              disabled={isPending}
+              className={classeBoutonPrimaire}
+            >
+              Créer quand même
+            </button>
+          )}
         </div>
       </form>
     </div>

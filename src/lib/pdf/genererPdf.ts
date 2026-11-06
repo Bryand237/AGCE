@@ -3,7 +3,11 @@ import { chromium } from 'playwright'
 
 type OptionsPdf = {
   paysage?: boolean
+  /** Modèle HTML de l'en-tête de chaque page (hors du corps du document). Vide par défaut. */
+  enTete?: string
   piedDePage?: string
+  /** Marges de la page, en notation CSS (« 14mm »). */
+  marges?: { haut: string; bas: string; gauche: string; droite: string }
 }
 
 const EXECUTABLE_CANDIDATS = [
@@ -38,8 +42,8 @@ function trouverExecutableChromium(): string | undefined {
  * (liste des enseignants, rapport semestriel d'avancement...) — un seul
  * moteur de rendu à maintenir plutôt qu'un par document.
  *
- * En Docker, nécessite `npx playwright install --with-deps chromium`
- * dans le Dockerfile (déjà présent — voir README).
+ * En Docker, le Dockerfile installe le Chromium du système (apt) et renseigne
+ * PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, lue ci-dessus.
  */
 export async function genererPdf(html: string, options: OptionsPdf = {}): Promise<Buffer> {
   const executablePath = trouverExecutableChromium()
@@ -48,20 +52,33 @@ export async function genererPdf(html: string, options: OptionsPdf = {}): Promis
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   })
   try {
-    const page = await browser.newPage()
+    // Les documents sont du HTML fabriqué par l'application : aucun script n'a à s'y exécuter.
+    // JavaScript est donc coupé dans la page, en plus de l'échappement des valeurs saisies
+    // (echapperHtml) : si une valeur échappait un jour à l'échappement, elle ne pourrait pas
+    // lire de fichier ni appeler de service depuis le Chromium du serveur.
+    const contexte = await browser.newContext({ javaScriptEnabled: false })
+    const page = await contexte.newPage()
     await page.setContent(html, { waitUntil: 'networkidle' })
     const pdf = await page.pdf({
       format: 'A4',
       landscape: options.paysage ?? false,
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: '<span></span>', // vide : l'en-tête vit dans le HTML lui-même, pas ici
+      // Vide par défaut : l'en-tête vit alors dans le HTML lui-même.
+      headerTemplate: options.enTete ?? '<span></span>',
       footerTemplate:
         options.piedDePage ??
         `<div style="font-size:8px; width:100%; text-align:center; color:#000;">
            Page <span class="pageNumber"></span> / <span class="totalPages"></span>
          </div>`,
-      margin: { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' },
+      margin: options.marges
+        ? {
+            top: options.marges.haut,
+            bottom: options.marges.bas,
+            left: options.marges.gauche,
+            right: options.marges.droite,
+          }
+        : { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' },
     })
     return pdf
   } finally {

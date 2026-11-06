@@ -17,8 +17,4 @@ export function couleur(index: number): string {
   return CHART_PALETTE[index % CHART_PALETTE.length]!
 }
 
-export function paletteFor(n: number): string[] {
-  return Array.from({ length: n }, (_, i) => couleur(i))
-}
-
 export default CHART_PALETTE

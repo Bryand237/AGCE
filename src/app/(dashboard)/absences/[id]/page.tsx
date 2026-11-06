@@ -1,37 +1,31 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import {
-  ArrowLeft,
-  CalendarDays,
-  CalendarOff,
-  Clock,
-  Mail,
-  Pencil,
-  Phone,
-  Trash2,
-} from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarOff, Clock, Mail, Pencil, Phone } from 'lucide-react'
 import { recupererAbsenceDetail } from '../donnees'
-import { supprimerAbsence } from '../actions'
 import {
   FormulaireValidationAbsence,
   FormulaireTerminerAbsence,
+  FormulaireSupprimerAbsence,
   BlocAttestationAbsence,
 } from '../formulaires'
-import { TYPES_AVEC_ATTESTATION } from '@/domain/absences/typesAvecAttestation'
+import {
+  TYPES_AVEC_ATTESTATION,
+  TYPES_RETOUR_APRES_ATTESTATION,
+} from '@/domain/absences/typesAvecAttestation'
+import { erreurDetailsMission, lireMotifMission } from '@/domain/absences/motifMission'
+import { erreurEtapeAbsence } from '@/domain/absences/etapesAbsence'
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { presentationAttestation } from '@/domain/absences/presentationAttestation'
+import { LIBELLES_STATUT_ABSENCE, statutEffectif } from '@/domain/absences/statutEffectif'
+import { dureeEnJours, nombreDeJoursRestants } from '@/domain/absences/duree'
+import { formaterDateMoisEnLettres } from '@/domain/dates/formaterDateMoisEnLettres'
+import { aujourdhui, jourLocalDe } from '@/domain/dates/jourCivil'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
 import { StatCard } from '@/components/dashboard/stat-card'
 
-const LIBELLES_TYPE: Record<string, string> = {
-  MISSION: 'Mission',
-  CONGE_MATERNITE: 'Congé de maternité',
-  CONGE_MALADIE: 'Congé de maladie',
-}
-
-const LIBELLES_STATUT: Record<string, string> = {
-  EN_ATTENTE: 'En attente',
-  EN_PERIODE: 'En période',
-  DEPASSE: 'Dépassé',
-  TERMINE: 'Terminé',
+const LIBELLES_ATTESTATION: Record<string, string> = {
+  EN_ATTENTE: 'Brouillon, non signée',
+  VALIDEE: 'Signée',
 }
 
 const STYLES_STATUT: Record<string, string> = {
@@ -41,38 +35,37 @@ const STYLES_STATUT: Record<string, string> = {
   TERMINE: 'bg-muted text-muted-foreground ring-border',
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function calculerDureeJours(debut: Date, fin: Date): number {
-  const msParJour = 1000 * 60 * 60 * 24
-  return Math.max(1, Math.round((fin.getTime() - debut.getTime()) / msParJour) + 1)
-}
-
-function calculerJoursRestants(fin: Date): number {
-  const aujourdhui = new Date()
-  aujourdhui.setHours(0, 0, 0, 0)
-  const finNormalisee = new Date(fin)
-  finNormalisee.setHours(0, 0, 0, 0)
-  return Math.max(
-    0,
-    Math.round((finNormalisee.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24))
-  )
-}
-
 export default async function DetailAbsence({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const absence = await recupererAbsenceDetail(id)
   if (!absence) notFound()
 
-  const supprimerAvecId = supprimerAbsence.bind(null, id)
-  const dureeJours = calculerDureeJours(absence.dateDebut, absence.dateFin)
+  // « Dépassé » se déduit de la date de fin à chaque affichage, il n'est pas lu dans la base
+  // (voir statutEffectif) : la fiche est juste même si personne n'a ouvert la liste.
+  const statut = statutEffectif(absence, aujourdhui())
+  const dureeJours = dureeEnJours(absence.dateDebut, absence.dateFin)
   const joursRestants =
-    absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE'
-      ? calculerJoursRestants(absence.dateFin)
+    statut === 'EN_PERIODE' || statut === 'DEPASSE'
+      ? nombreDeJoursRestants(absence.dateFin, aujourdhui())
       : null
   const { enseignant } = absence
+
+  // Les boutons suivent les règles que le serveur impose de toute façon (etapesAbsence.ts) :
+  // on ne propose pas une étape qu'il refuserait, et on dit pourquoi.
+  const refusModification = erreurEtapeAbsence('modifier', absence)
+  const refusSuppression = erreurEtapeAbsence('supprimer', absence)
+  const raisonFigee = refusSuppression ?? refusModification
+
+  // Une attestation enregistrée reste téléchargeable à tout moment, absence terminée comprise.
+  const presentation = presentationAttestation(absence)
+  // Une mission ne peut recevoir son brouillon qu'avec son établissement d'accueil et son objet.
+  const mission = absence.type === 'MISSION' ? lireMotifMission(absence.motif) : null
+  const raisonGeneration =
+    mission && absence.statutAttestation === null ? erreurDetailsMission(absence.motif) : undefined
+  const signature =
+    absence.statutAttestation === 'VALIDEE' && absence.dateValidationAttestation
+      ? `Signée le ${formaterDateMoisEnLettres(absence.dateValidationAttestation)}${absence.auteurValidationAttestation ? ` (${absence.auteurValidationAttestation})` : ''}`
+      : null
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -105,28 +98,23 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               </p>
             </div>
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STYLES_STATUT[absence.statut]}`}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STYLES_STATUT[statut]}`}
             >
-              {LIBELLES_STATUT[absence.statut]}
+              {LIBELLES_STATUT_ABSENCE[statut]}
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <Link
-                href={`/absences/${id}/modifier`}
-                className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
-              >
-                <Pencil size={14} />
-                Modifier
-              </Link>
-              <form action={supprimerAvecId}>
-                <button
-                  type="submit"
-                  className="border-border bg-card text-destructive hover:bg-destructive/5 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
+              {!refusModification && (
+                <Link
+                  href={`/absences/${id}/modifier`}
+                  className="border-border bg-card hover:bg-muted inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-sm"
                 >
-                  <Trash2 size={14} />
-                  Supprimer
-                </button>
-              </form>
+                  <Pencil size={14} />
+                  Modifier
+                </Link>
+              )}
+              {!refusSuppression && <FormulaireSupprimerAbsence absenceId={id} />}
             </div>
+            {raisonFigee && <p className="text-muted-foreground text-xs">{raisonFigee}</p>}
           </div>
 
           <div className="border-border border-t pt-5">
@@ -160,15 +148,15 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-6 lg:col-span-2">
           <section className="border-primary/20 bg-primary/5 rounded-2xl border px-6 py-5 shadow-sm">
             <h2 className="text-foreground mb-2 text-sm font-bold">
-              {LIBELLES_TYPE[absence.type]}
+              {LIBELLES_TYPE_ABSENCE[absence.type]}
             </h2>
             <p className="text-foreground text-sm">
-              Du <strong>{formatDate(absence.dateDebut)}</strong> au{' '}
-              <strong>{formatDate(absence.dateFin)}</strong>
+              Du <strong>{formaterDateMoisEnLettres(absence.dateDebut)}</strong> au{' '}
+              <strong>{formaterDateMoisEnLettres(absence.dateFin)}</strong>
             </p>
             {absence.dateRetour && (
               <p className="text-muted-foreground mt-1 text-sm">
-                Retour enregistré le {formatDate(absence.dateRetour)}
+                Retour enregistré le {formaterDateMoisEnLettres(absence.dateRetour)}
               </p>
             )}
           </section>
@@ -186,13 +174,13 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               value={joursRestants ?? '—'}
               icon={Clock}
               description={
-                absence.statut === 'TERMINE'
+                statut === 'TERMINE'
                   ? 'Absence terminée'
-                  : absence.statut === 'EN_ATTENTE'
+                  : statut === 'EN_ATTENTE'
                     ? 'En attente de validation'
                     : "Jusqu'à la date de fin"
               }
-              color={absence.statut === 'DEPASSE' ? 'rose' : 'green'}
+              color={statut === 'DEPASSE' ? 'rose' : 'green'}
             />
             <StatCard
               title="Absences"
@@ -206,62 +194,83 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
           <section className="border-border bg-card rounded-2xl border p-6 shadow-sm">
             <h2 className="text-foreground mb-4 text-sm font-bold">Détails de l&apos;absence</h2>
             <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-              <Item label="Type" valeur={LIBELLES_TYPE[absence.type] ?? absence.type} />
-              <Item label="Statut" valeur={LIBELLES_STATUT[absence.statut] ?? absence.statut} />
-              <Item label="Date de début" valeur={formatDate(absence.dateDebut)} />
-              <Item label="Date de fin" valeur={formatDate(absence.dateFin)} />
-              <Item label="Motif" valeur={absence.motif ?? '—'} />
-              <Item label="Enregistrée le" valeur={formatDate(absence.createdAt)} />
+              <Item label="Type" valeur={LIBELLES_TYPE_ABSENCE[absence.type]} />
+              <Item label="Statut" valeur={LIBELLES_STATUT_ABSENCE[statut] ?? statut} />
+              <Item label="Date de début" valeur={formaterDateMoisEnLettres(absence.dateDebut)} />
+              <Item label="Date de fin" valeur={formaterDateMoisEnLettres(absence.dateFin)} />
+              {mission ? (
+                <>
+                  <Item label="Établissement d'accueil" valeur={mission.lieuAccueil || '—'} />
+                  <Item label="Objet de la mission" valeur={mission.objet || '—'} multiligne />
+                </>
+              ) : (
+                <Item label="Motif" valeur={absence.motif ?? '—'} multiligne />
+              )}
+              <Item
+                label="Enregistrée le"
+                valeur={formaterDateMoisEnLettres(jourLocalDe(absence.createdAt))}
+              />
               {absence.dateValidation && (
                 <Item
                   label="Validée le"
-                  valeur={`${formatDate(absence.dateValidation)}${absence.auteurValidation ? ` (${absence.auteurValidation})` : ''}`}
+                  valeur={`${formaterDateMoisEnLettres(absence.dateValidation)}${absence.auteurValidation ? ` (${absence.auteurValidation})` : ''}`}
                 />
               )}
               {absence.referenceCorrespondance && (
                 <Item label="Réf. correspondance" valeur={absence.referenceCorrespondance} />
               )}
               {absence.dateCorrespondance && (
-                <Item label="Date correspondance" valeur={formatDate(absence.dateCorrespondance)} />
+                <Item
+                  label="Date correspondance"
+                  valeur={formaterDateMoisEnLettres(absence.dateCorrespondance)}
+                />
               )}
               {absence.dateDemandeInteressee && (
                 <Item
                   label="Demande intéressée"
-                  valeur={formatDate(absence.dateDemandeInteressee)}
+                  valeur={formaterDateMoisEnLettres(absence.dateDemandeInteressee)}
                 />
               )}
               {absence.numeroDecision && (
                 <Item label="N° décision" valeur={absence.numeroDecision} />
               )}
               {absence.statutAttestation && (
-                <Item label="Attestation" valeur={absence.statutAttestation} />
+                <Item
+                  label="Attestation"
+                  valeur={
+                    LIBELLES_ATTESTATION[absence.statutAttestation] ?? absence.statutAttestation
+                  }
+                />
               )}
             </dl>
           </section>
 
-          {absence.statut === 'EN_ATTENTE' && (
+          {statut === 'EN_ATTENTE' && (
             <FormulaireValidationAbsence
               absenceId={id}
-              estCongeMaternite={TYPES_AVEC_ATTESTATION.includes(absence.type)}
+              avecAttestation={TYPES_AVEC_ATTESTATION.includes(absence.type)}
             />
           )}
 
-          {TYPES_AVEC_ATTESTATION.includes(absence.type) &&
-            (absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') && (
-              <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
-                <h2 className="text-foreground mb-4 text-sm font-bold">Attestation</h2>
-                <BlocAttestationAbsence
-                  absenceId={id}
-                  statutAttestation={absence.statutAttestation}
-                  numeroDecision={absence.numeroDecision}
-                />
-              </div>
-            )}
+          {presentation !== 'aucune' && (
+            <div className="border-border bg-card rounded-2xl border p-6 shadow-sm">
+              <h2 className="text-foreground mb-4 text-sm font-bold">Attestation</h2>
+              <BlocAttestationAbsence
+                absenceId={id}
+                statutAttestation={absence.statutAttestation}
+                numeroDecision={absence.numeroDecision}
+                consultationSeule={presentation === 'consultation'}
+                signature={signature}
+                raisonBrouillon={erreurEtapeAbsence('validerAttestation', absence) ?? null}
+                raisonGeneration={raisonGeneration ?? null}
+              />
+            </div>
+          )}
 
-          {(absence.statut === 'EN_PERIODE' || absence.statut === 'DEPASSE') &&
-            (!TYPES_AVEC_ATTESTATION.includes(absence.type) ||
+          {(statut === 'EN_PERIODE' || statut === 'DEPASSE') &&
+            (!TYPES_RETOUR_APRES_ATTESTATION.includes(absence.type) ||
             absence.statutAttestation === 'VALIDEE' ? (
-              <FormulaireTerminerAbsence absenceId={id} estDepasse={absence.statut === 'DEPASSE'} />
+              <FormulaireTerminerAbsence absenceId={id} estDepasse={statut === 'DEPASSE'} />
             ) : (
               <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
                 <p className="text-muted-foreground text-sm">
@@ -271,10 +280,10 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
               </div>
             ))}
 
-          {absence.statut === 'TERMINE' && absence.dateRetour && (
+          {statut === 'TERMINE' && absence.dateRetour && (
             <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
               <p className="text-muted-foreground text-sm">
-                Retour enregistré le {formatDate(absence.dateRetour)}.
+                Retour enregistré le {formaterDateMoisEnLettres(absence.dateRetour)}.
               </p>
             </div>
           )}
@@ -284,11 +293,23 @@ export default async function DetailAbsence({ params }: { params: Promise<{ id: 
   )
 }
 
-function Item({ label, valeur }: { label: string; valeur: string }) {
+function Item({
+  label,
+  valeur,
+  multiligne = false,
+}: {
+  label: string
+  valeur: string
+  multiligne?: boolean
+}) {
   return (
     <div>
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-foreground mt-0.5 font-medium">{valeur}</dd>
+      <dd
+        className={`text-foreground mt-0.5 font-medium ${multiligne ? 'whitespace-pre-line' : ''}`}
+      >
+        {valeur}
+      </dd>
     </div>
   )
 }

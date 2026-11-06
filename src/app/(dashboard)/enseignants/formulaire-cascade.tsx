@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
-import { useActionState } from 'react'
-import { creerEnseignant, modifierEnseignant, type EtatFormulaire } from './actions'
+import { creerEnseignant, modifierEnseignant } from './actions'
+import type { EtatFormulaire } from '@/lib/formulaires'
+import { useActionConservee } from '@/lib/action-conservee'
 import { LIBELLES_GRADE } from '@/domain/enseignants/grade'
+import { valeurChampDate } from '@/domain/dates/valeurChampDate'
 
 type Etablissement = { id: string; nom: string; abreviation: string }
 type Departement = { id: string; nom: string; etablissementId: string }
@@ -47,10 +49,6 @@ const etatInitial: EtatFormulaire = {}
 const classeChamp =
   'rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none'
 
-function formatDateInput(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
-
 function SectionFormulaire({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
     <fieldset className="border-border bg-muted/20 flex flex-col gap-4 rounded-2xl border p-5">
@@ -78,7 +76,7 @@ export function FormulaireEnseignant({
   const actionServeur =
     mode === 'creer' ? creerEnseignant : modifierEnseignant.bind(null, enseignant!.id)
 
-  const [state, formAction, isPending] = useActionState(actionServeur, etatInitial)
+  const [state, surEnvoi, isPending] = useActionConservee(actionServeur, etatInitial)
   const [etablissementId, setEtablissementId] = useState(
     enseignant?.departement.etablissementId ?? ''
   )
@@ -108,7 +106,7 @@ export function FormulaireEnseignant({
   }, [departementsOrigine])
 
   return (
-    <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+    <form method="post" onSubmit={surEnvoi} className="flex max-w-2xl flex-col gap-6">
       <SectionFormulaire titre="Identité">
         <label className="flex flex-col gap-1 text-sm">
           Matricule
@@ -145,7 +143,12 @@ export function FormulaireEnseignant({
 
         <label className="flex flex-col gap-1 text-sm">
           Photo (facultatif)
-          <input name="photo" type="file" accept="image/*" className={classeChamp} />
+          <input
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className={classeChamp}
+          />
           {enseignant?.photoUrl && (
             <div className="mt-2 flex items-center gap-3">
               <Image
@@ -184,7 +187,7 @@ export function FormulaireEnseignant({
               type="date"
               name="dateNaissance"
               required
-              defaultValue={enseignant ? formatDateInput(enseignant.dateNaissance) : undefined}
+              defaultValue={enseignant ? valeurChampDate(enseignant.dateNaissance) : undefined}
               className={classeChamp}
             />
             {state.errors?.dateNaissance && (
@@ -223,6 +226,9 @@ export function FormulaireEnseignant({
               </optgroup>
             ))}
           </select>
+          {state.errors?.departementOrigineId && (
+            <p className="text-destructive text-sm">{state.errors.departementOrigineId[0]}</p>
+          )}
         </label>
       </SectionFormulaire>
 
@@ -252,7 +258,7 @@ export function FormulaireEnseignant({
             type="date"
             name="datePriseService"
             required
-            defaultValue={enseignant ? formatDateInput(enseignant.datePriseService) : undefined}
+            defaultValue={enseignant ? valeurChampDate(enseignant.datePriseService) : undefined}
             className={classeChamp}
           />
           {state.errors?.datePriseService && (
@@ -342,7 +348,7 @@ export function FormulaireEnseignant({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          Département
+          Département d&apos;affectation
           <select
             id="departementId"
             name="departementId"
@@ -437,7 +443,7 @@ export function FormulaireEnseignant({
             type="date"
             name="dateEffetEchelon"
             required
-            defaultValue={enseignant ? formatDateInput(enseignant.dateEffetEchelon) : undefined}
+            defaultValue={enseignant ? valeurChampDate(enseignant.dateEffetEchelon) : undefined}
             className={classeChamp}
           />
           {state.errors?.dateEffetEchelon && (
@@ -446,6 +452,13 @@ export function FormulaireEnseignant({
         </label>
       </SectionFormulaire>
 
+      {/* Filet de sécurité : si un champ est refusé sans message à côté de lui
+          (ou hors de l'écran), l'utilisateur sait au moins que l'envoi a échoué. */}
+      {state.errors && Object.keys(state.errors).length > 0 && (
+        <p className="text-destructive text-sm">
+          Le formulaire n&apos;a pas été enregistré : corrigez les champs signalés en rouge.
+        </p>
+      )}
       {state.message && <p className="text-destructive text-sm">{state.message}</p>}
 
       <button

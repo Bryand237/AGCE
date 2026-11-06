@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { CalendarOff, Clock, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
 import EtatPage from '@/components/etats/etat-page'
+import { Alerte } from '@/components/ui/alerte'
 import {
-  synchroniserStatutsAbsences,
   recupererStatsAbsences,
   recupererEffectifsAbsenceParGradeSexe,
   recupererEffectifsParType,
@@ -13,34 +13,30 @@ import { GraphiqueEffectifsParGrade } from '@/components/charts/graphique-effect
 import { StatCard } from '@/components/dashboard/stat-card'
 import { ChartCard } from '@/components/dashboard/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
-
-const LIBELLES_TYPE: Record<string, string> = {
-  MISSION: 'Mission',
-  CONGE_MATERNITE: 'Congé de maternité',
-  CONGE_MALADIE: 'Congé de maladie',
-}
-const LIBELLES_STATUT: Record<string, string> = {
-  EN_ATTENTE: 'En attente',
-  EN_PERIODE: 'En période',
-  DEPASSE: 'Dépassé',
-  TERMINE: 'Terminé',
-}
+import { LIBELLES_TYPE_ABSENCE } from '@/domain/absences/etatAbsence'
+import { formaterDateCourte } from '@/domain/dates/formaterDateCourte'
+import { LIBELLES_STATUT_ABSENCE } from '@/domain/absences/statutEffectif'
+import type { StatutAbsence } from '@/domain/enseignants/dossier'
+import { aujourdhui } from '@/domain/dates/jourCivil'
+import { lirePage } from '@/lib/pagination'
 
 export default async function PageAbsences({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; recherche?: string; tri?: string }>
 }) {
-  await synchroniserStatutsAbsences()
   const params = await searchParams
-  const page = Number(params.page ?? 1)
+  // Le même jour pour les compteurs et pour les lignes : rien n'est écrit en base, « dépassé »
+  // se calcule d'après la date de fin (voir statutEffectif).
+  const jour = aujourdhui()
+  const pageDemandee = lirePage(params.page)
   const tri = params.tri === 'grade' || params.tri === 'statut' ? params.tri : undefined
 
-  const [stats, effectifsSexe, effectifsType, { absences, totalPages }] = await Promise.all([
-    recupererStatsAbsences(),
+  const [stats, effectifsSexe, effectifsType, { absences, page, totalPages }] = await Promise.all([
+    recupererStatsAbsences(jour),
     recupererEffectifsAbsenceParGradeSexe(),
     recupererEffectifsParType(),
-    recupererAbsences({ page, recherche: params.recherche, tri }),
+    recupererAbsences({ page: pageDemandee, recherche: params.recherche, tri, jour }),
   ])
 
   function construireLien(p: number) {
@@ -64,17 +60,14 @@ export default async function PageAbsences({
       </PageHeader>
 
       {stats.depasse > 0 && (
-        <div
-          className="border-destructive/30 bg-destructive/5 text-destructive rounded-2xl border px-5 py-4 text-sm"
-          role="alert"
-        >
+        <Alerte ton="erreur" role="alert">
           <strong>
             {stats.depasse} absence{stats.depasse > 1 ? 's ont' : ' a'}
           </strong>{' '}
           dépassé
           {stats.depasse > 1 ? ' leur' : ' sa'} durée prévue — l&apos;enseignant n&apos;est pas
           encore rentré.
-        </div>
+        </Alerte>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,7 +115,7 @@ export default async function PageAbsences({
           type="search"
           name="recherche"
           defaultValue={params.recherche}
-          placeholder="Rechercher par nom ou matricule..."
+          placeholder="Rechercher par nom, prénom ou matricule..."
           className="border-border bg-card focus:border-primary focus:ring-primary/20 min-w-[200px] flex-1 rounded-2xl border px-4 py-2.5 text-sm shadow-sm focus:ring-2 focus:outline-none"
         />
         <select
@@ -174,11 +167,10 @@ export default async function PageAbsences({
                     </Link>
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
-                    {LIBELLES_TYPE[a.type] ?? a.type}
+                    {LIBELLES_TYPE_ABSENCE[a.type]}
                   </td>
                   <td className="text-muted-foreground px-3 py-3">
-                    {a.dateDebut.toLocaleDateString('fr-FR')} –{' '}
-                    {a.dateFin.toLocaleDateString('fr-FR')}
+                    {formaterDateCourte(a.dateDebut)} – {formaterDateCourte(a.dateFin)}
                   </td>
                   <td className="px-3 py-3">
                     <BadgeStatut statut={a.statut} />
@@ -217,7 +209,7 @@ export default async function PageAbsences({
   )
 }
 
-function BadgeStatut({ statut }: { statut: string }) {
+function BadgeStatut({ statut }: { statut: StatutAbsence }) {
   const styles: Record<string, string> = {
     EN_ATTENTE: 'bg-amber-50 text-amber-700 ring-amber-100',
     EN_PERIODE: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
@@ -228,7 +220,7 @@ function BadgeStatut({ statut }: { statut: string }) {
     <span
       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[statut] ?? 'bg-muted text-muted-foreground'}`}
     >
-      {LIBELLES_STATUT[statut] ?? statut}
+      {LIBELLES_STATUT_ABSENCE[statut] ?? statut}
     </span>
   )
 }

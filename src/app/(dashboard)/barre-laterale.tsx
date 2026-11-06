@@ -8,10 +8,10 @@ import {
   Building2,
   CalendarOff,
   TrendingUp,
+  Printer,
   Search,
-  Bell,
-  Settings,
   LogOut,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { seDeconnecter } from '@/app/connexion/actions'
@@ -22,6 +22,7 @@ const LIENS = [
   { href: '/enseignants', label: 'Enseignants', icone: Users },
   { href: '/absences', label: 'Absences', icone: CalendarOff },
   { href: '/avancements', label: 'Avancements', icone: TrendingUp },
+  { href: '/editions', label: 'Éditions', icone: Printer },
 ]
 
 const FIL_ARIANE: Record<string, string> = {
@@ -30,6 +31,8 @@ const FIL_ARIANE: Record<string, string> = {
   enseignants: 'Enseignants',
   absences: 'Absences',
   avancements: 'Avancements',
+  editions: 'Éditions',
+  compte: 'Mon compte',
   nouveau: 'Nouveau',
   modifier: 'Modifier',
 }
@@ -78,7 +81,10 @@ export function BarreLaterale() {
 
       <div className="border-primary/20 bg-primary/5 text-muted-foreground m-4 rounded-2xl border p-4 text-xs leading-relaxed">
         <p className="text-primary font-medium">Rappel</p>
-        <p className="mt-1">Sauvegardez régulièrement la base de données — voir le README.</p>
+        <p className="mt-1">
+          Sauvegardez régulièrement la base de données — voir « Sauvegarde et restauration » dans le
+          README.
+        </p>
       </div>
     </aside>
   )
@@ -143,23 +149,6 @@ export function EnTeteDashboard({
         </form>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            title="Notifications"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
-          >
-            <Bell size={18} />
-          </button>
-          <button
-            type="button"
-            title="Paramètres"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-9 w-9 items-center justify-center rounded-xl transition-colors sm:flex"
-          >
-            <Settings size={18} />
-          </button>
-
-          <div className="bg-border mx-1 hidden h-6 w-px sm:block" />
-
           <div className="hidden items-center gap-2.5 sm:flex">
             <div className="text-right">
               <p className="text-foreground text-sm font-semibold">{nomUtilisateur}</p>
@@ -169,6 +158,14 @@ export function EnTeteDashboard({
               {nomUtilisateur.charAt(0).toUpperCase()}
             </div>
           </div>
+
+          <Link
+            href="/compte"
+            title="Mon compte : identifiant et mot de passe"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+          >
+            <Settings size={18} />
+          </Link>
 
           <form action={seDeconnecter}>
             <button

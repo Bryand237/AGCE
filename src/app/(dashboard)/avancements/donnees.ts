@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { LIBELLES_GRADE_PLURIEL } from '@/domain/enseignants/grade'
-import { TAILLE_PAGE } from '@/lib/constantes'
+import { bornerPage } from '@/lib/pagination'
+import { analyserDateIso } from '@/domain/dates/jourCivil'
+import { contientTousLesMots, recherchePeutRestreindre } from '@/domain/texte/contientTousLesMots'
 
 export async function recupererStatsRapports() {
   const [total, valides, brouillons, dernierRapport] = await Promise.all([
@@ -48,6 +50,33 @@ export async function recupererEffectifsAvancementParGradeSexe(rapportId?: strin
   }))
 }
 
+/**
+ * Le filtre de la recherche libre de la liste des rapports.
+ *
+ * - Une date « AAAA-MM-JJ » exacte (le format indiqué dans le champ) : les rapports dont la
+ *   période contient ce jour.
+ * - Toute autre saisie : l'édition (« 54ème »), chaque mot devant s'y retrouver, sans tenir compte
+ *   de la casse ni des accents (« 54eme » trouve « 54ème »).
+ *
+ * Seule une date AAAA-MM-JJ valide est lue comme une date. Avant, tout ce que `new Date()`
+ * acceptait l'était : « 54 », « 2026 » ou « 2026-003 » donnaient une date, et la recherche
+ * d'une édition renvoyait les rapports d'une période au lieu de l'édition.
+ *
+ * La base ne compare pas sans les accents : les éditions (une ou deux par an) sont lues puis
+ * filtrées ici, et la requête porte sur leurs identifiants.
+ */
+async function filtreDeRecherche(recherche: string | undefined) {
+  const saisie = (recherche ?? '').trim()
+  if (!recherchePeutRestreindre(saisie)) return {}
+
+  const jour = analyserDateIso(saisie)
+  if (jour) return { periodeDebut: { lte: jour }, periodeFin: { gte: jour } }
+
+  const editions = await prisma.sessionConseil.findMany({ select: { id: true, numero: true } })
+  const ids = editions.filter((e) => contientTousLesMots(saisie, [e.numero])).map((e) => e.id)
+  return { id: { in: ids } }
+}
+
 export async function recupererRapports({
   page = 1,
   recherche,
@@ -55,25 +84,20 @@ export async function recupererRapports({
   page?: number
   recherche?: string
 }) {
-  const commeDate = recherche ? new Date(recherche) : null
-  const dateValide = commeDate && !isNaN(commeDate.getTime())
-  const where = !recherche
-    ? {}
-    : dateValide
-      ? { periodeDebut: { lte: commeDate! }, periodeFin: { gte: commeDate! } }
-      : { numero: { contains: recherche, mode: 'insensitive' as const } }
+  const where = await filtreDeRecherche(recherche)
 
-  const [rapports, total] = await Promise.all([
-    prisma.sessionConseil.findMany({
-      where,
-      orderBy: { periodeDebut: 'desc' },
-      skip: (page - 1) * TAILLE_PAGE,
-      take: TAILLE_PAGE,
-      include: { _count: { select: { selections: true } } },
-    }),
-    prisma.sessionConseil.count({ where }),
-  ])
-  return { rapports, page, totalPages: Math.max(1, Math.ceil(total / TAILLE_PAGE)) }
+  // Le total d'abord : la page demandée est ramenée dans les limites avant d'être lue.
+  const pagination = bornerPage(page, await prisma.sessionConseil.count({ where }))
+  const rapports = await prisma.sessionConseil.findMany({
+    where,
+    // L'identifiant départage deux rapports de même début : sinon une ligne peut apparaître sur
+    // deux pages (ou sur aucune) d'une requête à l'autre.
+    orderBy: [{ periodeDebut: 'desc' }, { id: 'asc' }],
+    skip: pagination.skip,
+    take: pagination.take,
+    include: { _count: { select: { selections: true } } },
+  })
+  return { rapports, page: pagination.page, totalPages: pagination.totalPages }
 }
 
 export async function recupererGrilleEchelonIndiciaire() {

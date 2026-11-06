@@ -16,7 +16,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      - uploads:/app/public/uploads
+      # Photos et images téléversées : UPLOADS_DIR=/app/data/uploads dans le Dockerfile.
+      - uploads:/app/data/uploads
 
   db:
     image: postgres:16-alpine
@@ -26,7 +27,10 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - '${DR_PORT:-51213}:5432'
+      # 127.0.0.1 : le port n'est joignable que depuis cette machine (Next.js en
+      # local, Prisma Studio, sauvegardes). Sans cette adresse, Docker publie le
+      # port sur toutes les interfaces et la base devient visible du réseau.
+      - '127.0.0.1:${DR_PORT:-51213}:5432'
     networks:
       - agce_network
     volumes:

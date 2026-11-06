@@ -46,6 +46,19 @@
   --color-sexe-m: oklch(34% 0.14 230);
   --color-sexe-f: oklch(40% 0.18 340);
 
+  /* Apparition douce des fenêtres et notifications (coupée si l'utilisateur réduit les animations) */
+  --animate-apparition: apparition 160ms ease-out;
+  @keyframes apparition {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   /* Rayons */
   --radius-card: 1rem;
   --radius-lg: 0.875rem;
